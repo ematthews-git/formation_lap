@@ -1,28 +1,30 @@
 """FastF1 adapter — timing, lap data, telemetry.
 
 Used by:
-- jobs.pre_season.lap_records      (fastest historical laps per circuit)
-- jobs.pre_season.circuit_stats    (pit losses, SC/RF probabilities, undercut/overcut from prior seasons)
-- jobs.post_race.lap_records       (update if a race produced a new fastest lap)
+- jobs.pre_season.lap_records   (fastest historical laps per circuit)
+- jobs.pre_season.circuit_stats (pit losses, SC/RF probabilities, undercut/overcut from prior seasons)
+- jobs.post_race.lap_records    (update if a race produced a new fastest lap)
 
-FastF1 wants a cache directory on disk — set FASTF1_CACHE_DIR or fall back to ~/.cache/fastf1.
 """
 
 from __future__ import annotations
 
 import logging
+import fastf1
+import os
 
 logger = logging.getLogger(__name__)
 
 
 def enable_cache() -> None:
     """Configure FastF1's on-disk cache. Call once at process start."""
-    # TODO:
-    #   import fastf1
-    #   cache_dir = os.environ.get("FASTF1_CACHE_DIR", os.path.expanduser("~/.cache/fastf1"))
-    #   os.makedirs(cache_dir, exist_ok=True)
-    #   fastf1.Cache.enable_cache(cache_dir)
-    logger.debug("enable_cache (skeleton — no-op)")
+
+    cache_dir = os.environ.get(
+        "FASTF1_CACHE_DIR", os.path.expanduser("~/.cache/fastf1")
+    )
+    os.makedirs(cache_dir, exist_ok=True)
+
+    fastf1.Cache.enable_cache(cache_dir)
 
 
 def get_event_schedule(season: int):
