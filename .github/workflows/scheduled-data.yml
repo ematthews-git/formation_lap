@@ -23,6 +23,7 @@ on:
 
 jobs:
   run:
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
