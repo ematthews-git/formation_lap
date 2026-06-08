@@ -1,0 +1,11 @@
+[project]
+name = "formation-lap"
+version = "0.1.0"
+description = "F1 data app monorepo"
+requires-python = ">=3.12"
+
+[tool.uv]
+python-preference = "only-managed"
+
+[tool.uv.workspace]
+members = ["packages/data", "packages/api"]

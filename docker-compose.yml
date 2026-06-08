@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: formation_lap_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-formation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-formation}
+      POSTGRES_DB: ${POSTGRES_DB:-formation_lap}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
