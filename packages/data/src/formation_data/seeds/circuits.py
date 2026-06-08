@@ -5,7 +5,7 @@ Confirmed from FIA announcements: melbourne(5), shanghai(4), suzuka(2), miami(3)
 Remaining circuits use 2025 DRS zone counts as best-available estimates pending FIA confirmation.
 """
 
-from formation_data.models import Circuit
+from formation_data.domain import Circuit
 
 CIRCUITS = [
     Circuit(

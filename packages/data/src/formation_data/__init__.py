@@ -1,5 +1,4 @@
-from formation_data.base import Base
-from formation_data.models import (
+from formation_data.domain import (
     Circuit,
     CircuitStats,
     Driver,
@@ -13,7 +12,6 @@ from formation_data.models import (
 )
 
 __all__ = [
-    "Base",
     "Circuit",
     "CircuitStats",
     "Driver",
