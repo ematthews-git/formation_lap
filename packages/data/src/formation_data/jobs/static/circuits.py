@@ -11,18 +11,14 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
 
-def run(session: Session) -> None:
+def run(conn: Connection) -> None:
     # TODO:
+    #   from formation_data import repositories, schema
     #   from formation_data.seeds.circuits import CIRCUITS
-    #   for c in CIRCUITS:
-    #       stmt = insert(Circuit).values(...).on_conflict_do_update(
-    #           index_elements=["circuit_id"],
-    #           set_={"event_name": ..., "country": ..., ...},
-    #       )
-    #       session.execute(stmt)
+    #   repositories.upsert(conn, schema.circuits, CIRCUITS, ["circuit_id"])
     logger.info("static.circuits.run (skeleton — would upsert 22 circuits)")

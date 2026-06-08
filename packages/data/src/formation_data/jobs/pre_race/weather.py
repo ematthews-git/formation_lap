@@ -18,39 +18,30 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
 
-def run(session: Session, *, season: int, round_number: int) -> None:
+def run(conn: Connection, *, season: int, round_number: int) -> None:
     # TODO:
-    #   rw = session.scalar(
-    #       select(RaceWeekend).where(
-    #           RaceWeekend.season == season,
-    #           RaceWeekend.round_number == round_number,
-    #       )
-    #   )
+    #   from formation_data import domain, repositories, schema
+    #   from formation_data.sources import weather_client
+    #   rw = repositories.get_race_weekend(conn, season, round_number)
     #   sessions_by_day = _expand_session_schedule(rw)   # list[(session_name, session_date)]
     #   forecast = weather_client.get_forecast(
     #       rw.circuit_id, sessions_by_day[0][1], sessions_by_day[-1][1],
     #   )
-    #   for session_name, session_date in sessions_by_day:
-    #       day = _pick_day(forecast, session_date)
-    #       stmt = insert(WeatherForecast).values(
-    #           race_weekend_id=rw.id,
-    #           session_name=session_name,
-    #           session_date=session_date,
-    #           condition=_classify(day["weathercode"]),
-    #           temp_high_c=day["temperature_2m_max"],
-    #           temp_low_c=day["temperature_2m_min"],
-    #           rain_probability=day["precipitation_probability_max"],
-    #           wind_speed_kph=day["wind_speed_10m_max"],
-    #       ).on_conflict_do_update(
-    #           index_elements=["race_weekend_id", "session_name"],
-    #           set_={...},
-    #       )
-    #       session.execute(stmt)
+    #   items = [domain.WeatherForecast(
+    #       race_weekend_id=rw.id, session_name=name, session_date=d,
+    #       condition=_classify(day["weathercode"]),
+    #       temp_high_c=day["temperature_2m_max"], temp_low_c=day["temperature_2m_min"],
+    #       rain_probability=day["precipitation_probability_max"],
+    #       wind_speed_kph=day["wind_speed_10m_max"],
+    #   ) for (name, d), day in zip(sessions_by_day, _pick_days(forecast, sessions_by_day))]
+    #   repositories.upsert(
+    #       conn, schema.weather_forecasts, items, ["race_weekend_id", "session_name"],
+    #   )
     logger.info(
         "pre_race.weather.run season=%s round=%s (skeleton)", season, round_number
     )

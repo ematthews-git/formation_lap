@@ -19,34 +19,31 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
 HISTORY_SEASONS = 3
 
 
-def run(session: Session, *, season: int) -> None:
+def run(conn: Connection, *, season: int) -> None:
     # TODO:
-    #   for circuit in session.scalars(select(Circuit)):
+    #   from formation_data import domain, repositories, schema
+    #   from formation_data.sources import fastf1_client
+    #   items = []
+    #   for circuit in repositories.list_circuits(conn):
     #       sessions = [
     #           fastf1_client.get_race_session(season - n, _round_for(circuit, season - n))
     #           for n in range(1, HISTORY_SEASONS + 1)
     #       ]
-    #       sc_prob = _safety_car_probability(sessions)
-    #       rf_prob = _red_flag_probability(sessions)
-    #       pit_normal, pit_sc, pit_vsc = _pit_losses(sessions)
-    #       undercut, overcut = _undercut_overcut(sessions)
-    #       stmt = insert(CircuitStats).values(
+    #       items.append(domain.CircuitStats(
     #           circuit_id=circuit.circuit_id, season=season,
-    #           sc_probability=sc_prob, red_flag_probability=rf_prob,
-    #           pit_loss_normal=pit_normal, pit_loss_sc=pit_sc, pit_loss_vsc=pit_vsc,
-    #           undercut_strength=undercut, overcut_strength=overcut,
-    #       ).on_conflict_do_update(
-    #           index_elements=["circuit_id", "season"],
-    #           set_={"sc_probability": sc_prob, "red_flag_probability": rf_prob, ...},
-    #       )
-    #       session.execute(stmt)
+    #           sc_probability=_safety_car_probability(sessions),
+    #           red_flag_probability=_red_flag_probability(sessions),
+    #           pit_loss_normal=..., pit_loss_sc=..., pit_loss_vsc=...,
+    #           undercut_strength=..., overcut_strength=...,
+    #       ))
+    #   repositories.upsert(conn, schema.circuit_stats, items, ["circuit_id", "season"])
     logger.info(
         "pre_season.circuit_stats.run season=%s (skeleton — would aggregate %s prior seasons)",
         season, HISTORY_SEASONS,

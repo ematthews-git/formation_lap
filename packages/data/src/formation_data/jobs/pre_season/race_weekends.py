@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -25,21 +25,19 @@ logger = logging.getLogger(__name__)
 COMPOUND_DEFAULTS = ("C3", "C4", "C5")  # (hard, medium, soft)
 
 
-def run(session: Session, *, season: int) -> None:
+def run(conn: Connection, *, season: int) -> None:
     # TODO:
+    #   from formation_data import domain, repositories, schema
+    #   from formation_data.sources import jolpica_client
     #   races = jolpica_client.get_schedule(season)
-    #   for r in races:
-    #       hard, medium, soft = COMPOUND_DEFAULTS  # or lookup per circuit
-    #       stmt = insert(RaceWeekend).values(
-    #           circuit_id=_jolpica_to_our_circuit_id(r["Circuit"]["circuitId"]),
-    #           season=season,
-    #           round_number=int(r["round"]),
-    #           race_date=date.fromisoformat(r["date"]),
-    #           is_sprint="Sprint" in r,
-    #           soft_compound=soft, medium_compound=medium, hard_compound=hard,
-    #       ).on_conflict_do_update(
-    #           index_elements=["circuit_id", "season"],
-    #           set_={"round_number": ..., "race_date": ..., ...},
-    #       )
-    #       session.execute(stmt)
+    #   hard, medium, soft = COMPOUND_DEFAULTS  # or lookup per circuit
+    #   items = [domain.RaceWeekend(
+    #       circuit_id=_jolpica_to_our_circuit_id(r["Circuit"]["circuitId"]),
+    #       season=season,
+    #       round_number=int(r["round"]),
+    #       race_date=date.fromisoformat(r["date"]),
+    #       is_sprint="Sprint" in r,
+    #       soft_compound=soft, medium_compound=medium, hard_compound=hard,
+    #   ) for r in races]
+    #   repositories.upsert(conn, schema.race_weekends, items, ["circuit_id", "season"])
     logger.info("pre_season.race_weekends.run season=%s (skeleton)", season)

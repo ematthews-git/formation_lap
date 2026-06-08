@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -30,20 +30,18 @@ UNDERCUT_THRESHOLD = 0.6  # tune once real CircuitStats exist
 SC_GAMBLE_THRESHOLD = 50  # SC probability is stored as int percent
 
 
-def run(session: Session, *, season: int, round_number: int) -> None:
+def run(conn: Connection, *, season: int, round_number: int) -> None:
     # TODO:
-    #   rw = _get_race_weekend(session, season, round_number)
-    #   stats = _get_circuit_stats(session, rw.circuit_id, rw.season)
-    #   plans = []
-    #   plans.append(_one_stop_base(rw, stats))
-    #   plans.append(_two_stop_base(rw, stats))
+    #   from formation_data import repositories
+    #   rw = repositories.get_race_weekend(conn, season, round_number)
+    #   stats = repositories.get_circuit_stats(conn, rw.circuit_id, rw.season)
+    #   plans = [_one_stop_base(rw, stats), _two_stop_base(rw, stats)]
     #   if stats.undercut_strength > UNDERCUT_THRESHOLD:
     #       plans.append(_undercut_variant(rw, stats))
     #   if stats.sc_probability > SC_GAMBLE_THRESHOLD:
     #       plans.append(_sc_gamble_variant(rw, stats))
     #   for plan in plans:
-    #       strategy_id = _upsert_strategy(session, rw, plan)
-    #       _upsert_stints(session, strategy_id, plan.stints)
+    #       repositories.upsert_strategy_with_stints(conn, plan.strategy, plan.stints)
     logger.info(
         "pre_race.strategies.run season=%s round=%s (skeleton)", season, round_number
     )

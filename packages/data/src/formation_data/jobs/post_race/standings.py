@@ -14,23 +14,29 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
 
-def run(session: Session, *, season: int, round_number: int) -> None:
+def run(conn: Connection, *, season: int, round_number: int) -> None:
     # TODO:
-    #   for row in jolpica_client.get_driver_standings(season, round_number):
-    #       _upsert_standing(session, season, round_number, "driver",
-    #                        position=int(row["position"]),
-    #                        name=f"{row['Driver']['givenName']} {row['Driver']['familyName']}",
-    #                        points=float(row["points"]))
-    #   for row in jolpica_client.get_constructor_standings(season, round_number):
-    #       _upsert_standing(session, season, round_number, "constructor",
-    #                        position=int(row["position"]),
-    #                        name=row["Constructor"]["name"],
-    #                        points=float(row["points"]))
+    #   from formation_data import domain, repositories, schema
+    #   from formation_data.sources import jolpica_client
+    #   items = [domain.Standing(
+    #       season=season, after_round=round_number, type="driver",
+    #       position=int(r["position"]),
+    #       name=f"{r['Driver']['givenName']} {r['Driver']['familyName']}",
+    #       points=float(r["points"]),
+    #   ) for r in jolpica_client.get_driver_standings(season, round_number)]
+    #   items += [domain.Standing(
+    #       season=season, after_round=round_number, type="constructor",
+    #       position=int(r["position"]),
+    #       name=r["Constructor"]["name"], points=float(r["points"]),
+    #   ) for r in jolpica_client.get_constructor_standings(season, round_number)]
+    #   repositories.upsert(
+    #       conn, schema.standings, items, ["season", "after_round", "type", "position"],
+    #   )
     logger.info(
         "post_race.standings.run season=%s round=%s (skeleton)", season, round_number
     )

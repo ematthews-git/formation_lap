@@ -1,14 +1,19 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
 
-from formation_api.database import get_session
-from formation_data.models import Circuit
+from fastapi import APIRouter
+
+from formation_data import repositories
+from formation_data.db import connection_scope
+from formation_data.domain import Circuit
 
 router = APIRouter(prefix="/circuits", tags=["circuits"])
 
 
-@router.get("/")
-async def list_circuits(session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(Circuit))
-    return result.scalars().all()
+def _list_all() -> list[Circuit]:
+    with connection_scope() as conn:
+        return repositories.list_circuits(conn)
+
+
+@router.get("/", response_model=list[Circuit])
+async def list_circuits() -> list[Circuit]:
+    return await asyncio.to_thread(_list_all)

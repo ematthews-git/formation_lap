@@ -1,8 +1,8 @@
 """`formation-data` CLI — one subcommand per job plus orchestrator flows.
 
 Real wiring (so `formation-data --help` enumerates everything). The handlers themselves
-open a session and call into the skeleton jobs, which log placeholder messages today
-and will fetch + upsert in a follow-up.
+open a connection_scope and call into the skeleton jobs, which log placeholder messages
+today and will fetch + upsert via the repository layer in a follow-up.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import logging
 import typer
 
 from formation_data import orchestrator
-from formation_data.db import session_scope
+from formation_data.db import connection_scope
 from formation_data.jobs.post_race import (
     lap_records as post_race_lap_records,
     race_results,
@@ -62,32 +62,32 @@ def _configure_logging(verbose: bool = typer.Option(False, "--verbose", "-v")) -
 
 @circuits_app.command("seed")
 def circuits_seed() -> None:
-    with session_scope() as session:
-        static_circuits.run(session)
+    with connection_scope() as conn:
+        static_circuits.run(conn)
 
 
 @drivers_app.command("refresh")
 def drivers_refresh(season: int = typer.Option(...)) -> None:
-    with session_scope() as session:
-        drivers.run(session, season=season)
+    with connection_scope() as conn:
+        drivers.run(conn, season=season)
 
 
 @weekends_app.command("refresh")
 def weekends_refresh(season: int = typer.Option(...)) -> None:
-    with session_scope() as session:
-        race_weekends.run(session, season=season)
+    with connection_scope() as conn:
+        race_weekends.run(conn, season=season)
 
 
 @lap_records_app.command("refresh")
 def lap_records_refresh() -> None:
-    with session_scope() as session:
-        pre_season_lap_records.run(session)
+    with connection_scope() as conn:
+        pre_season_lap_records.run(conn)
 
 
 @circuit_stats_app.command("recompute")
 def circuit_stats_recompute(season: int = typer.Option(...)) -> None:
-    with session_scope() as session:
-        circuit_stats.run(session, season=season)
+    with connection_scope() as conn:
+        circuit_stats.run(conn, season=season)
 
 
 @weather_app.command("refresh")
@@ -95,8 +95,8 @@ def weather_refresh(
     season: int = typer.Option(...),
     round: int = typer.Option(..., "--round"),
 ) -> None:
-    with session_scope() as session:
-        weather.run(session, season=season, round_number=round)
+    with connection_scope() as conn:
+        weather.run(conn, season=season, round_number=round)
 
 
 @strategies_app.command("generate")
@@ -104,8 +104,8 @@ def strategies_generate(
     season: int = typer.Option(...),
     round: int = typer.Option(..., "--round"),
 ) -> None:
-    with session_scope() as session:
-        strategies.run(session, season=season, round_number=round)
+    with connection_scope() as conn:
+        strategies.run(conn, season=season, round_number=round)
 
 
 @results_app.command("refresh")
@@ -113,8 +113,8 @@ def results_refresh(
     season: int = typer.Option(...),
     round: int = typer.Option(..., "--round"),
 ) -> None:
-    with session_scope() as session:
-        race_results.run(session, season=season, round_number=round)
+    with connection_scope() as conn:
+        race_results.run(conn, season=season, round_number=round)
 
 
 @standings_app.command("refresh")
@@ -122,8 +122,8 @@ def standings_refresh(
     season: int = typer.Option(...),
     round: int = typer.Option(..., "--round"),
 ) -> None:
-    with session_scope() as session:
-        standings.run(session, season=season, round_number=round)
+    with connection_scope() as conn:
+        standings.run(conn, season=season, round_number=round)
         # post_race.lap_records is also part of T+1, expose it via the orchestrator command;
         # standings alone is a fine manual operation.
         _ = post_race_lap_records  # silence unused

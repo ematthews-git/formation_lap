@@ -10,25 +10,22 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
 
-def run(session: Session, *, season: int) -> None:
+def run(conn: Connection, *, season: int) -> None:
     # TODO:
+    #   from formation_data import domain, repositories, schema
     #   from formation_data.sources import jolpica_client
-    #   drivers = jolpica_client.get_drivers(season)
-    #   for d in drivers:
-    #       stmt = insert(Driver).values(
-    #           driver_id=d["driverId"],
-    #           full_name=f"{d['givenName']} {d['familyName']}",
-    #           nationality=d["nationality"],
-    #           team=...,        # join with constructor data — Jolpica returns drivers and constructors separately
-    #           season=season,
-    #       ).on_conflict_do_update(
-    #           index_elements=["driver_id", "season"],
-    #           set_={"full_name": ..., "team": ..., ...},
-    #       )
-    #       session.execute(stmt)
+    #   raw = jolpica_client.get_drivers(season)
+    #   items = [domain.Driver(
+    #       driver_id=d["driverId"],
+    #       full_name=f"{d['givenName']} {d['familyName']}",
+    #       nationality=d["nationality"],
+    #       team=...,        # Jolpica returns drivers and constructors separately — join here
+    #       season=season,
+    #   ) for d in raw]
+    #   repositories.upsert(conn, schema.drivers, items, ["driver_id", "season"])
     logger.info("pre_season.drivers.run season=%s (skeleton)", season)

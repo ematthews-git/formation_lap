@@ -13,24 +13,24 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
 
-def run(session: Session) -> None:
+def run(conn: Connection) -> None:
     # TODO:
-    #   for circuit in session.scalars(select(Circuit)):
+    #   from formation_data import domain, repositories, schema
+    #   from formation_data.sources import fastf1_client
+    #   items = []
+    #   for circuit in repositories.list_circuits(conn):
     #       result = fastf1_client.get_fastest_lap_for_circuit(circuit.circuit_id)
     #       if result is None:
     #           continue
     #       driver, year, lap_time_seconds = result
-    #       stmt = insert(LapRecord).values(
-    #           circuit_id=circuit.circuit_id, driver=driver, year=year,
-    #           lap_time_seconds=lap_time_seconds,
-    #       ).on_conflict_do_update(
-    #           index_elements=["circuit_id"],
-    #           set_={"driver": driver, "year": year, "lap_time_seconds": lap_time_seconds},
-    #       )
-    #       session.execute(stmt)
+    #       items.append(domain.LapRecord(
+    #           circuit_id=circuit.circuit_id, driver=driver,
+    #           year=year, lap_time_seconds=lap_time_seconds,
+    #       ))
+    #   repositories.upsert(conn, schema.lap_records, items, ["circuit_id"])
     logger.info("pre_season.lap_records.run (skeleton)")

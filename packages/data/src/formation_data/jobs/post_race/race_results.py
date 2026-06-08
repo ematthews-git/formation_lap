@@ -10,26 +10,26 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
 
-def run(session: Session, *, season: int, round_number: int) -> None:
+def run(conn: Connection, *, season: int, round_number: int) -> None:
     # TODO:
-    #   rw = _get_race_weekend(session, season, round_number)
-    #   results = jolpica_client.get_race_results(season, round_number)
-    #   for r in results:
-    #       stmt = insert(RaceResult).values(
-    #           circuit_id=rw.circuit_id, season=season,
-    #           position=int(r["position"]),
-    #           driver_id=r["Driver"]["driverId"],
-    #           team=r["Constructor"]["name"],
-    #       ).on_conflict_do_update(
-    #           index_elements=["circuit_id", "season", "position"],
-    #           set_={"driver_id": ..., "team": ...},
-    #       )
-    #       session.execute(stmt)
+    #   from formation_data import domain, repositories, schema
+    #   from formation_data.sources import jolpica_client
+    #   rw = repositories.get_race_weekend(conn, season, round_number)
+    #   raw = jolpica_client.get_race_results(season, round_number)
+    #   items = [domain.RaceResult(
+    #       circuit_id=rw.circuit_id, season=season,
+    #       position=int(r["position"]),
+    #       driver_id=r["Driver"]["driverId"],
+    #       team=r["Constructor"]["name"],
+    #   ) for r in raw]
+    #   repositories.upsert(
+    #       conn, schema.race_results, items, ["circuit_id", "season", "position"],
+    #   )
     logger.info(
         "post_race.race_results.run season=%s round=%s (skeleton)", season, round_number
     )
