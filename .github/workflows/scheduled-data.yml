@@ -1,0 +1,57 @@
+name: Scheduled data jobs
+
+# Free fallback path for the scheduler. Mirrors the AWS EventBridge cron table from the plan.
+# Each job calls the same `formation-data` CLI that the production ECS task runs.
+#
+# DATABASE_URL must be set as a repository secret pointing at the live database.
+
+on:
+  schedule:
+    # post-race: Monday 06:00 UTC. No-ops if no race ran the prior weekend.
+    - cron: "0 6 * * MON"
+    # pre-race refresh: Thursday + Saturday 06:00 UTC. No-ops if no race within 7 days.
+    - cron: "0 6 * * THU" #TODO: consider earlier
+    - cron: "0 6 * * SAT"
+    # pre-season: 15 January 06:00 UTC.
+    - cron: "0 6 15 1 *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Command to run (e.g. 'run-pre-race', 'run-pre-season --season 2026')"
+        required: true
+        default: "run-pre-race"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - run: uv sync --package formation-data
+
+      - name: Dispatch based on schedule
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # GitHub puts the matched cron into github.event.schedule. Pick the command from there;
+          # for workflow_dispatch use the input verbatim.
+          case "${{ github.event.schedule }}" in
+            "0 6 * * MON")
+              uv run --package formation-data formation-data run-post-race
+              uv run --package formation-data formation-data run-pre-race
+              ;;
+            "0 6 * * THU"|"0 6 * * SAT")
+              uv run --package formation-data formation-data run-pre-race
+              ;;
+            "0 6 15 1 *")
+              # Adjust the season once a year, or trigger manually via workflow_dispatch.
+              uv run --package formation-data formation-data run-pre-season --season "$(date +%Y)"
+              ;;
+            *)
+              uv run --package formation-data formation-data ${{ github.event.inputs.command }}
+              ;;
+          esac

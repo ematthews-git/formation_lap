@@ -12,5 +12,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # One-shot data loader. The scheduler (AWS EventBridge, GitHub Actions, etc.)
+  # invokes this container with a `formation-data run-*` command. Locally:
+  #   docker compose run --rm worker formation-data --help
+  worker:
+    build:
+      context: .
+      dockerfile: packages/data/Dockerfile
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-formation}:${POSTGRES_PASSWORD:-formation}@db:5432/${POSTGRES_DB:-formation_lap}
+    profiles: ["worker"]
+
 volumes:
   pgdata:

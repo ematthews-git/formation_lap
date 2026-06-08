@@ -11,7 +11,7 @@ from formation_data.base import Base
 class Circuit(Base):
     __tablename__ = "circuits"
 
-    # following filled by seed_circuits
+    # following filled by static seed (see seeds/circuits.py)
     circuit_id: Mapped[str] = mapped_column(String(50), primary_key=True)
     event_name: Mapped[str]
     country: Mapped[str]
@@ -94,6 +94,7 @@ class RaceWeekend(Base):
 
 class WeatherForecast(Base):
     __tablename__ = "weather_forecasts"
+    __table_args__ = (UniqueConstraint("race_weekend_id", "session_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     race_weekend_id: Mapped[int] = mapped_column(ForeignKey("race_weekends.id"))
@@ -110,6 +111,7 @@ class WeatherForecast(Base):
 
 class Strategy(Base):
     __tablename__ = "strategies"
+    __table_args__ = (UniqueConstraint("race_weekend_id", "label"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     race_weekend_id: Mapped[int] = mapped_column(ForeignKey("race_weekends.id"))
@@ -123,6 +125,7 @@ class Strategy(Base):
 
 class StrategyStint(Base):
     __tablename__ = "strategy_stints"
+    __table_args__ = (UniqueConstraint("strategy_id", "stint_order"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     strategy_id: Mapped[int] = mapped_column(ForeignKey("strategies.id"))
@@ -136,6 +139,7 @@ class StrategyStint(Base):
 
 class RaceResult(Base):
     __tablename__ = "race_results"
+    __table_args__ = (UniqueConstraint("circuit_id", "season", "position"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     circuit_id: Mapped[str] = mapped_column(ForeignKey("circuits.circuit_id"))
