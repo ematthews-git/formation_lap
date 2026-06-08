@@ -11,6 +11,7 @@ from formation_data.base import Base
 class Circuit(Base):
     __tablename__ = "circuits"
 
+    # following filled by seed_circuits
     circuit_id: Mapped[str] = mapped_column(String(50), primary_key=True)
     event_name: Mapped[str]
     country: Mapped[str]
@@ -19,6 +20,7 @@ class Circuit(Base):
     num_laps: Mapped[int]
     sm_zones: Mapped[int]
 
+    # calculated
     lap_record: Mapped[LapRecord | None] = relationship(back_populates="circuit")
     stats: Mapped[list[CircuitStats]] = relationship(back_populates="circuit")
     race_weekends: Mapped[list[RaceWeekend]] = relationship(back_populates="circuit")
@@ -29,7 +31,9 @@ class LapRecord(Base):
     __tablename__ = "lap_records"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    circuit_id: Mapped[str] = mapped_column(ForeignKey("circuits.circuit_id"), unique=True)
+    circuit_id: Mapped[str] = mapped_column(
+        ForeignKey("circuits.circuit_id"), unique=True
+    )
     driver: Mapped[str]
     year: Mapped[int]
     lap_time_seconds: Mapped[float]
@@ -82,7 +86,9 @@ class RaceWeekend(Base):
     hard_compound: Mapped[str] = mapped_column(String(5))
 
     circuit: Mapped[Circuit] = relationship(back_populates="race_weekends")
-    weather_forecasts: Mapped[list[WeatherForecast]] = relationship(back_populates="race_weekend")
+    weather_forecasts: Mapped[list[WeatherForecast]] = relationship(
+        back_populates="race_weekend"
+    )
     strategies: Mapped[list[Strategy]] = relationship(back_populates="race_weekend")
 
 
