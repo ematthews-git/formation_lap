@@ -26,6 +26,7 @@ from formation_data.jobs.pre_season import (
     race_weekends,
 )
 from formation_data.jobs.static import circuits as static_circuits
+from formation_data.sources import fastf1_client
 
 app = typer.Typer(help="Formation Lap data loader.")
 circuits_app = typer.Typer(help="Static circuit seed.")
@@ -148,6 +149,7 @@ def run_post_race() -> None:
 
 
 def main() -> None:
+    fastf1_client.enable_cache()
     app()
 
 

@@ -20,10 +20,24 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import Connection
+from formation_data import domain, repositories, schema
+from formation_data.sources import fastf1_client
 
 logger = logging.getLogger(__name__)
 
 HISTORY_SEASONS = 3
+
+# class CircuitStats(_Base):
+#     id: int | None = None
+#     circuit_id: str
+#     season: int
+#     sc_probability: int
+#     red_flag_probability: int
+#     pit_loss_normal: float
+#     pit_loss_sc: float
+#     pit_loss_vsc: float
+#     undercut_strength: float
+#     overcut_strength: float
 
 
 def run(conn: Connection, *, season: int) -> None:
@@ -46,5 +60,28 @@ def run(conn: Connection, *, season: int) -> None:
     #   repositories.upsert(conn, schema.circuit_stats, items, ["circuit_id", "season"])
     logger.info(
         "pre_season.circuit_stats.run season=%s (skeleton — would aggregate %s prior seasons)",
-        season, HISTORY_SEASONS,
+        season,
+        HISTORY_SEASONS,
     )
+
+
+def _safety_car_probability(sessions):
+    """Calculates the probability of a safety car based on all sessions given.
+
+    Args:
+        sessions (_type_): _description_
+    """
+
+    pass
+
+
+def _red_flag_probability(sessions):
+    pass
+
+
+def _undercut_strength():
+    pass
+
+
+def _overcut_strength():
+    pass

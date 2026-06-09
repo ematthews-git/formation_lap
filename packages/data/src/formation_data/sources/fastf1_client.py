@@ -25,27 +25,20 @@ def enable_cache() -> None:
     os.makedirs(cache_dir, exist_ok=True)
 
     fastf1.Cache.enable_cache(cache_dir)
+    logger.info("FastF1 cache enabled at %s", cache_dir)
 
 
 def get_event_schedule(season: int):
     """Return the FIA event schedule for `season` as a DataFrame-ish object."""
-    # TODO: return fastf1.get_event_schedule(season)
-    logger.info("get_event_schedule season=%s (skeleton)", season)
-    return None
+    logger.info("get_event_schedule season=%s", season)
+    return fastf1.get_event_schedule(season)
 
 
 def get_race_session(season: int, round_number: int):
     """Return a FastF1 race session, loaded with laps + results."""
-    # TODO:
-    #   session = fastf1.get_session(season, round_number, "R")
-    #   session.load(laps=True, telemetry=False, weather=False, messages=False)
-    #   return session
-    logger.info("get_race_session season=%s round=%s (skeleton)", season, round_number)
-    return None
 
+    session = fastf1.get_session(season, round_number, "R")
+    session.load(laps=True, telemetry=False, weather=False, messages=False)
 
-def get_fastest_lap_for_circuit(circuit_id: str):
-    """Return (driver, year, lap_time_seconds) for the all-time fastest race lap."""
-    # TODO: iterate FastF1 sessions for the circuit; track min lap time.
-    logger.info("get_fastest_lap_for_circuit %s (skeleton)", circuit_id)
-    return None
+    logger.info("get_race_session season=%s round=%s", season, round_number)
+    return session
