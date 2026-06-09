@@ -9,3 +9,9 @@ python-preference = "only-managed"
 
 [tool.uv.workspace]
 members = ["packages/data", "packages/api"]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "jupyter>=1.1.1",
+]

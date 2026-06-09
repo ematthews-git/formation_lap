@@ -35,10 +35,10 @@ def get_event_schedule(season: int):
 
 
 def get_race_session(season: int, round_number: int):
-    """Return a FastF1 race session, loaded with laps + results."""
+    """Return a FastF1 race session, loaded with laps + results + messages."""
 
     session = fastf1.get_session(season, round_number, "R")
-    session.load(laps=True, telemetry=False, weather=False, messages=False)
+    session.load(laps=True, telemetry=False, weather=False, messages=True)
 
     logger.info("get_race_session season=%s round=%s", season, round_number)
     return session

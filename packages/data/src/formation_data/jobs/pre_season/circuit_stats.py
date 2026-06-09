@@ -3,15 +3,6 @@
 Cadence: yearly. Runs after the prior season has fully settled. Reads several closed seasons
 of FastF1 data and produces one CircuitStats row per circuit, keyed by the *upcoming* season.
 
-Inputs (per circuit, aggregated over the last N closed seasons — default 3):
-- sc_probability       : fraction of races that had at least one safety car (FastF1 race control messages)
-- red_flag_probability : fraction of races that had a red flag (FastF1 race control messages)
-- pit_loss_normal      : median time lost in green-flag pit stops (out-lap delta from FastF1 laps)
-- pit_loss_sc          : median pit loss during SC laps
-- pit_loss_vsc         : median pit loss during VSC laps
-- undercut_strength    : mean position delta gained by undercutters in the first stop window
-- overcut_strength     : same, mean delta for overcutters
-
 Upsert key: CircuitStats UniqueConstraint(circuit_id, season).
 """
 
@@ -25,7 +16,7 @@ from formation_data.sources import fastf1_client
 
 logger = logging.getLogger(__name__)
 
-HISTORY_SEASONS = 3
+HISTORY_SEASONS = 5
 
 # class CircuitStats(_Base):
 #     id: int | None = None
@@ -65,18 +56,48 @@ def run(conn: Connection, *, season: int) -> None:
     )
 
 
-def _safety_car_probability(sessions):
-    """Calculates the probability of a safety car based on all sessions given.
+def _safety_car_probability(sessions) -> float:
+    """Proportion of sessions which had at least one SC deployment.
+
+    Recommend 5 race sessions.
 
     Args:
-        sessions (_type_): _description_
+        sessions (fastF1 session): A race session from fastF1.
+    """
+    count = 0
+
+    for session in sessions:
+        rc = session.race_control_messages
+        sc_messages = rc[
+            rc["Message"].str.contains("SAFETY CAR", na=False)
+            & rc["Status"].str.contains("DEPLOYED", na=False)
+        ]
+        if len(sc_messages) != 0:
+            count += 1
+
+    return count / len(sessions)
+
+
+def _red_flag_probability(sessions) -> float:
+    """Proportion of sessions which had at least one Red flag.
+
+    Recommend 5 race sessions.
+
+    Args:
+        sessions (Fastf1 session): A race session from fastf1.
     """
 
-    pass
+    count = 0
 
+    for session in sessions:
+        rc = session.race_control_messages
+        print(rc)
 
-def _red_flag_probability(sessions):
-    pass
+        red = rc[rc["Message"] == "RED FLAG"]
+        if len(red) != 0:
+            count += 1
+
+    return count / len(sessions)
 
 
 def _undercut_strength():
