@@ -13,10 +13,13 @@ import logging
 from sqlalchemy import Connection
 from formation_data import domain, repositories, schema
 from formation_data.sources import fastf1_client
+import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 HISTORY_SEASONS = 5
+FUEL_RATE = -0.06  # s/lap of pace improvement from burning fuel
 
 # class CircuitStats(_Base):
 #     id: int | None = None
@@ -100,8 +103,72 @@ def _red_flag_probability(sessions) -> float:
     return count / len(sessions)
 
 
-def _undercut_strength():
-    pass
+def _fresh_tyre_advantage(session, fuel_rate=FUEL_RATE, n=3):
+    """One row per clean green-flag pit stop: fuel-corrected pace gain from worn
+    tyres (last `n` laps before the in-lap) to fresh (laps 2..n+1 after the out-lap).
+
+    Keys off PitInTime/PitOutTime + TyreLife only — never the unreliable Stint
+    counter.
+    """
+    gf = _green_flying(session.laps)
+    rows = []
+
+    for drv, dall in session.laps.groupby("Driver"):
+        dall = dall.sort_values("LapNumber")
+        g = gf[gf["Driver"] == drv]
+
+        for L in dall.loc[dall["PitInTime"].notna(), "LapNumber"]:
+            worn = g[(g["LapNumber"] >= L - n - 1) & (g["LapNumber"] < L)]
+            fresh = g[
+                (g["LapNumber"] > L + 1) & (g["LapNumber"] <= L + 1 + n)
+            ]  # skip out-lap
+
+            if len(worn) < 2 or len(fresh) < 2:
+                continue
+
+            dlap = fresh["LapNumber"].mean() - worn["LapNumber"].mean()
+
+            # project both pools to a common fuel load, then take the tyre delta
+            adv = (
+                worn["LapTime_s"].median() - fresh["LapTime_s"].median()
+            ) + fuel_rate * dlap
+            from_comp = (
+                worn["Compound"].dropna().iloc[-1]
+                if worn["Compound"].notna().any()
+                else None
+            )
+            rows.append(
+                {
+                    "drv": drv,
+                    "pit_lap": int(L),
+                    "from": from_comp,
+                    "fresh_adv": round(adv, 3),
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
+def _undercut_strength(session, fuel_rate=FUEL_RATE):
+    """Circuit undercut strength (s): the tyre-degradation engine of the undercut."""
+    df = _fresh_tyre_advantage(session, fuel_rate)
+    vals = df.loc[
+        df["fresh_adv"] > -0.5, "fresh_adv"
+    ]  # drop off-plan / anomalous switches
+    return float(np.median(vals)), df
+
+
+def _green_flying(laps):
+    """Green-flag flying laps: valid time, no in/out-lap, no SC/VSC/red, TyreLife>1."""
+    d = laps.copy()
+    d["LapTime_s"] = d["LapTime"].dt.total_seconds()
+    return d[
+        d["LapTime_s"].notna()
+        & d["PitInTime"].isna()
+        & d["PitOutTime"].isna()
+        & ~d["TrackStatus"].astype(str).str.contains("[4567]", regex=True)
+        & (d["TyreLife"] > 1)
+    ]
 
 
 def _overcut_strength():
