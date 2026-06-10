@@ -14,5 +14,6 @@ dist/
 bin/
 
 .jupyter/
+.ipynb_checkpoints/
 
 .cache
