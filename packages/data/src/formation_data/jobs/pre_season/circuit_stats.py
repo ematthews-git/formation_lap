@@ -11,8 +11,6 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import Connection
-from formation_data import domain, repositories, schema
-from formation_data.sources import fastf1_client
 import pandas as pd
 import numpy as np
 
@@ -20,18 +18,6 @@ logger = logging.getLogger(__name__)
 
 HISTORY_SEASONS = 5
 FUEL_RATE = -0.06  # s/lap of pace improvement from burning fuel
-
-# class CircuitStats(_Base):
-#     id: int | None = None
-#     circuit_id: str
-#     season: int
-#     sc_probability: int
-#     red_flag_probability: int
-#     pit_loss_normal: float
-#     pit_loss_sc: float
-#     pit_loss_vsc: float
-#     undercut_strength: float
-#     overcut_strength: float
 
 
 def run(conn: Connection, *, season: int) -> None:
@@ -41,9 +27,12 @@ def run(conn: Connection, *, season: int) -> None:
     #   items = []
     #   for circuit in repositories.list_circuits(conn):
     #       sessions = [
-    #           fastf1_client.get_race_session(season - n, _round_for(circuit, season - n))
-    #           for n in range(1, HISTORY_SEASONS + 1)
+    #           fastf1_client.get_race_session(s, _round_for(circuit, s))
+    #           for s in range(season - HISTORY_SEASONS, season)
+    #           if _round_for(circuit, s) is not None
     #       ]
+    #       if not sessions:
+    #           continue  # new venue (e.g. madrid in 2026) — no history yet
     #       items.append(domain.CircuitStats(
     #           circuit_id=circuit.circuit_id, season=season,
     #           sc_probability=_safety_car_probability(sessions),
@@ -59,48 +48,52 @@ def run(conn: Connection, *, season: int) -> None:
     )
 
 
-def _safety_car_probability(sessions) -> float:
-    """Proportion of sessions which had at least one SC deployment.
+def _safety_car_probability(sessions) -> int:
+    """Percentage (0-100) of sessions with at least one full SC deployment.
 
-    Recommend 5 race sessions.
+    VSC messages also contain "SAFETY CAR", so they are excluded explicitly.
+    Stored as int percent per the CircuitStats schema. Recommend 5 race sessions.
 
     Args:
-        sessions (fastF1 session): A race session from fastF1.
+        sessions: non-empty list of loaded FastF1 race sessions.
     """
+    if not sessions:
+        raise ValueError("sessions must be non-empty")
     count = 0
 
     for session in sessions:
         rc = session.race_control_messages
         sc_messages = rc[
             rc["Message"].str.contains("SAFETY CAR", na=False)
+            & ~rc["Message"].str.contains("VIRTUAL", na=False)
             & rc["Status"].str.contains("DEPLOYED", na=False)
         ]
         if len(sc_messages) != 0:
             count += 1
 
-    return count / len(sessions)
+    return round(100 * count / len(sessions))
 
 
-def _red_flag_probability(sessions) -> float:
-    """Proportion of sessions which had at least one Red flag.
+def _red_flag_probability(sessions) -> int:
+    """Percentage (0-100) of sessions with at least one red flag.
 
-    Recommend 5 race sessions.
+    Stored as int percent per the CircuitStats schema. Recommend 5 race sessions.
 
     Args:
-        sessions (Fastf1 session): A race session from fastf1.
+        sessions: non-empty list of loaded FastF1 race sessions.
     """
-
+    if not sessions:
+        raise ValueError("sessions must be non-empty")
     count = 0
 
     for session in sessions:
         rc = session.race_control_messages
-        print(rc)
-
-        red = rc[rc["Message"] == "RED FLAG"]
+        # \b guard: "CHEQUERED FLAG" ends every race and contains "RED FLAG"
+        red = rc[rc["Message"].str.contains(r"\bRED FLAG", regex=True, na=False)]
         if len(red) != 0:
             count += 1
 
-    return count / len(sessions)
+    return round(100 * count / len(sessions))
 
 
 def _fresh_tyre_advantage(session, fuel_rate=FUEL_RATE, n=3):
@@ -118,7 +111,7 @@ def _fresh_tyre_advantage(session, fuel_rate=FUEL_RATE, n=3):
         g = gf[gf["Driver"] == drv]
 
         for L in dall.loc[dall["PitInTime"].notna(), "LapNumber"]:
-            worn = g[(g["LapNumber"] >= L - n - 1) & (g["LapNumber"] < L)]
+            worn = g[(g["LapNumber"] >= L - n) & (g["LapNumber"] < L)]
             fresh = g[
                 (g["LapNumber"] > L + 1) & (g["LapNumber"] <= L + 1 + n)
             ]  # skip out-lap

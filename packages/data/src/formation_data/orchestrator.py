@@ -66,22 +66,21 @@ def run_pre_race_for_next_weekend(today: date | None = None) -> None:
 
 
 def run_post_race_for_last_weekend(today: date | None = None) -> None:
-    """Called on a cron. No-ops if the most recent race already has results loaded.
+    """Called on a cron. No-ops if every past race already has results loaded.
 
-    For now the "already loaded" check is left as a TODO — idempotent upserts mean
-    re-running is safe, just slightly wasteful of upstream API calls.
+    Processes *all* past weekends lacking results, not just the most recent —
+    a missed cron run (GitHub Actions schedules are best-effort, and auto-disable
+    after 60 days of repo inactivity) plus back-to-back race weekends would
+    otherwise leave a permanent hole. Idempotent upserts make catch-up free.
     """
     today = today or date.today()
     # TODO:
     #   from formation_data import repositories
     #   with connection_scope() as conn:
-    #       rw = repositories.most_recent_race_weekend_before(conn, today)
-    #       if rw is None:
-    #           logger.info("no completed race found")
-    #           return
-    #       race_results.run(conn, season=rw.season, round_number=rw.round_number)
-    #       standings.run(conn, season=rw.season, round_number=rw.round_number)
-    #       post_race_lap_records.run(conn, season=rw.season, round_number=rw.round_number)
+    #       for rw in repositories.race_weekends_missing_results(conn, before=today):
+    #           race_results.run(conn, season=rw.season, round_number=rw.round_number)
+    #           standings.run(conn, season=rw.season, round_number=rw.round_number)
+    #           post_race_lap_records.run(conn, season=rw.season, round_number=rw.round_number)
     logger.info(
         "orchestrator.run_post_race_for_last_weekend today=%s (skeleton)", today
     )

@@ -18,12 +18,17 @@ from collections.abc import Iterable
 from datetime import date, timedelta
 
 from pydantic import BaseModel
-from sqlalchemy import Connection, Table, select
+from sqlalchemy import Connection, Table, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from formation_data import domain, schema
 
 logger = logging.getLogger(__name__)
+
+# Columns the database owns. Excluded from upsert payloads so server defaults
+# apply on insert; refreshed explicitly on conflict (ON CONFLICT DO UPDATE does
+# not run SQLAlchemy `onupdate` hooks).
+_SERVER_MANAGED_COLS = {"updated_at"}
 
 
 # --- write ---
@@ -37,22 +42,29 @@ def upsert(
 ) -> int:
     """Upsert a batch of domain models into `table`, keyed on `conflict_cols`.
 
-    Auto-id PKs are excluded via `exclude_none=True` on the Pydantic dump, so
-    Postgres assigns them on insert. On conflict, every non-PK / non-conflict
-    column is replaced with the incoming row's value.
+    Auto-id PKs and server-managed columns are excluded from the dump (not via
+    `exclude_none` — that would also drop legitimately-None values once nullable
+    columns exist, and multi-row inserts need homogeneous keys). On conflict,
+    every other non-conflict column is replaced with the incoming row's value.
     """
-    payload = [item.model_dump(exclude_none=True) for item in items]
+    payload = [
+        item.model_dump(exclude={"id"} | _SERVER_MANAGED_COLS) for item in items
+    ]  # union op
     if not payload:
         return 0
     stmt = insert(table).values(payload)
     update_cols = [
-        c.name for c in table.c if c.name not in conflict_cols and not c.primary_key
+        c.name
+        for c in table.c
+        if c.name not in conflict_cols
+        and not c.primary_key
+        and c.name not in _SERVER_MANAGED_COLS
     ]
     if update_cols:
-        stmt = stmt.on_conflict_do_update(
-            index_elements=conflict_cols,
-            set_={col: stmt.excluded[col] for col in update_cols},
-        )
+        set_ = {col: stmt.excluded[col] for col in update_cols}
+        if "updated_at" in table.c:
+            set_["updated_at"] = func.now()
+        stmt = stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
     else:
         stmt = stmt.on_conflict_do_nothing(index_elements=conflict_cols)
     return conn.execute(stmt).rowcount

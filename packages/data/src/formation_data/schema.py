@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     Date,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
+    func,
 )
 
 metadata = MetaData()
@@ -32,6 +34,11 @@ circuits = Table(
     Column("num_corners", Integer, nullable=False),
     Column("num_laps", Integer, nullable=False),
     Column("sm_zones", Integer, nullable=False),
+    # Cross-source identity + location, hand-curated alongside the rest of the row.
+    # jolpica_id joins against Jolpica's Circuit.circuitId; lat/lon feed Open-Meteo.
+    Column("jolpica_id", String(50), nullable=False, unique=True),
+    Column("lat", Float, nullable=False),
+    Column("lon", Float, nullable=False),
 )
 
 
@@ -61,6 +68,12 @@ circuit_stats = Table(
     Column("pit_loss_vsc", Float, nullable=False),
     Column("undercut_strength", Float, nullable=False),
     Column("overcut_strength", Float, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
     UniqueConstraint("circuit_id", "season"),
 )
 
@@ -90,7 +103,10 @@ race_weekends = Table(
     Column("soft_compound", String(5), nullable=False),
     Column("medium_compound", String(5), nullable=False),
     Column("hard_compound", String(5), nullable=False),
-    UniqueConstraint("circuit_id", "season"),
+    # Keyed on (season, round_number), not (circuit_id, season): double-header
+    # seasons (2020: Red Bull Ring, Silverstone, Bahrain ×2) visit a circuit twice,
+    # and circuit_stats backfills historical seasons.
+    UniqueConstraint("season", "round_number"),
 )
 
 
@@ -106,6 +122,12 @@ weather_forecasts = Table(
     Column("temp_low_c", Float, nullable=False),
     Column("rain_probability", Integer, nullable=False),
     Column("wind_speed_kph", Float, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
     UniqueConstraint("race_weekend_id", "session_name"),
 )
 
@@ -118,6 +140,12 @@ strategies = Table(
     Column("is_base", Boolean, nullable=False),
     Column("num_stops", Integer, nullable=False),
     Column("label", String, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
     UniqueConstraint("race_weekend_id", "label"),
 )
 

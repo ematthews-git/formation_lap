@@ -4,6 +4,9 @@ Cadence: rare. Re-run only when the FIA calendar gains/loses a circuit, when sm_
 are confirmed, or when track measurements change.
 
 Data is hand written. sm_zones yet to be confirmed for future races (currently reflects DRS zones)
+
+jolpica_id and lat/lon were verified against the live Jolpica 2026 schedule
+(GET /ergast/f1/2026.json — Circuit.circuitId and Circuit.Location).
 """
 
 from __future__ import annotations
@@ -34,6 +37,9 @@ CIRCUITS = [
         num_corners=14,
         num_laps=58,
         sm_zones=5,
+        jolpica_id="albert_park",
+        lat=-37.8497,
+        lon=144.968,
     ),
     Circuit(
         circuit_id="shanghai",
@@ -43,6 +49,9 @@ CIRCUITS = [
         num_corners=16,
         num_laps=56,
         sm_zones=4,
+        jolpica_id="shanghai",
+        lat=31.3389,
+        lon=121.22,
     ),
     Circuit(
         circuit_id="suzuka",
@@ -52,6 +61,9 @@ CIRCUITS = [
         num_corners=18,
         num_laps=53,
         sm_zones=2,
+        jolpica_id="suzuka",
+        lat=34.8431,
+        lon=136.541,
     ),
     Circuit(
         circuit_id="miami",
@@ -61,6 +73,9 @@ CIRCUITS = [
         num_corners=19,
         num_laps=57,
         sm_zones=3,
+        jolpica_id="miami",
+        lat=25.9581,
+        lon=-80.2389,
     ),
     Circuit(
         circuit_id="montreal",
@@ -70,6 +85,9 @@ CIRCUITS = [
         num_corners=14,
         num_laps=70,
         sm_zones=3,
+        jolpica_id="villeneuve",
+        lat=45.5,
+        lon=-73.5228,
     ),
     Circuit(
         circuit_id="monaco",
@@ -79,6 +97,9 @@ CIRCUITS = [
         num_corners=19,
         num_laps=78,
         sm_zones=0,
+        jolpica_id="monaco",
+        lat=43.7347,
+        lon=7.42056,
     ),
     Circuit(
         circuit_id="barcelona",
@@ -88,6 +109,9 @@ CIRCUITS = [
         num_corners=16,
         num_laps=66,
         sm_zones=2,
+        jolpica_id="catalunya",
+        lat=41.57,
+        lon=2.26111,
     ),
     Circuit(
         circuit_id="red_bull_ring",
@@ -97,6 +121,9 @@ CIRCUITS = [
         num_corners=10,
         num_laps=71,
         sm_zones=3,
+        jolpica_id="red_bull_ring",
+        lat=47.2197,
+        lon=14.7647,
     ),
     Circuit(
         circuit_id="silverstone",
@@ -106,6 +133,9 @@ CIRCUITS = [
         num_corners=18,
         num_laps=52,
         sm_zones=2,
+        jolpica_id="silverstone",
+        lat=52.0786,
+        lon=-1.01694,
     ),
     Circuit(
         circuit_id="spa",
@@ -115,6 +145,9 @@ CIRCUITS = [
         num_corners=19,
         num_laps=44,
         sm_zones=2,
+        jolpica_id="spa",
+        lat=50.4372,
+        lon=5.97139,
     ),
     Circuit(
         circuit_id="hungaroring",
@@ -124,6 +157,9 @@ CIRCUITS = [
         num_corners=14,
         num_laps=70,
         sm_zones=2,
+        jolpica_id="hungaroring",
+        lat=47.5789,
+        lon=19.2486,
     ),
     Circuit(
         circuit_id="zandvoort",
@@ -133,6 +169,9 @@ CIRCUITS = [
         num_corners=14,
         num_laps=72,
         sm_zones=2,
+        jolpica_id="zandvoort",
+        lat=52.3888,
+        lon=4.54092,
     ),
     Circuit(
         circuit_id="monza",
@@ -142,6 +181,9 @@ CIRCUITS = [
         num_corners=11,
         num_laps=53,
         sm_zones=2,
+        jolpica_id="monza",
+        lat=45.6156,
+        lon=9.28111,
     ),
     Circuit(
         circuit_id="madrid",
@@ -151,6 +193,9 @@ CIRCUITS = [
         num_corners=22,
         num_laps=57,
         sm_zones=3,
+        jolpica_id="madring",
+        lat=40.46528,
+        lon=-3.61528,
     ),
     Circuit(
         circuit_id="baku",
@@ -160,6 +205,9 @@ CIRCUITS = [
         num_corners=20,
         num_laps=51,
         sm_zones=2,
+        jolpica_id="baku",
+        lat=40.3725,
+        lon=49.8533,
     ),
     Circuit(
         circuit_id="singapore",
@@ -169,6 +217,9 @@ CIRCUITS = [
         num_corners=19,
         num_laps=62,
         sm_zones=3,
+        jolpica_id="marina_bay",
+        lat=1.2914,
+        lon=103.864,
     ),
     Circuit(
         circuit_id="austin",
@@ -178,6 +229,9 @@ CIRCUITS = [
         num_corners=20,
         num_laps=56,
         sm_zones=2,
+        jolpica_id="americas",
+        lat=30.1328,
+        lon=-97.6411,
     ),
     Circuit(
         circuit_id="mexico_city",
@@ -187,6 +241,9 @@ CIRCUITS = [
         num_corners=17,
         num_laps=71,
         sm_zones=3,
+        jolpica_id="rodriguez",
+        lat=19.4042,
+        lon=-99.0907,
     ),
     Circuit(
         circuit_id="sao_paulo",
@@ -196,6 +253,9 @@ CIRCUITS = [
         num_corners=15,
         num_laps=71,
         sm_zones=2,
+        jolpica_id="interlagos",
+        lat=-23.7036,
+        lon=-46.6997,
     ),
     Circuit(
         circuit_id="las_vegas",
@@ -205,6 +265,9 @@ CIRCUITS = [
         num_corners=17,
         num_laps=50,
         sm_zones=2,
+        jolpica_id="vegas",
+        lat=36.1147,
+        lon=-115.173,
     ),
     Circuit(
         circuit_id="lusail",
@@ -214,6 +277,9 @@ CIRCUITS = [
         num_corners=16,
         num_laps=57,
         sm_zones=2,
+        jolpica_id="losail",
+        lat=25.49,
+        lon=51.4542,
     ),
     Circuit(
         circuit_id="abu_dhabi",
@@ -223,5 +289,8 @@ CIRCUITS = [
         num_corners=16,
         num_laps=58,
         sm_zones=2,
+        jolpica_id="yas_marina",
+        lat=24.4672,
+        lon=54.6031,
     ),
 ]

@@ -28,9 +28,10 @@ def run(conn: Connection, *, season: int, round_number: int) -> None:
     #   from formation_data import domain, repositories, schema
     #   from formation_data.sources import weather_client
     #   rw = repositories.get_race_weekend(conn, season, round_number)
+    #   circuit = repositories.get_circuit(conn, rw.circuit_id)   # lat/lon live on circuits
     #   sessions_by_day = _expand_session_schedule(rw)   # list[(session_name, session_date)]
     #   forecast = weather_client.get_forecast(
-    #       rw.circuit_id, sessions_by_day[0][1], sessions_by_day[-1][1],
+    #       circuit.lat, circuit.lon, sessions_by_day[0][1], sessions_by_day[-1][1],
     #   )
     #   items = [domain.WeatherForecast(
     #       race_weekend_id=rw.id, session_name=name, session_date=d,

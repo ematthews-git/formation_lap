@@ -40,7 +40,6 @@ formation-lap/               # uv workspace root
 │   ├── api/                 # formation-api — FastAPI app
 │   │   └── src/formation_api/
 │   │       ├── main.py
-│   │       ├── config.py
 │   │       └── routers/    # health, circuits (minimal — most endpoints not yet built)
 │   └── web/                 # planned React frontend (empty)
 ├── docker-compose.yml       # postgres + one-shot worker container
@@ -53,18 +52,25 @@ formation-lap/               # uv workspace root
 
 | Table | Key columns | Upsert key |
 |---|---|---|
-| `circuits` | circuit_id (PK), event_name, country, track_length_km, num_corners, num_laps, sm_zones | circuit_id |
-| `race_weekends` | circuit_id (FK), season, round_number, race_date, is_sprint, soft/medium/hard_compound | (circuit_id, season) |
-| `circuit_stats` | circuit_id (FK), season, sc_probability, red_flag_probability, pit_loss_*, undercut/overcut_strength | (circuit_id, season) |
+| `circuits` | circuit_id (PK), event_name, country, track_length_km, num_corners, num_laps, sm_zones, jolpica_id (unique), lat, lon | circuit_id |
+| `race_weekends` | circuit_id (FK), season, round_number, race_date, is_sprint, soft/medium/hard_compound | (season, round_number) |
+| `circuit_stats` | circuit_id (FK), season, sc_probability, red_flag_probability, pit_loss_*, undercut/overcut_strength, updated_at | (circuit_id, season) |
 | `lap_records` | circuit_id (FK, unique), driver, year, lap_time_seconds | circuit_id |
 | `drivers` | driver_id, full_name, nationality, team, season | (driver_id, season) |
-| `weather_forecasts` | race_weekend_id (FK), session_name, session_date, condition, temps, rain_probability, wind | (race_weekend_id, session_name) |
-| `strategies` | race_weekend_id (FK), is_base, num_stops, label | (race_weekend_id, label) |
+| `weather_forecasts` | race_weekend_id (FK), session_name, session_date, condition, temps, rain_probability, wind, updated_at | (race_weekend_id, session_name) |
+| `strategies` | race_weekend_id (FK), is_base, num_stops, label, updated_at | (race_weekend_id, label) |
 | `strategy_stints` | strategy_id (FK), stint_order, compound, pit_lap_window_start/end | (strategy_id, stint_order) |
 | `race_results` | circuit_id (FK), season, position, driver_id, team | (circuit_id, season, position) |
 | `standings` | season, after_round, type ("driver"/"constructor"), position, name, points | (season, after_round, type, position) |
 
 Schema lives in `schema.py`, mirrored by Pydantic models in `domain.py`.
+
+Notes:
+- `race_weekends` is keyed on (season, round_number), not (circuit_id, season) — double-header seasons (2020) visit a circuit twice.
+- `circuits.jolpica_id` maps our circuit_id to Jolpica's; `lat`/`lon` feed Open-Meteo. All hand-curated in the seed, verified against the live Jolpica 2026 schedule.
+- `updated_at` columns are server-managed: server_default on insert, explicitly set to `now()` in `upsert()`'s ON CONFLICT clause (Postgres upserts don't run SQLAlchemy `onupdate`).
+- `sc_probability` / `red_flag_probability` are **int percent** (0-100), matching `strategies.py` thresholds.
+- No migrations yet — schema changes mean drop/recreate of the dev DB. Adopt Alembic before the first Supabase deploy.
 
 ## Data pipeline
 

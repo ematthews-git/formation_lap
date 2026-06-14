@@ -10,7 +10,7 @@ Auto-generated id columns default to None so the same model represents both
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,6 +27,9 @@ class Circuit(_Base):
     num_corners: int
     num_laps: int
     sm_zones: int
+    jolpica_id: str
+    lat: float
+    lon: float
 
 
 class LapRecord(_Base):
@@ -48,6 +51,7 @@ class CircuitStats(_Base):
     pit_loss_vsc: float
     undercut_strength: float
     overcut_strength: float
+    updated_at: datetime | None = None
 
 
 class Driver(_Base):
@@ -81,6 +85,7 @@ class WeatherForecast(_Base):
     temp_low_c: float
     rain_probability: int
     wind_speed_kph: float
+    updated_at: datetime | None = None
 
 
 class Strategy(_Base):
@@ -89,6 +94,7 @@ class Strategy(_Base):
     is_base: bool
     num_stops: int
     label: str
+    updated_at: datetime | None = None
 
 
 class StrategyStint(_Base):
