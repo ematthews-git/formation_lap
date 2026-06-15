@@ -102,6 +102,14 @@ def upsert_strategy_with_stints(
 
 
 def list_circuits(conn: Connection) -> list[domain.Circuit]:
+    """Gets the list of circuits from database.
+
+    Args:
+        conn (Connection): Database connection.
+
+    Returns:
+        list[domain.Circuit]: List of circuits as domain dataclass.
+    """
     rows = conn.execute(
         select(schema.circuits).order_by(schema.circuits.c.circuit_id)
     ).all()

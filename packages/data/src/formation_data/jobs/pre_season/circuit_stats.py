@@ -14,6 +14,9 @@ from sqlalchemy import Connection
 import pandas as pd
 import numpy as np
 
+from formation_data import domain, repositories, schema
+from formation_data.sources import fastf1_client
+
 logger = logging.getLogger(__name__)
 
 HISTORY_SEASONS = 5
@@ -21,26 +24,39 @@ FUEL_RATE = -0.06  # s/lap of pace improvement from burning fuel
 
 
 def run(conn: Connection, *, season: int) -> None:
-    # TODO:
-    #   from formation_data import domain, repositories, schema
-    #   from formation_data.sources import fastf1_client
-    #   items = []
-    #   for circuit in repositories.list_circuits(conn):
-    #       sessions = [
-    #           fastf1_client.get_race_session(s, _round_for(circuit, s))
-    #           for s in range(season - HISTORY_SEASONS, season)
-    #           if _round_for(circuit, s) is not None
-    #       ]
-    #       if not sessions:
-    #           continue  # new venue (e.g. madrid in 2026) — no history yet
-    #       items.append(domain.CircuitStats(
-    #           circuit_id=circuit.circuit_id, season=season,
-    #           sc_probability=_safety_car_probability(sessions),
-    #           red_flag_probability=_red_flag_probability(sessions),
-    #           pit_loss_normal=..., pit_loss_sc=..., pit_loss_vsc=...,
-    #           undercut_strength=..., overcut_strength=...,
-    #       ))
-    #   repositories.upsert(conn, schema.circuit_stats, items, ["circuit_id", "season"])
+    """Populates circuit stats.
+
+    Args:
+        conn (Connection): Database connection.
+        season (int): This is the last season completed.
+    """
+    items = []
+    for circuit in repositories.list_circuits(conn):
+        sessions_race = [
+            fastf1_client.get_race_session(s, _round_for(circuit, s))
+            for s in range(season - HISTORY_SEASONS, season)
+            if _round_for(circuit, s) is not None
+        ]
+        if not sessions_race:
+            continue  # suggests new venue
+
+        pl = _pit_loss_by_condition(sessions_race)
+
+        items.append(
+            domain.CircuitStats(
+                circuit_id=circuit.circuit_id,
+                season=season,
+                sc_probability=_safety_car_probability(sessions_race),
+                red_flag_probability=_red_flag_probability(sessions_race),
+                pit_loss_normal=pl["normal"]["median_s"] if not None else 0,
+                pit_loss_sc=pl["sc"]["median_s"] if not None else 0,
+                pit_loss_vsc=pl["vsc"]["median_s"] if not None else 0,
+                undercut_strength=_undercut_strength(sessions_race),
+                overcut_strength=None,
+            )
+        )
+    repositories.upsert(conn, schema.circuit_stats, items, ["circuit_id", "season"])
+
     logger.info(
         "pre_season.circuit_stats.run season=%s (skeleton — would aggregate %s prior seasons)",
         season,
@@ -52,7 +68,6 @@ def _safety_car_probability(sessions) -> int:
     """Percentage (0-100) of sessions with at least one full SC deployment.
 
     VSC messages also contain "SAFETY CAR", so they are excluded explicitly.
-    Stored as int percent per the CircuitStats schema. Recommend 5 race sessions.
 
     Args:
         sessions: non-empty list of loaded FastF1 race sessions.
@@ -77,8 +92,6 @@ def _safety_car_probability(sessions) -> int:
 def _red_flag_probability(sessions) -> int:
     """Percentage (0-100) of sessions with at least one red flag.
 
-    Stored as int percent per the CircuitStats schema. Recommend 5 race sessions.
-
     Args:
         sessions: non-empty list of loaded FastF1 race sessions.
     """
@@ -94,6 +107,111 @@ def _red_flag_probability(sessions) -> int:
             count += 1
 
     return round(100 * count / len(sessions))
+
+
+def _undercut_strength(session, fuel_rate=FUEL_RATE) -> float:
+    """Circuit undercut strength (s): the tyre-degradation engine of the undercut."""
+    df = _fresh_tyre_advantage(session, fuel_rate)
+    vals = df.loc[
+        df["fresh_adv"] > -0.5, "fresh_adv"
+    ]  # drop off-plan / anomalous switches
+    return float(np.median(vals))
+
+
+def _overcut_strength():
+    pass
+
+
+def _pit_loss_by_condition(sessions, min_reference_laps=4):
+    """
+    Strategic pit loss (seconds) under normal / SC / VSC.
+
+    Per stop:
+        loss = (inlap_laptime  - field_pace[inlap_number])
+             + (outlap_laptime - field_pace[outlap_number])
+
+    Returns {cond: {"median_s": float | None, "n": int}}.
+    """
+    buckets = {"normal": [], "sc": [], "vsc": []}
+
+    for session in sessions:
+        laps = session.laps
+        if laps is None or laps.empty:
+            continue
+        laps = laps.sort_values(["DriverNumber", "LapNumber"]).copy()
+
+        # Reference pace per lap from cars staying out. Deliberately NOT
+        # IsAccurate-filtered: SC/VSC laps are flagged "inaccurate" but we
+        # need them to form the slow baseline.
+        on_track = laps[laps["PitInTime"].isna() & laps["PitOutTime"].isna()]
+        agg = on_track.groupby("LapNumber")["LapTime"].agg(["median", "count"])
+        ref = agg.loc[agg["count"] >= min_reference_laps, "median"]
+
+        # Lift the following lap (the outlap) onto the inlap row.
+        grp = laps.groupby("DriverNumber")
+        laps["OutLapTime"] = grp["LapTime"].shift(-1)
+        laps["OutLapNumber"] = grp["LapNumber"].shift(-1)
+        laps["OutLapPitOut"] = grp["PitOutTime"].shift(-1)
+        laps["OutLapStatus"] = grp["TrackStatus"].shift(-1)
+
+        stops = laps[
+            laps["PitInTime"].notna()
+            & laps["LapTime"].notna()
+            & laps["OutLapTime"].notna()
+            & laps["OutLapPitOut"].notna()
+            & (laps["OutLapNumber"] == laps["LapNumber"] + 1)  # guard dropouts
+        ].copy()
+
+        stops["RefIn"] = stops["LapNumber"].map(ref)
+        stops["RefOut"] = stops["OutLapNumber"].map(ref)
+        stops = stops.dropna(subset=["RefIn", "RefOut"])
+
+        stops["Loss"] = (
+            (stops["LapTime"] - stops["RefIn"])
+            + (stops["OutLapTime"] - stops["RefOut"])
+        ).dt.total_seconds()
+
+        for in_s, out_s, loss in zip(
+            stops["TrackStatus"], stops["OutLapStatus"], stops["Loss"]
+        ):
+            cond = _condition_of(in_s, out_s)
+            if cond is not None and loss > 0:  # drop mispaired/negative
+                buckets[cond].append(loss)
+
+    return {
+        cond: {"median_s": float(np.median(v)) if v else None, "n": len(v)}
+        for cond, v in buckets.items()
+    }
+
+
+# --- HELPER FUNCTIONS ---
+
+
+def _round_for(circuit, season):
+    """Gets the round number of a circuit at a given season.
+
+    Needed to cover for circuits that did not have a race in all historical seasons.
+    """
+    schedule = fastf1_client.get_event_schedule(season)
+
+    for index, event in schedule.iterrows():
+        if event.Country == circuit:
+            return event.RoundNumber
+
+    return None
+
+
+def _green_flying(laps):
+    """Green-flag flying laps: valid time, no in/out-lap, no SC/VSC/red, TyreLife>1."""
+    d = laps.copy()
+    d["LapTime_s"] = d["LapTime"].dt.total_seconds()
+    return d[
+        d["LapTime_s"].notna()
+        & d["PitInTime"].isna()
+        & d["PitOutTime"].isna()
+        & ~d["TrackStatus"].astype(str).str.contains("[4567]", regex=True)
+        & (d["TyreLife"] > 1)
+    ]
 
 
 def _fresh_tyre_advantage(session, fuel_rate=FUEL_RATE, n=3):
@@ -142,27 +260,13 @@ def _fresh_tyre_advantage(session, fuel_rate=FUEL_RATE, n=3):
     return pd.DataFrame(rows)
 
 
-def _undercut_strength(session, fuel_rate=FUEL_RATE):
-    """Circuit undercut strength (s): the tyre-degradation engine of the undercut."""
-    df = _fresh_tyre_advantage(session, fuel_rate)
-    vals = df.loc[
-        df["fresh_adv"] > -0.5, "fresh_adv"
-    ]  # drop off-plan / anomalous switches
-    return float(np.median(vals)), df
-
-
-def _green_flying(laps):
-    """Green-flag flying laps: valid time, no in/out-lap, no SC/VSC/red, TyreLife>1."""
-    d = laps.copy()
-    d["LapTime_s"] = d["LapTime"].dt.total_seconds()
-    return d[
-        d["LapTime_s"].notna()
-        & d["PitInTime"].isna()
-        & d["PitOutTime"].isna()
-        & ~d["TrackStatus"].astype(str).str.contains("[4567]", regex=True)
-        & (d["TyreLife"] > 1)
-    ]
-
-
-def _overcut_strength():
-    pass
+def _condition_of(in_status, out_status):
+    """Bucket a stop by the most significant status across its two laps."""
+    blob = f"{in_status or ''}{out_status or ''}"
+    if "5" in blob:
+        return None
+    if "4" in blob:
+        return "sc"
+    if "6" in blob or "7" in blob:
+        return "vsc"
+    return "normal"
