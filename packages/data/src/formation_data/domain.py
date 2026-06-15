@@ -21,13 +21,13 @@ class _Base(BaseModel):
 
 class Circuit(_Base):
     circuit_id: str
-    event_name: str
     country: str
     track_length_km: float
     num_corners: int
     num_laps: int
     sm_zones: int
     jolpica_id: str
+    fastf1_location: str
     lat: float
     lon: float
 
@@ -68,6 +68,7 @@ class RaceWeekend(_Base):
     circuit_id: str
     season: int
     round_number: int
+    event_name: str
     race_date: date
     is_sprint: bool
     soft_compound: str
@@ -110,6 +111,7 @@ class RaceResult(_Base):
     id: int | None = None
     circuit_id: str
     season: int
+    round_number: int
     position: int
     driver_id: str
     team: str

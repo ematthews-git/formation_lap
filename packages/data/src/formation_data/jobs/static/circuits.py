@@ -7,6 +7,12 @@ Data is hand written. sm_zones yet to be confirmed for future races (currently r
 
 jolpica_id and lat/lon were verified against the live Jolpica 2026 schedule
 (GET /ergast/f1/2026.json — Circuit.circuitId and Circuit.Location).
+
+fastf1_location is FastF1's get_event_schedule().Location, the stable cross-source
+key used to find a circuit's rounds (Country isn't unique, EventName is season-
+unstable). Values are the current (2026) Location; a few venues have been renamed
+across seasons (Miami/Miami Gardens, Monaco/Monte Carlo, Yas Island/Yas Marina),
+and those historical variants are handled in fastf1_client._LOCATION_ALIASES.
 """
 
 from __future__ import annotations
@@ -31,7 +37,7 @@ def run(conn: Connection) -> None:
 CIRCUITS = [
     Circuit(
         circuit_id="melbourne",
-        event_name="Australian Grand Prix",
+        fastf1_location="Melbourne",
         country="Australia",
         track_length_km=5.278,
         num_corners=14,
@@ -43,7 +49,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="shanghai",
-        event_name="Chinese Grand Prix",
+        fastf1_location="Shanghai",
         country="China",
         track_length_km=5.451,
         num_corners=16,
@@ -55,7 +61,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="suzuka",
-        event_name="Japanese Grand Prix",
+        fastf1_location="Suzuka",
         country="Japan",
         track_length_km=5.807,
         num_corners=18,
@@ -67,7 +73,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="miami",
-        event_name="Miami Grand Prix",
+        fastf1_location="Miami Gardens",
         country="United States",
         track_length_km=5.412,
         num_corners=19,
@@ -79,7 +85,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="montreal",
-        event_name="Canadian Grand Prix",
+        fastf1_location="Montréal",
         country="Canada",
         track_length_km=4.361,
         num_corners=14,
@@ -91,7 +97,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="monaco",
-        event_name="Monaco Grand Prix",
+        fastf1_location="Monte Carlo",
         country="Monaco",
         track_length_km=3.337,
         num_corners=19,
@@ -103,7 +109,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="barcelona",
-        event_name="Barcelona-Catalunya Grand Prix",
+        fastf1_location="Barcelona",
         country="Spain",
         track_length_km=4.657,
         num_corners=16,
@@ -115,7 +121,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="red_bull_ring",
-        event_name="Austrian Grand Prix",
+        fastf1_location="Spielberg",
         country="Austria",
         track_length_km=4.318,
         num_corners=10,
@@ -127,7 +133,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="silverstone",
-        event_name="British Grand Prix",
+        fastf1_location="Silverstone",
         country="United Kingdom",
         track_length_km=5.891,
         num_corners=18,
@@ -139,7 +145,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="spa",
-        event_name="Belgian Grand Prix",
+        fastf1_location="Spa-Francorchamps",
         country="Belgium",
         track_length_km=7.004,
         num_corners=19,
@@ -151,7 +157,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="hungaroring",
-        event_name="Hungarian Grand Prix",
+        fastf1_location="Budapest",
         country="Hungary",
         track_length_km=4.381,
         num_corners=14,
@@ -163,7 +169,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="zandvoort",
-        event_name="Dutch Grand Prix",
+        fastf1_location="Zandvoort",
         country="Netherlands",
         track_length_km=4.259,
         num_corners=14,
@@ -175,7 +181,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="monza",
-        event_name="Italian Grand Prix",
+        fastf1_location="Monza",
         country="Italy",
         track_length_km=5.793,
         num_corners=11,
@@ -187,7 +193,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="madrid",
-        event_name="Spanish Grand Prix",
+        fastf1_location="Madrid",
         country="Spain",
         track_length_km=5.476,
         num_corners=22,
@@ -199,7 +205,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="baku",
-        event_name="Azerbaijan Grand Prix",
+        fastf1_location="Baku",
         country="Azerbaijan",
         track_length_km=6.003,
         num_corners=20,
@@ -211,7 +217,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="singapore",
-        event_name="Singapore Grand Prix",
+        fastf1_location="Marina Bay",
         country="Singapore",
         track_length_km=4.940,
         num_corners=19,
@@ -223,7 +229,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="austin",
-        event_name="United States Grand Prix",
+        fastf1_location="Austin",
         country="United States",
         track_length_km=5.513,
         num_corners=20,
@@ -235,7 +241,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="mexico_city",
-        event_name="Mexico City Grand Prix",
+        fastf1_location="Mexico City",
         country="Mexico",
         track_length_km=4.304,
         num_corners=17,
@@ -247,7 +253,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="sao_paulo",
-        event_name="São Paulo Grand Prix",
+        fastf1_location="São Paulo",
         country="Brazil",
         track_length_km=4.309,
         num_corners=15,
@@ -259,7 +265,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="las_vegas",
-        event_name="Las Vegas Grand Prix",
+        fastf1_location="Las Vegas",
         country="United States",
         track_length_km=6.201,
         num_corners=17,
@@ -271,7 +277,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="lusail",
-        event_name="Qatar Grand Prix",
+        fastf1_location="Lusail",
         country="Qatar",
         track_length_km=5.419,
         num_corners=16,
@@ -283,7 +289,7 @@ CIRCUITS = [
     ),
     Circuit(
         circuit_id="abu_dhabi",
-        event_name="Abu Dhabi Grand Prix",
+        fastf1_location="Yas Marina",
         country="United Arab Emirates",
         track_length_km=5.281,
         num_corners=16,

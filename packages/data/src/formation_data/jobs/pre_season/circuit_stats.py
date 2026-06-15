@@ -33,9 +33,9 @@ def run(conn: Connection, *, season: int) -> None:
     items = []
     for circuit in repositories.list_circuits(conn):
         sessions_race = [
-            fastf1_client.get_race_session(s, _round_for(circuit, s))
+            fastf1_client.get_race_session(s, r)
             for s in range(season - HISTORY_SEASONS, season)
-            if _round_for(circuit, s) is not None
+            for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location)
         ]
         if not sessions_race:
             continue  # suggests new venue
@@ -48,11 +48,11 @@ def run(conn: Connection, *, season: int) -> None:
                 season=season,
                 sc_probability=_safety_car_probability(sessions_race),
                 red_flag_probability=_red_flag_probability(sessions_race),
-                pit_loss_normal=pl["normal"]["median_s"] if not None else 0,
-                pit_loss_sc=pl["sc"]["median_s"] if not None else 0,
-                pit_loss_vsc=pl["vsc"]["median_s"] if not None else 0,
+                pit_loss_normal=pl["normal"]["median_s"] or 0.0,
+                pit_loss_sc=pl["sc"]["median_s"] or 0.0,
+                pit_loss_vsc=pl["vsc"]["median_s"] or 0.0,
                 undercut_strength=_undercut_strength(sessions_race),
-                overcut_strength=None,
+                overcut_strength=0,
             )
         )
     repositories.upsert(conn, schema.circuit_stats, items, ["circuit_id", "season"])
@@ -109,12 +109,22 @@ def _red_flag_probability(sessions) -> int:
     return round(100 * count / len(sessions))
 
 
-def _undercut_strength(session, fuel_rate=FUEL_RATE) -> float:
-    """Circuit undercut strength (s): the tyre-degradation engine of the undercut."""
-    df = _fresh_tyre_advantage(session, fuel_rate)
-    vals = df.loc[
-        df["fresh_adv"] > -0.5, "fresh_adv"
-    ]  # drop off-plan / anomalous switches
+def _undercut_strength(sessions, fuel_rate=FUEL_RATE) -> float:
+    """Circuit undercut strength (s): the tyre-degradation engine of the undercut.
+
+    Args:
+        sessions: non-empty list of loaded FastF1 race sessions.
+        fuel_rate: pace improvement per lap from burning fuel (s/lap).
+    """
+    if not sessions:
+        raise ValueError("sessions must be non-empty")
+    vals = []
+    for session in sessions:
+        df = _fresh_tyre_advantage(session, fuel_rate)
+        if df.empty:
+            continue
+        # drop off-plan / anomalous switches
+        vals.extend(df.loc[df["fresh_adv"] > -0.5, "fresh_adv"].tolist())
     return float(np.median(vals))
 
 
@@ -185,20 +195,6 @@ def _pit_loss_by_condition(sessions, min_reference_laps=4):
 
 
 # --- HELPER FUNCTIONS ---
-
-
-def _round_for(circuit, season):
-    """Gets the round number of a circuit at a given season.
-
-    Needed to cover for circuits that did not have a race in all historical seasons.
-    """
-    schedule = fastf1_client.get_event_schedule(season)
-
-    for index, event in schedule.iterrows():
-        if event.Country == circuit:
-            return event.RoundNumber
-
-    return None
 
 
 def _green_flying(laps):

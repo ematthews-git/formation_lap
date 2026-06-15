@@ -4,7 +4,9 @@ Cadence: yearly. Carries records forward; post_race.lap_records handles in-seaso
 
 Source: sources.fastf1_client.get_fastest_lap_for_circuit(circuit_id) — iterates FastF1
 sessions for the circuit and tracks the minimum lap time. The race lap record (not qualifying)
-is what we care about.
+is what we care about. To find the circuit's sessions each season, resolve rounds via
+fastf1_client.rounds_for_location(season, circuit.fastf1_location) — never by Country
+(not unique) or EventName (season-unstable).
 
 Upsert key: LapRecord.circuit_id is already unique (declared on the column in models.py).
 """
