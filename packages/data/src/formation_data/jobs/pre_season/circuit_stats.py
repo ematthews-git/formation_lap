@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import Connection
+from fastf1.exceptions import RateLimitExceededError
 import pandas as pd
 import numpy as np
 
@@ -19,7 +20,7 @@ from formation_data.sources import fastf1_client
 
 logger = logging.getLogger(__name__)
 
-HISTORY_SEASONS = 5
+HISTORY_SEASONS = 4
 FUEL_RATE = -0.06  # s/lap of pace improvement from burning fuel
 
 
@@ -31,35 +32,49 @@ def run(conn: Connection, *, season: int) -> None:
         season (int): This is the last season completed.
     """
     items = []
-    for circuit in repositories.list_circuits(conn):
-        sessions_race = [
-            fastf1_client.get_race_session(s, r)
-            for s in range(season - HISTORY_SEASONS, season)
-            for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location)
-        ]
-        if not sessions_race:
-            continue  # suggests new venue
+    try:
+        for circuit in repositories.list_circuits(conn):
+            sessions_race = [
+                fastf1_client.get_race_session(s, r)
+                for s in range(season - HISTORY_SEASONS, season)
+                for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location)
+            ]
+            if not sessions_race:
+                continue  # suggests new venue
 
-        pl = _pit_loss_by_condition(sessions_race)
+            pl = _pit_loss_by_condition(sessions_race)
 
-        items.append(
-            domain.CircuitStats(
-                circuit_id=circuit.circuit_id,
-                season=season,
-                sc_probability=_safety_car_probability(sessions_race),
-                red_flag_probability=_red_flag_probability(sessions_race),
-                pit_loss_normal=pl["normal"]["median_s"] or 0.0,
-                pit_loss_sc=pl["sc"]["median_s"] or 0.0,
-                pit_loss_vsc=pl["vsc"]["median_s"] or 0.0,
-                undercut_strength=_undercut_strength(sessions_race),
-                overcut_strength=0,
+            items.append(
+                domain.CircuitStats(
+                    circuit_id=circuit.circuit_id,
+                    season=season,
+                    sc_probability=_safety_car_probability(sessions_race),
+                    red_flag_probability=_red_flag_probability(sessions_race),
+                    pit_loss_normal=pl["normal"]["median_s"] or 0.0,
+                    pit_loss_sc=pl["sc"]["median_s"] or 0.0,
+                    pit_loss_vsc=pl["vsc"]["median_s"] or 0.0,
+                    undercut_strength=_undercut_strength(sessions_race),
+                    overcut_strength=0,
+                )
             )
+    except RateLimitExceededError:
+        # Every session fetched so far is already on FastF1's on-disk cache, and
+        # cache hits don't count against the limit — so re-running in ~1h resumes
+        # for free. Loading a large history for the first time? Warm the cache in
+        # smaller HISTORY_SEASONS chunks spaced an hour apart.
+        logger.error(
+            "pre_season.circuit_stats: FastF1 rate limit hit while loading %s "
+            "seasons; progress is cached on disk, re-run to resume.",
+            HISTORY_SEASONS,
         )
+        raise
+
     repositories.upsert(conn, schema.circuit_stats, items, ["circuit_id", "season"])
 
     logger.info(
-        "pre_season.circuit_stats.run season=%s (skeleton — would aggregate %s prior seasons)",
+        "pre_season.circuit_stats.run season=%s circuits=%s history_seasons=%s",
         season,
+        len(items),
         HISTORY_SEASONS,
     )
 

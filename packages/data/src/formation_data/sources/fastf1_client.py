@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import fastf1
 import os
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,14 @@ def enable_cache() -> None:
     logger.info("FastF1 cache enabled at %s", cache_dir)
 
 
+@lru_cache(maxsize=None)
 def get_event_schedule(season: int):
-    """Return the FIA event schedule for `season` as a DataFrame-ish object."""
-    logger.info("get_event_schedule season=%s", season)
+    """Return the FIA event schedule for `season` as a DataFrame-ish object.
+
+    Memoised per process. Callers must treat the result as read-only
+    (filter into a copy, never mutate in place).
+    """
+    logger.info("get_event_schedule season=%s (fetch)", season)
     return fastf1.get_event_schedule(season)
 
 
@@ -41,9 +47,18 @@ def get_event_schedule(season: int):
 # across seasons, so each such venue maps to the full set of strings it has used.
 # Canonical key = the current (2026) Location, matching the circuits seed.
 _LOCATION_ALIASES = {
-    "Miami Gardens": {"Miami Gardens", "Miami"},  # "Miami" 2022-24 -> "Miami Gardens" 2025+
-    "Monte Carlo": {"Monte Carlo", "Monaco"},  # "Monaco" 2022-25; "Monte Carlo" 2021 & 2026
-    "Yas Marina": {"Yas Marina", "Yas Island"},  # "Yas Island" -2025 -> "Yas Marina" 2026
+    "Miami Gardens": {
+        "Miami Gardens",
+        "Miami",
+    },  # "Miami" 2022-24 -> "Miami Gardens" 2025+
+    "Monte Carlo": {
+        "Monte Carlo",
+        "Monaco",
+    },  # "Monaco" 2022-25; "Monte Carlo" 2021 & 2026
+    "Yas Marina": {
+        "Yas Marina",
+        "Yas Island",
+    },  # "Yas Island" -2025 -> "Yas Marina" 2026
 }
 
 
@@ -61,7 +76,11 @@ def rounds_for_location(season: int, fastf1_location: str) -> list[int]:
     aliases = _LOCATION_ALIASES.get(fastf1_location, {fastf1_location})
     schedule = get_event_schedule(season)
     schedule = schedule[schedule["EventFormat"] != "testing"]
-    return [int(event.RoundNumber) for _, event in schedule.iterrows() if event.Location in aliases]
+    return [
+        int(event.RoundNumber)
+        for _, event in schedule.iterrows()
+        if event.Location in aliases
+    ]
 
 
 def get_race_session(season: int, round_number: int):
