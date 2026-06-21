@@ -134,13 +134,52 @@ def test_fresh_tyre_advantage_single_clean_stop():
         )
     session = FakeSession(laps=_laps_df(rows))
 
-    df = circuit_stats._fresh_tyre_advantage(session, fuel_rate=-0.06, n=3)
+    df = circuit_stats._fresh_tyre_advantage(session, n=3)
 
     assert len(df) == 1
     row = df.iloc[0]
     assert row["drv"] == "VER"
     assert row["pit_lap"] == pit_lap
     assert row["from"] == "MEDIUM"
-    # worn = laps 7-9 (92.0s), fresh = laps 12-14 (90.5s), 5 laps apart:
-    # (92.0 - 90.5) + (-0.06 * 5) = 1.2
-    assert row["fresh_adv"] == pytest.approx(1.2)
+    # worn = laps 7-9 (92.0s), fresh = laps 12-14 (90.5s):
+    # 92.0 - 90.5 = 1.5
+    assert row["fresh_adv"] == pytest.approx(1.5)
+
+
+# --- _pit_adjusted_undercut ---
+
+
+def test_pit_adjusted_undercut_demotes_long_pit_lane():
+    # 3s slower than the reference pit lane, default weight 0.5 → -1.5s.
+    adj = circuit_stats._pit_adjusted_undercut(
+        raw_undercut=2.2, pit_loss_normal=24.0, pit_loss_ref=21.0
+    )
+    assert adj == pytest.approx(2.2 - 0.5 * 3.0)
+
+
+def test_pit_adjusted_undercut_unchanged_at_or_below_reference():
+    # Faster than reference → no penalty (excess clamps at 0).
+    below = circuit_stats._pit_adjusted_undercut(
+        raw_undercut=1.5, pit_loss_normal=20.0, pit_loss_ref=21.0
+    )
+    at = circuit_stats._pit_adjusted_undercut(
+        raw_undercut=1.5, pit_loss_normal=21.0, pit_loss_ref=21.0
+    )
+    assert below == pytest.approx(1.5)
+    assert at == pytest.approx(1.5)
+
+
+def test_pit_adjusted_undercut_clamps_at_zero():
+    # Penalty exceeds the raw advantage → floored at 0, never negative.
+    adj = circuit_stats._pit_adjusted_undercut(
+        raw_undercut=1.0, pit_loss_normal=30.0, pit_loss_ref=21.0
+    )
+    assert adj == 0.0
+
+
+def test_pit_adjusted_undercut_respects_weight():
+    # weight=1.0 charges the full 2s excess against a 3s advantage → 1.0s.
+    adj = circuit_stats._pit_adjusted_undercut(
+        raw_undercut=3.0, pit_loss_normal=23.0, pit_loss_ref=21.0, weight=1.0
+    )
+    assert adj == pytest.approx(1.0)
