@@ -91,6 +91,19 @@ def circuit_stats_recompute(season: int = typer.Option(...)) -> None:
         circuit_stats.run(conn, season=season)
 
 
+@circuit_stats_app.command("diagnose")
+def circuit_stats_diagnose(
+    season: int = typer.Option(...),
+    circuit: str = typer.Option(None, "--circuit", help="Limit to one circuit_id."),
+) -> None:
+    """Print the per-circuit undercut decomposition + consensus correlation. No DB write."""
+    from formation_data.jobs.pre_season import diagnostics
+
+    with connection_scope() as conn:
+        rows = circuit_stats.diagnose(conn, season=season, circuit_id=circuit)
+    typer.echo(diagnostics.format_table(rows))
+
+
 @weather_app.command("refresh")
 def weather_refresh(
     season: int = typer.Option(...),

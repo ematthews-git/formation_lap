@@ -70,6 +70,16 @@ circuit_stats = Table(
     Column("pit_loss_normal", Float, nullable=False),
     Column("pit_loss_sc", Float, nullable=False),
     Column("pit_loss_vsc", Float, nullable=False),
+    # Undercut/overcut model (jobs.pre_season.undercut). undercut_laptime_swing is the
+    # pure two-car tyre swing (s); undercut_strength / overcut_strength scale it by
+    # overtaking_difficulty (0-1). tyre_deg_rate (s/lap) and warmup_penalty (s) are the
+    # feeder metrics; undercut_sample_size is the count of mined exchanges (0 => the
+    # value came from the mechanistic fallback). All seconds-scale floats, clamped >= 0.
+    Column("tyre_deg_rate", Float, nullable=False),
+    Column("warmup_penalty", Float, nullable=False),
+    Column("overtaking_difficulty", Float, nullable=False),
+    Column("undercut_laptime_swing", Float, nullable=False),
+    Column("undercut_sample_size", Integer, nullable=False),
     Column("undercut_strength", Float, nullable=False),
     Column("overcut_strength", Float, nullable=False),
     Column(

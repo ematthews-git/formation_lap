@@ -26,7 +26,10 @@ from sqlalchemy import Connection
 
 logger = logging.getLogger(__name__)
 
-UNDERCUT_THRESHOLD = 0.6  # tune once real CircuitStats exist
+# CircuitStats.undercut_strength is the decisiveness-scaled tyre swing (s, >= 0) from
+# jobs.pre_season.undercut. Emit the aggressive-undercut variant above this; re-tune
+# against the real per-circuit distribution once circuit-stats has been run.
+UNDERCUT_THRESHOLD = 0.6
 SC_GAMBLE_THRESHOLD = 50  # SC probability is stored as int percent
 
 

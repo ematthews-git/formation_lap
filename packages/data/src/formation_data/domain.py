@@ -44,13 +44,18 @@ class CircuitStats(_Base):
     id: int | None = None
     circuit_id: str
     season: int
-    sc_probability: int
-    red_flag_probability: int
-    pit_loss_normal: float
-    pit_loss_sc: float
-    pit_loss_vsc: float
-    undercut_strength: float
-    overcut_strength: float
+    sc_probability: int  # 0-100 percent of races with a full SC
+    red_flag_probability: int  # 0-100 percent of races red-flagged
+    pit_loss_normal: float  # green-flag pit loss (s)
+    pit_loss_sc: float  # pit loss under SC (s)
+    pit_loss_vsc: float  # pit loss under VSC (s)
+    tyre_deg_rate: float  # in-stint degradation, fuel-corrected (s/lap)
+    warmup_penalty: float  # fresh-tyre warm-up deficit (s)
+    overtaking_difficulty: float  # 0 (easy) .. 1 (near-impossible)
+    undercut_laptime_swing: float  # pure two-car tyre swing (s)
+    undercut_sample_size: int  # mined exchanges; 0 => mechanistic fallback
+    undercut_strength: float  # swing scaled by decisiveness (s), >= 0
+    overcut_strength: float  # mirror — later-pitter advantage (s), >= 0
     updated_at: datetime | None = None
 
 

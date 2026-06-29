@@ -3,6 +3,10 @@
 Cadence: yearly. Runs after the prior season has fully settled. Reads several closed seasons
 of FastF1 data and produces one CircuitStats row per circuit, keyed by the *upcoming* season.
 
+Per circuit it derives: SC / red-flag probabilities, pit loss by condition, the pace feeders
+(``pace_metrics``: degradation, warm-up, stop age, overtaking difficulty), and the two-layer
+undercut/overcut strength (``undercut``).
+
 Upsert key: CircuitStats UniqueConstraint(circuit_id, season).
 """
 
@@ -12,18 +16,20 @@ import logging
 
 from sqlalchemy import Connection
 from fastf1.exceptions import RateLimitExceededError
-import pandas as pd
 import numpy as np
 
 from formation_data import domain, repositories, schema
 from formation_data.sources import fastf1_client
+from formation_data.jobs.pre_season import pace_metrics, undercut
 
 logger = logging.getLogger(__name__)
 
 HISTORY_SEASONS = 4
-PIT_PENALTY_WEIGHT = (
-    0.5  # out-lap share of excess pit-lane time charged against the undercut
-)
+
+
+def _finite(x) -> float:
+    """Coalesce a None/NaN aggregate (no data measured) to 0.0 for non-null storage."""
+    return float(x) if x is not None and np.isfinite(x) else 0.0
 
 
 def run(conn: Connection, *, season: int) -> None:
@@ -33,33 +39,13 @@ def run(conn: Connection, *, season: int) -> None:
         conn (Connection): Database connection.
         season (int): This is the last season completed.
     """
-    # Pass 1: fetch each circuit's history once and compute its raw stats. The
-    # pit-lane calibration of undercut_strength needs the field-wide pit_loss
-    # median, so finalising is deferred to pass 2 below.
     rows = []
     try:
         for circuit in repositories.list_circuits(conn):
-            sessions_race = [
-                fastf1_client.get_race_session(s, r)
-                for s in range(season - HISTORY_SEASONS, season)
-                for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location)
-            ]
+            sessions_race = _load_history(circuit, season)
             if not sessions_race:
                 continue  # suggests new venue
-
-            pl = _pit_loss_by_condition(sessions_race)
-
-            rows.append(
-                {
-                    "circuit_id": circuit.circuit_id,
-                    "sc_probability": _safety_car_probability(sessions_race),
-                    "red_flag_probability": _red_flag_probability(sessions_race),
-                    "pit_loss_normal": pl["normal"]["median_s"] or 0.0,
-                    "pit_loss_sc": pl["sc"]["median_s"] or 0.0,
-                    "pit_loss_vsc": pl["vsc"]["median_s"] or 0.0,
-                    "raw_undercut": _undercut_strength(sessions_race),
-                }
-            )
+            rows.append(_compute(circuit, sessions_race))
     except RateLimitExceededError:
         # Every session fetched so far is already on FastF1's on-disk cache, and
         # cache hits don't count against the limit — so re-running in ~1h resumes
@@ -72,34 +58,11 @@ def run(conn: Connection, *, season: int) -> None:
         )
         raise
 
-    # Reference pit time: median measured pit loss across the field this season.
-    # Zeros mean "no clean stops to measure" — excluded so they don't drag it down.
-    measured = [r["pit_loss_normal"] for r in rows if r["pit_loss_normal"] > 0]
-    pit_loss_ref = float(np.median(measured)) if measured else None
-
-    # Pass 2: discount each undercut by the out-lap share of this circuit's
-    # pit-lane time in excess of the reference (skipped if no reference exists).
+    fields = domain.CircuitStats.model_fields
     items = [
-        domain.CircuitStats(
-            circuit_id=r["circuit_id"],
-            season=season,
-            sc_probability=r["sc_probability"],
-            red_flag_probability=r["red_flag_probability"],
-            pit_loss_normal=r["pit_loss_normal"],
-            pit_loss_sc=r["pit_loss_sc"],
-            pit_loss_vsc=r["pit_loss_vsc"],
-            undercut_strength=(
-                r["raw_undercut"]
-                if pit_loss_ref is None
-                else _pit_adjusted_undercut(
-                    r["raw_undercut"], r["pit_loss_normal"], pit_loss_ref
-                )
-            ),
-            overcut_strength=0,
-        )
+        domain.CircuitStats(season=season, **{k: v for k, v in r.items() if k in fields})
         for r in rows
     ]
-
     repositories.upsert(conn, schema.circuit_stats, items, ["circuit_id", "season"])
 
     logger.info(
@@ -108,6 +71,72 @@ def run(conn: Connection, *, season: int) -> None:
         len(items),
         HISTORY_SEASONS,
     )
+
+
+def _load_history(circuit, season: int) -> list:
+    """Load the `HISTORY_SEASONS` closed-season race sessions for a circuit."""
+    return [
+        fastf1_client.get_race_session(s, r)
+        for s in range(season - HISTORY_SEASONS, season)
+        for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location)
+    ]
+
+
+def _compute(circuit, sessions_race) -> dict:
+    """All CircuitStats fields for one circuit, plus diagnostic-only extras.
+
+    The stored undercut comes from the tyre model (`pace_metrics.tyre_model` +
+    `undercut.undercut_laptime_swing`). The empirical pair miner is run only as a
+    cross-check; its fields (`typical_stop_age`, `emp_swing`, `swap_rate`) are surfaced by
+    `diagnose()` but not persisted (`run()` filters to the model's columns).
+    """
+    pl = _pit_loss_by_condition(sessions_race)
+    tyre = pace_metrics.tyre_model(sessions_race)
+    deg, warmup = tyre["deg"], tyre["warmup"]
+    stop_age = pace_metrics.typical_stop_age(sessions_race)
+    difficulty = pace_metrics.overtaking_difficulty(circuit.circuit_id)
+    swing = undercut.undercut_laptime_swing(deg, warmup, stop_age)
+    emp = undercut.empirical_summary(sessions_race)  # diagnostic cross-check only
+
+    return {
+        "circuit_id": circuit.circuit_id,
+        "sc_probability": _safety_car_probability(sessions_race),
+        "red_flag_probability": _red_flag_probability(sessions_race),
+        "pit_loss_normal": pl["normal"]["median_s"] or 0.0,
+        "pit_loss_sc": pl["sc"]["median_s"] or 0.0,
+        "pit_loss_vsc": pl["vsc"]["median_s"] or 0.0,
+        "tyre_deg_rate": _finite(deg),
+        "warmup_penalty": _finite(warmup),
+        "overtaking_difficulty": difficulty,
+        "undercut_laptime_swing": _finite(swing),
+        "undercut_sample_size": emp["n"],
+        "undercut_strength": undercut.undercut_strength(swing, difficulty),
+        "overcut_strength": undercut.overcut_strength(swing, difficulty),
+        # diagnostic-only (not persisted):
+        "typical_stop_age": stop_age,
+        "emp_swing": emp["median_swing"],
+        "swap_rate": emp["swap_rate"],
+    }
+
+
+def diagnose(conn: Connection, *, season: int, circuit_id: str | None = None) -> list[dict]:
+    """Compute the per-circuit undercut decomposition without writing to the DB.
+
+    Returns one rich row per circuit (all the `_compute` fields). For eyeballing the
+    model against the consensus ranking; see `jobs.pre_season.diagnostics`.
+    """
+    circuits = repositories.list_circuits(conn)
+    if circuit_id is not None:
+        circuits = [c for c in circuits if c.circuit_id == circuit_id]
+
+    rows = []
+    for circuit in circuits:
+        sessions_race = _load_history(circuit, season)
+        if not sessions_race:
+            logger.info("diagnose: no history for %s, skipping", circuit.circuit_id)
+            continue
+        rows.append(_compute(circuit, sessions_race))
+    return rows
 
 
 def _safety_car_probability(sessions) -> int:
@@ -153,55 +182,6 @@ def _red_flag_probability(sessions) -> int:
             count += 1
 
     return round(100 * count / len(sessions))
-
-
-def _undercut_strength(sessions) -> float:
-    """Circuit undercut strength (s): the median advantage of an undercut.
-
-    The per-stop fresh-tyre advantage is the raw pace gain switching from worn to
-    fresh rubber — exactly the lap-time swing an undercut buys.
-
-    Args:
-        sessions: non-empty list of loaded FastF1 race sessions.
-    """
-    if not sessions:
-        raise ValueError("sessions must be non-empty")
-    vals = []
-    for session in sessions:
-        df = _fresh_tyre_advantage(session)
-        if df.empty:
-            continue
-        # drop off-plan / anomalous switches
-        vals.extend(df.loc[df["fresh_adv"] > -0.5, "fresh_adv"].tolist())
-    return float(np.median(vals))
-
-
-def _pit_adjusted_undercut(
-    raw_undercut, pit_loss_normal, pit_loss_ref, weight=PIT_PENALTY_WEIGHT
-) -> float:
-    """Realized undercut strength (s): the raw fresh-tyre advantage minus the
-    out-lap share of this circuit's pit-lane time *in excess of* the field-median
-    reference.
-
-    The fresh-tyre advantage (`raw_undercut`) is measured on flying laps and so
-    ignores the pit lane entirely — overstating long-pit-lane / slow-limiter
-    circuits (Spa, Silverstone), where part of the out-lap is spent at the speed
-    limit and the fresh-tyre pace can't be deployed. The universal pit-lane time
-    cancels between two pitting cars, so only the excess over the reference demotes
-    a circuit. Clamped at 0 (a net-negative undercut means the undercut doesn't pay).
-
-    Args:
-        raw_undercut: fresh-tyre advantage in seconds (see `_undercut_strength`).
-        pit_loss_normal: this circuit's median green-flag pit loss (s).
-        pit_loss_ref: reference pit loss — the field-wide median (s).
-        weight: out-lap share of the excess charged against the undercut.
-    """
-    excess = max(0.0, pit_loss_normal - pit_loss_ref)
-    return max(0.0, raw_undercut - weight * excess)
-
-
-def _overcut_strength():
-    pass
 
 
 def _pit_loss_by_condition(sessions, min_reference_laps=4):
@@ -264,64 +244,6 @@ def _pit_loss_by_condition(sessions, min_reference_laps=4):
         cond: {"median_s": float(np.median(v)) if v else None, "n": len(v)}
         for cond, v in buckets.items()
     }
-
-
-# --- HELPER FUNCTIONS ---
-
-
-def _green_flying(laps):
-    """Green-flag flying laps: valid time, no in/out-lap, no SC/VSC/red, TyreLife>1."""
-    d = laps.copy()
-    d["LapTime_s"] = d["LapTime"].dt.total_seconds()
-    return d[
-        d["LapTime_s"].notna()
-        & d["PitInTime"].isna()
-        & d["PitOutTime"].isna()
-        & ~d["TrackStatus"].astype(str).str.contains("[4567]", regex=True)
-        & (d["TyreLife"] > 1)
-    ]
-
-
-def _fresh_tyre_advantage(session, n=3):
-    """One row per clean green-flag pit stop: pace gain from worn tyres (last `n`
-    laps before the in-lap) to fresh (laps 2..n+1 after the out-lap).
-
-    Keys off PitInTime/PitOutTime + TyreLife only — never the unreliable Stint
-    counter.
-    """
-    gf = _green_flying(session.laps)
-    rows = []
-
-    for drv, dall in session.laps.groupby("Driver"):
-        dall = dall.sort_values("LapNumber")
-        g = gf[gf["Driver"] == drv]
-
-        for L in dall.loc[dall["PitInTime"].notna(), "LapNumber"]:
-            worn = g[(g["LapNumber"] >= L - n) & (g["LapNumber"] < L)]
-            fresh = g[
-                (g["LapNumber"] > L + 1) & (g["LapNumber"] <= L + 1 + n)
-            ]  # skip out-lap
-
-            if len(worn) < 2 or len(fresh) < 2:
-                continue
-
-            # raw pace swing from worn to fresh rubber — the undercut advantage
-            adv = worn["LapTime_s"].median() - fresh["LapTime_s"].median()
-            from_comp = (
-                worn["Compound"].dropna().iloc[-1]
-                if worn["Compound"].notna().any()
-                else None
-            )
-            rows.append(
-                {
-                    "drv": drv,
-                    "pit_lap": int(L),
-                    "from": from_comp,
-                    "fresh_adv": round(adv, 3),
-                }
-            )
-
-    return pd.DataFrame(rows)
 
 
 def _condition_of(in_status, out_status):
