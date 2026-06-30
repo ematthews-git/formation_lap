@@ -1,0 +1,67 @@
+/*
+ * Design tokens — extracted verbatim from the approved mockup
+ * (packages/web/mockup.reference.html). Every colour/font here maps 1:1 to a
+ * value used in that design. Components consume these via var(--token); avoid
+ * hard-coding hex values in component CSS.
+ */
+:root {
+  /* ---- Surfaces ---- */
+  --bg: #161514;
+  --bg-header-top: #201f1e;
+  --panel: #1e1d1c;
+  --panel-raised: #242322;
+  --panel-header: #2a2928;
+  --panel-header-accent: #2c2b29;
+
+  /* ---- Borders ---- */
+  --border: #3c3a36;
+  --border-strong: #46433e;
+  --border-soft: #322f2b;
+  --border-hair: #2a2724;
+  --border-header: #36332f;
+
+  /* ---- Text ---- */
+  --text-bright: #f4f2ef;
+  --text-num: #f1eeeb;
+  --text: #e6e3e0;
+  --text-dim: #bbb7b3;
+  --text-muted: #a6a29e;
+  --text-faint: #8c8884;
+  --text-fainter: #827e7a;
+  --text-ghost: #6c6864;
+  --text-rule: #5c5854;
+
+  /* ---- Accents ---- */
+  --accent: #c13a40; /* primary red */
+  --accent-hot: #d6555a; /* countdown seconds, highlights */
+  --gold: #cba552; /* medium compound / safety-car / "REC" tag */
+  --gold-dim: #8a7b45;
+  --soft: #c95852; /* soft compound */
+  --hard: #dad7d2; /* hard compound */
+  --rain: #6f8ba6; /* rain probability blue */
+  --live: #7e9b82; /* "FEED_LIVE" green */
+
+  /* ---- Compound stint fills (timeline bars) ---- */
+  --stint-soft-bg: #2c211f;
+  --stint-medium-bg: #2a2519;
+  --stint-hard-bg: #262420;
+
+  /* ---- Team colours (driver rows / history dots) ---- */
+  --team-mclaren: #e07f2a;
+  --team-redbull: #4674ae;
+  --team-ferrari: #c5343c;
+  --team-mercedes: #3fb0a0;
+  --team-aston: #38886a;
+  --team-williams: #4674c4;
+  --team-racingbulls: #7088c6;
+  --team-default: #8c8884;
+
+  /* ---- Typography ---- */
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Saira Condensed', 'IBM Plex Sans', sans-serif;
+
+  /* ---- Layout ---- */
+  --maxw: 1340px;
+  --gap: 22px;
+}

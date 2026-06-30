@@ -1,0 +1,17 @@
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.poleBox {
+  padding: 18px 20px;
+}
+
+.poleLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-fainter);
+  margin-bottom: 8px;
+}

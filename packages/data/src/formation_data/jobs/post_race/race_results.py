@@ -3,7 +3,9 @@
 Cadence: T+1 (Monday after the race), once Jolpica has published results.
 
 Source: sources.jolpica_client.get_race_results(season, round_number).
-Upsert key: RaceResult UniqueConstraint(circuit_id, season, position).
+Upsert key: RaceResult UniqueConstraint(season, round_number, position) — a circuit
+can host two rounds in one season (double-headers), so (circuit_id, season) is not
+unique. circuit_id is carried as a denormalized FK for convenient joins.
 """
 
 from __future__ import annotations
@@ -22,13 +24,13 @@ def run(conn: Connection, *, season: int, round_number: int) -> None:
     #   rw = repositories.get_race_weekend(conn, season, round_number)
     #   raw = jolpica_client.get_race_results(season, round_number)
     #   items = [domain.RaceResult(
-    #       circuit_id=rw.circuit_id, season=season,
+    #       circuit_id=rw.circuit_id, season=season, round_number=round_number,
     #       position=int(r["position"]),
     #       driver_id=r["Driver"]["driverId"],
     #       team=r["Constructor"]["name"],
     #   ) for r in raw]
     #   repositories.upsert(
-    #       conn, schema.race_results, items, ["circuit_id", "season", "position"],
+    #       conn, schema.race_results, items, ["season", "round_number", "position"],
     #   )
     logger.info(
         "post_race.race_results.run season=%s round=%s (skeleton)", season, round_number

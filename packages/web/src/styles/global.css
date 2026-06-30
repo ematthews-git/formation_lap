@@ -1,0 +1,55 @@
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Pulsing live-status dots (header logo dot, FEED_LIVE indicator). */
+@keyframes flpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Sweeping scanline across the header band. */
+@keyframes flscan {
+  0% {
+    top: -2px;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+/* Display-number defaults: Saira Condensed, tabular figures. */
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}

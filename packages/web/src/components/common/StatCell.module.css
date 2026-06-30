@@ -1,0 +1,30 @@
+.cell {
+  padding: 15px 18px;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-fainter);
+  margin-bottom: 6px;
+}
+
+.value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 0.9;
+  color: var(--text-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.md {
+  font-size: 30px;
+}
+
+.unit {
+  font-size: 15px;
+  color: var(--text-faint);
+  margin-left: 2px;
+}

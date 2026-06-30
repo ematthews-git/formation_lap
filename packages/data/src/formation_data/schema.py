@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     Date,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
+    func,
 )
 
 metadata = MetaData()
@@ -26,12 +28,21 @@ circuits = Table(
     "circuits",
     metadata,
     Column("circuit_id", String(50), primary_key=True),
-    Column("event_name", String, nullable=False),
     Column("country", String, nullable=False),
     Column("track_length_km", Float, nullable=False),
     Column("num_corners", Integer, nullable=False),
     Column("num_laps", Integer, nullable=False),
     Column("sm_zones", Integer, nullable=False),
+    # Cross-source identity + location, hand-curated alongside the rest of the row.
+    # These map our circuit_id onto the keys other sources use, so we never have to
+    # match on a season-unstable event name (e.g. "Spanish Grand Prix" = Barcelona
+    # pre-2026, Madrid from 2026). jolpica_id joins against Jolpica's Circuit.circuitId;
+    # fastf1_location joins against FastF1's get_event_schedule().Location (stable per
+    # track, unlike EventName); lat/lon feed Open-Meteo.
+    Column("jolpica_id", String(50), nullable=False, unique=True),
+    Column("fastf1_location", String(50), nullable=False, unique=True),
+    Column("lat", Float, nullable=False),
+    Column("lon", Float, nullable=False),
 )
 
 
@@ -61,6 +72,12 @@ circuit_stats = Table(
     Column("pit_loss_vsc", Float, nullable=False),
     Column("undercut_strength", Float, nullable=False),
     Column("overcut_strength", Float, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
     UniqueConstraint("circuit_id", "season"),
 )
 
@@ -85,12 +102,19 @@ race_weekends = Table(
     Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
     Column("season", Integer, nullable=False),
     Column("round_number", Integer, nullable=False),
+    # FastF1's EventName for this round, stored verbatim. This is the season-
+    # specific event label (e.g. "Styrian Grand Prix"); it is NOT a stable circuit
+    # key, which is why circuit identity lives on circuit_id, not here.
+    Column("event_name", String, nullable=False),
     Column("race_date", Date, nullable=False),
     Column("is_sprint", Boolean, nullable=False),
     Column("soft_compound", String(5), nullable=False),
     Column("medium_compound", String(5), nullable=False),
     Column("hard_compound", String(5), nullable=False),
-    UniqueConstraint("circuit_id", "season"),
+    # Keyed on (season, round_number), not (circuit_id, season): double-header
+    # seasons (2020: Red Bull Ring, Silverstone, Bahrain ×2) visit a circuit twice,
+    # and circuit_stats backfills historical seasons.
+    UniqueConstraint("season", "round_number"),
 )
 
 
@@ -106,6 +130,12 @@ weather_forecasts = Table(
     Column("temp_low_c", Float, nullable=False),
     Column("rain_probability", Integer, nullable=False),
     Column("wind_speed_kph", Float, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
     UniqueConstraint("race_weekend_id", "session_name"),
 )
 
@@ -118,6 +148,12 @@ strategies = Table(
     Column("is_base", Boolean, nullable=False),
     Column("num_stops", Integer, nullable=False),
     Column("label", String, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
     UniqueConstraint("race_weekend_id", "label"),
 )
 
@@ -141,10 +177,14 @@ race_results = Table(
     Column("id", Integer, primary_key=True),
     Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
     Column("season", Integer, nullable=False),
+    Column("round_number", Integer, nullable=False),
     Column("position", Integer, nullable=False),
     Column("driver_id", String, nullable=False),
     Column("team", String, nullable=False),
-    UniqueConstraint("circuit_id", "season", "position"),
+    # Keyed on (season, round_number) rather than (circuit_id, season): a circuit
+    # can host two rounds in one season (2020 double-headers), which would collide
+    # on circuit_id. circuit_id stays as a denormalized FK for convenient joins.
+    UniqueConstraint("season", "round_number", "position"),
 )
 
 

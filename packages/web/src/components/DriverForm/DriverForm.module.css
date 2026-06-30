@@ -1,0 +1,87 @@
+.headRow,
+.row {
+  display: grid;
+  grid-template-columns: 34px 1fr 116px 96px 60px 74px;
+  align-items: center;
+}
+
+.headRow {
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-ghost);
+}
+
+.row {
+  position: relative;
+  padding: 11px 18px 11px 0;
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.accentBar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.pos {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-faint);
+  padding-left: 18px;
+}
+
+.name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 21px;
+  color: var(--text-num);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.team {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.right {
+  text-align: right;
+}
+
+.last {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.placeholder {
+  color: var(--text-ghost);
+  font-family: var(--font-mono);
+}
+
+.pts {
+  text-align: right;
+  padding-right: 18px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 23px;
+  color: var(--text-num);
+  font-variant-numeric: tabular-nums;
+}

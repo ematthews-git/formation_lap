@@ -23,7 +23,14 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-formation}:${POSTGRES_PASSWORD:-formation}@db:5432/${POSTGRES_DB:-formation_lap}
+      FASTF1_CACHE_DIR: /cache/fastf1
+    # Persist FastF1's HTTP cache across one-shot runs. Finished seasons never
+    # change, so a warm cache makes re-runs free and keeps cold loads from
+    # re-fetching the same data into FastF1's 500-req/h limit.
+    volumes:
+      - fastf1cache:/cache/fastf1
     profiles: ["worker"]
 
 volumes:
   pgdata:
+  fastf1cache:
