@@ -25,7 +25,11 @@ from formation_data.jobs.pre_season import (
     lap_records as pre_season_lap_records,
     race_weekends,
 )
-from formation_data.jobs.static import circuits as static_circuits
+from formation_data.jobs.static import (
+    circuits as static_circuits,
+    drivers as static_drivers,
+    race_weekends as static_weekends,
+)
 from formation_data.sources import fastf1_client
 
 app = typer.Typer(help="Formation Lap data loader.")
@@ -67,10 +71,24 @@ def circuits_seed() -> None:
         static_circuits.run(conn)
 
 
+@drivers_app.command("seed")
+def drivers_seed(season: int = typer.Option(2026)) -> None:
+    """Hand-curated grid (v1). Use `refresh` to pull from Jolpica instead."""
+    with connection_scope() as conn:
+        static_drivers.run(conn, season=season)
+
+
 @drivers_app.command("refresh")
 def drivers_refresh(season: int = typer.Option(...)) -> None:
     with connection_scope() as conn:
         drivers.run(conn, season=season)
+
+
+@weekends_app.command("seed")
+def weekends_seed(season: int = typer.Option(2026)) -> None:
+    """Hand-curated calendar (v1). Use `refresh` to pull from Jolpica instead."""
+    with connection_scope() as conn:
+        static_weekends.run(conn, season=season)
 
 
 @weekends_app.command("refresh")
