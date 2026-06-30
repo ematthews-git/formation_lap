@@ -19,6 +19,7 @@ export interface Circuit {
   fastf1_location: string
   lat: number
   lon: number
+  track_outline: string | null
 }
 
 export interface RaceWeekend {
@@ -73,4 +74,36 @@ export interface LapRecord {
   driver: string
   year: number
   lap_time_seconds: number
+}
+
+export interface WeatherForecast {
+  id: number | null
+  race_weekend_id: number
+  session_name: string
+  session_date: string
+  condition: string
+  temp_high_c: number
+  temp_low_c: number
+  rain_probability: number
+  wind_speed_kph: number
+  updated_at: string | null
+}
+
+export interface StrategyStint {
+  id: number | null
+  strategy_id: number
+  stint_order: number
+  compound: string
+  pit_lap_window_start: number
+  pit_lap_window_end: number
+}
+
+export interface StrategyWithStints {
+  id: number | null
+  race_weekend_id: number
+  is_base: boolean
+  num_stops: number
+  label: string
+  updated_at: string | null
+  stints: StrategyStint[]
 }

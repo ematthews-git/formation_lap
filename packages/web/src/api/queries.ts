@@ -7,6 +7,8 @@ import type {
   LapRecord,
   RaceWeekend,
   Standing,
+  StrategyWithStints,
+  WeatherForecast,
 } from './types'
 
 export const DEFAULT_SEASON = 2026
@@ -57,6 +59,24 @@ export function useCircuitStats(
   })
 }
 
+export function useWeather(season: number, round: number | undefined) {
+  return useQuery({
+    queryKey: ['weather', season, round],
+    enabled: round != null,
+    queryFn: () =>
+      api.get<WeatherForecast[]>(`/weather/?season=${season}&round=${round}`),
+  })
+}
+
+export function useStrategies(season: number, round: number | undefined) {
+  return useQuery({
+    queryKey: ['strategies', season, round],
+    enabled: round != null,
+    queryFn: () =>
+      api.get<StrategyWithStints[]>(`/strategies/?season=${season}&round=${round}`),
+  })
+}
+
 export function useLapRecord(circuitId: string | undefined) {
   return useQuery({
     queryKey: ['lap-record', circuitId],
@@ -64,6 +84,19 @@ export function useLapRecord(circuitId: string | undefined) {
     queryFn: () =>
       api.getOptional<LapRecord>(`/circuits/${circuitId}/lap-record`),
   })
+}
+
+/** Index of the upcoming round (race_date today or later); last round if the
+ * season is over. Returns -1 for an empty/missing calendar. Assumes `sorted`. */
+function upcomingIndex(sorted: RaceWeekend[]): number {
+  if (sorted.length === 0) return -1
+  const today = new Date().toISOString().slice(0, 10)
+  const idx = sorted.findIndex((w) => w.race_date >= today)
+  return idx === -1 ? sorted.length - 1 : idx
+}
+
+function sortByRound(weekends: RaceWeekend[]): RaceWeekend[] {
+  return [...weekends].sort((a, b) => a.round_number - b.round_number)
 }
 
 /**
@@ -76,10 +109,28 @@ export function pickFeaturedWeekend(
   roundOverride?: number,
 ): RaceWeekend | undefined {
   if (!weekends || weekends.length === 0) return undefined
-  const sorted = [...weekends].sort((a, b) => a.round_number - b.round_number)
+  const sorted = sortByRound(weekends)
   if (roundOverride != null) {
     return sorted.find((w) => w.round_number === roundOverride) ?? sorted[0]
   }
-  const today = new Date().toISOString().slice(0, 10)
-  return sorted.find((w) => w.race_date >= today) ?? sorted[sorted.length - 1]
+  return sorted[upcomingIndex(sorted)]
+}
+
+/** Look up a weekend by round number. */
+export function weekendByRound(
+  weekends: RaceWeekend[] | undefined,
+  round: number,
+): RaceWeekend | undefined {
+  return weekends?.find((w) => w.round_number === round)
+}
+
+/** The next `count` race weekends after the upcoming one, in calendar order. */
+export function lookaheadWeekends(
+  weekends: RaceWeekend[] | undefined,
+  count = 3,
+): RaceWeekend[] {
+  if (!weekends || weekends.length === 0) return []
+  const sorted = sortByRound(weekends)
+  const start = upcomingIndex(sorted) + 1
+  return sorted.slice(start, start + count)
 }

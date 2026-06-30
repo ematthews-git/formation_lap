@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from datetime import date, timedelta
 
 from pydantic import BaseModel
-from sqlalchemy import Connection, Table, func, select
+from sqlalchemy import Connection, Table, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from formation_data import domain, schema
@@ -75,27 +75,54 @@ def upsert_strategy_with_stints(
 ) -> int:
     """Upsert a Strategy and its stints atomically; returns the strategy id.
 
-    Skeleton — needs the RETURNING-style two-step that swaps the new strategy_id
-    into each stint before its own upsert.
+    The strategy row is inserted (or updated, keyed on its unique
+    (race_weekend_id, label)) with RETURNING so its auto-id lands before the
+    child stints are written — each stint's `strategy_id` is swapped to the
+    returned id, then the stints upsert keyed on (strategy_id, stint_order).
     """
-    # TODO:
-    #   strat_stmt = insert(schema.strategies).values(strategy.model_dump(exclude_none=True))
-    #   strat_stmt = strat_stmt.on_conflict_do_update(
-    #       index_elements=["race_weekend_id", "label"],
-    #       set_={"is_base": strat_stmt.excluded.is_base,
-    #             "num_stops": strat_stmt.excluded.num_stops},
-    #   ).returning(schema.strategies.c.id)
-    #   strategy_id = conn.execute(strat_stmt).scalar_one()
-    #   for s in stints:
-    #       s.strategy_id = strategy_id
-    #   upsert(conn, schema.strategy_stints, stints, ["strategy_id", "stint_order"])
-    #   return strategy_id
-    logger.info(
-        "repositories.upsert_strategy_with_stints label=%s stints=%d (skeleton)",
-        strategy.label,
-        len(stints),
+    strat_payload = strategy.model_dump(exclude={"id"} | _SERVER_MANAGED_COLS)
+    strat_stmt = insert(schema.strategies).values(strat_payload)
+    strat_stmt = strat_stmt.on_conflict_do_update(
+        index_elements=["race_weekend_id", "label"],
+        set_={
+            "is_base": strat_stmt.excluded.is_base,
+            "num_stops": strat_stmt.excluded.num_stops,
+            "updated_at": func.now(),
+        },
+    ).returning(schema.strategies.c.id)
+    strategy_id = conn.execute(strat_stmt).scalar_one()
+
+    for s in stints:
+        s.strategy_id = strategy_id
+    upsert(conn, schema.strategy_stints, stints, ["strategy_id", "stint_order"])
+    return strategy_id
+
+
+def delete_strategies_for_weekend(conn: Connection, race_weekend_id: int) -> int:
+    """Delete every strategy (and its stints) for a race weekend.
+
+    Used before a fresh strategy generation so strategies that are no longer in
+    the current top-N don't linger. There's no ON DELETE CASCADE on the FK, so
+    the child stints are removed first. Returns the number of strategies deleted.
+    """
+    ids = (
+        conn.execute(
+            select(schema.strategies.c.id).where(
+                schema.strategies.c.race_weekend_id == race_weekend_id
+            )
+        )
+        .scalars()
+        .all()
     )
-    return 0
+    if not ids:
+        return 0
+    conn.execute(
+        delete(schema.strategy_stints).where(
+            schema.strategy_stints.c.strategy_id.in_(ids)
+        )
+    )
+    conn.execute(delete(schema.strategies).where(schema.strategies.c.id.in_(ids)))
+    return len(ids)
 
 
 # --- read ---
@@ -226,6 +253,75 @@ def get_lap_record_for_circuit(
         )
     ).first()
     return domain.LapRecord.model_validate(row._mapping) if row else None
+
+
+def list_strategies_for_weekend(
+    conn: Connection, season: int, round_number: int
+) -> list[domain.StrategyWithStints]:
+    """Generated strategies (each with its ordered stints) for a race weekend.
+
+    Base strategy first, then by stop count. Returns `[]` when the weekend
+    doesn't exist or has no strategies generated yet.
+    """
+    rw = get_race_weekend(conn, season, round_number)
+    if rw is None:
+        return []
+
+    strat_rows = conn.execute(
+        select(schema.strategies)
+        .where(schema.strategies.c.race_weekend_id == rw.id)
+        .order_by(
+            schema.strategies.c.is_base.desc(),
+            schema.strategies.c.num_stops,
+            schema.strategies.c.label,
+        )
+    ).all()
+    if not strat_rows:
+        return []
+
+    strategy_ids = [row.id for row in strat_rows]
+    stint_rows = conn.execute(
+        select(schema.strategy_stints)
+        .where(schema.strategy_stints.c.strategy_id.in_(strategy_ids))
+        .order_by(
+            schema.strategy_stints.c.strategy_id,
+            schema.strategy_stints.c.stint_order,
+        )
+    ).all()
+
+    stints_by_strategy: dict[int, list[domain.StrategyStint]] = {}
+    for row in stint_rows:
+        stints_by_strategy.setdefault(row.strategy_id, []).append(
+            domain.StrategyStint.model_validate(row._mapping)
+        )
+
+    return [
+        domain.StrategyWithStints(
+            **row._mapping, stints=stints_by_strategy.get(row.id, [])
+        )
+        for row in strat_rows
+    ]
+
+
+def list_weather_for_weekend(
+    conn: Connection, season: int, round_number: int
+) -> list[domain.WeatherForecast]:
+    """Per-session weather forecast for a race weekend, in chronological order.
+
+    Returns `[]` when the weekend doesn't exist or has no forecast loaded yet.
+    """
+    rw = get_race_weekend(conn, season, round_number)
+    if rw is None:
+        return []
+    rows = conn.execute(
+        select(schema.weather_forecasts)
+        .where(schema.weather_forecasts.c.race_weekend_id == rw.id)
+        .order_by(
+            schema.weather_forecasts.c.session_date,
+            schema.weather_forecasts.c.id,
+        )
+    ).all()
+    return [domain.WeatherForecast.model_validate(row._mapping) for row in rows]
 
 
 def get_circuit_stats(

@@ -1,14 +1,17 @@
-import type { CircuitStats, RaceWeekend } from '../../api/types'
+import type { CircuitStats, RaceWeekend, StrategyWithStints } from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { EmptyState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
+import { StintTimeline } from './StintTimeline'
 import styles from './TyreStrategy.module.css'
 
 interface Props {
   weekend: RaceWeekend
   stats: CircuitStats | null | undefined
   statsLoading: boolean
+  strategies: StrategyWithStints[] | undefined
+  strategiesLoading: boolean
 }
 
 const COMPOUNDS = [
@@ -17,7 +20,13 @@ const COMPOUNDS = [
   { key: 'soft', name: 'Soft', desc: 'PEAK GRIP · QUALI', color: 'var(--soft)' },
 ] as const
 
-export function TyreStrategy({ weekend, stats, statsLoading }: Props) {
+export function TyreStrategy({
+  weekend,
+  stats,
+  statsLoading,
+  strategies,
+  strategiesLoading,
+}: Props) {
   const code = {
     hard: weekend.hard_compound,
     medium: weekend.medium_compound,
@@ -99,13 +108,18 @@ export function TyreStrategy({ weekend, stats, statsLoading }: Props) {
         </div>
       </div>
 
-      {/* stint timeline — strategies have no endpoint yet */}
+      {/* stint timeline — mined from the most recent dry running of this circuit */}
       <div className={styles.stintArea}>
-        <div className={styles.sectionLabel}>STINT PLAN</div>
-        <EmptyState
-          label="STRATEGY MODEL PENDING"
-          hint="strategies generate job + /strategies endpoint not yet implemented"
-        />
+        {strategiesLoading ? (
+          <LoadingState label="LOADING STRATEGIES" />
+        ) : strategies && strategies.length > 0 ? (
+          <StintTimeline strategies={strategies} />
+        ) : (
+          <EmptyState
+            label="NO STRATEGY DATA"
+            hint="run: formation-data strategies generate --season … --round …"
+          />
+        )}
       </div>
     </Panel>
   )

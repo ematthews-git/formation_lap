@@ -24,6 +24,7 @@ from formation_data.jobs.pre_season import (
     drivers,
     lap_records as pre_season_lap_records,
     race_weekends,
+    track_maps,
 )
 from formation_data.jobs.static import (
     circuits as static_circuits,
@@ -69,6 +70,16 @@ def _configure_logging(verbose: bool = typer.Option(False, "--verbose", "-v")) -
 def circuits_seed() -> None:
     with connection_scope() as conn:
         static_circuits.run(conn)
+
+
+@circuits_app.command("trackmap")
+def circuits_trackmap(
+    season: int = typer.Option(2025, help="Most recent season to source telemetry from."),
+    circuit: str | None = typer.Option(None, "--circuit", help="Single circuit_id; default all."),
+) -> None:
+    """Generate circuit-outline SVG paths from FastF1 telemetry."""
+    with connection_scope() as conn:
+        track_maps.run(conn, season=season, circuit_id=circuit)
 
 
 @drivers_app.command("seed")

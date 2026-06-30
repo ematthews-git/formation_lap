@@ -1,6 +1,89 @@
-.body {
+.fill {
   display: flex;
   flex: 1;
   align-items: center;
   min-height: 180px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.cell {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.cellLeft {
+  border-left: 1px solid var(--border-soft);
+}
+
+.cellLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text-fainter);
+  margin-bottom: 6px;
+}
+
+.cellValue {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 0.9;
+  color: var(--text-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.cellUnit {
+  font-size: 15px;
+  color: var(--text-faint);
+  margin-left: 2px;
+}
+
+.chart {
+  padding: 15px 18px 18px;
+}
+
+.chartLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text-fainter);
+  margin-bottom: 11px;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  height: 70px;
+}
+
+.barCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.barPct {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-faint);
+}
+
+.bar {
+  width: 100%;
+  background: var(--rain);
+}
+
+.barName {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
 }

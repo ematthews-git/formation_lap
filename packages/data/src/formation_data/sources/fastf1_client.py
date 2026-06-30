@@ -91,3 +91,21 @@ def get_race_session(season: int, round_number: int):
 
     logger.info("get_race_session season=%s round=%s", season, round_number)
     return session
+
+
+def get_fastest_lap_track(season: int, round_number: int):
+    """Position trace of the race's fastest lap, plus the circuit rotation.
+
+    Returns (x, y, rotation_deg): the fastest lap's X/Y telemetry as numpy
+    arrays (FastF1 position units), and the circuit's canonical rotation in
+    degrees (from `get_circuit_info()`) so every generated map can be oriented
+    consistently. Loads telemetry, which is heavier than a plain lap load.
+    """
+    session = fastf1.get_session(season, round_number, "R")
+    session.load(laps=True, telemetry=True, weather=False, messages=False)
+
+    telemetry = session.laps.pick_fastest().get_telemetry()
+    rotation = float(session.get_circuit_info().rotation)
+
+    logger.info("get_fastest_lap_track season=%s round=%s", season, round_number)
+    return telemetry["X"].to_numpy(), telemetry["Y"].to_numpy(), rotation

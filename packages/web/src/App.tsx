@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import {
   DEFAULT_SEASON,
+  lookaheadWeekends,
   pickFeaturedWeekend,
   useCircuit,
   useCircuitStats,
@@ -7,8 +9,12 @@ import {
   useLapRecord,
   useRaceWeekends,
   useStandings,
+  useStrategies,
+  useWeather,
+  weekendByRound,
 } from './api/queries'
 import { roundOverrideFromUrl } from './lib/format'
+import { raceSession } from './lib/weather'
 import { Header } from './components/Header/Header'
 import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
@@ -22,14 +28,28 @@ import styles from './App.module.css'
 const SEASON = DEFAULT_SEASON
 
 export default function App() {
-  const roundOverride = roundOverrideFromUrl()
+  // A round the user has clicked into via the lookahead; null = the upcoming race.
+  const [selectedRound, setSelectedRound] = useState<number | undefined>(
+    roundOverrideFromUrl(),
+  )
 
   const weekends = useRaceWeekends(SEASON)
-  const featured = pickFeaturedWeekend(weekends.data, roundOverride)
+  const upcoming = pickFeaturedWeekend(weekends.data)
+  const lookahead = lookaheadWeekends(weekends.data, 3)
+  const featured =
+    selectedRound != null
+      ? (weekendByRound(weekends.data, selectedRound) ?? upcoming)
+      : upcoming
+
+  const onSelectRound = (round: number) =>
+    // Click the active lookahead race again to return to the upcoming one.
+    setSelectedRound((cur) => (cur === round ? undefined : round))
 
   const circuit = useCircuit(featured?.circuit_id)
   const lapRecord = useLapRecord(featured?.circuit_id)
   const stats = useCircuitStats(featured?.circuit_id, SEASON)
+  const strategies = useStrategies(SEASON, featured?.round_number)
+  const weather = useWeather(SEASON, featured?.round_number)
   const drivers = useDrivers(SEASON)
   const standings = useStandings(SEASON)
 
@@ -65,7 +85,15 @@ export default function App() {
 
   return (
     <div className={styles.page}>
-      <Header weekend={featured} circuit={circuit.data} totalRounds={totalRounds} />
+      <Header
+        weekend={featured}
+        circuit={circuit.data}
+        totalRounds={totalRounds}
+        raceWeather={raceSession(weather.data)}
+        lookahead={lookahead}
+        activeRound={featured.round_number}
+        onSelectRound={onSelectRound}
+      />
 
       <main className={styles.main}>
         <section className={styles.splitWide}>
@@ -75,10 +103,16 @@ export default function App() {
             lapRecord={lapRecord.data}
             lapRecordLoading={lapRecord.isLoading}
           />
-          <WeatherStrip />
+          <WeatherStrip weather={weather.data} weatherLoading={weather.isLoading} />
         </section>
 
-        <TyreStrategy weekend={featured} stats={stats.data} statsLoading={stats.isLoading} />
+        <TyreStrategy
+          weekend={featured}
+          stats={stats.data}
+          statsLoading={stats.isLoading}
+          strategies={strategies.data}
+          strategiesLoading={strategies.isLoading}
+        />
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>
           <DriverForm

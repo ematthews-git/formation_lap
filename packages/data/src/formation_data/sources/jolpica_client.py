@@ -14,10 +14,19 @@ Used by:
 from __future__ import annotations
 
 import logging
+import time
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.jolpi.ca/ergast/f1"
+
+_TIMEOUT = httpx.Timeout(30.0)
+_PAGE_SIZE = 100
+# Jolpica's unauthenticated burst limit is ~4 req/s; pause between paged
+# requests to stay comfortably under it (a 429 would abort a circuit).
+_REQUEST_DELAY_S = 0.34
 
 
 def get_drivers(season: int):
@@ -48,3 +57,49 @@ def get_constructor_standings(season: int, round_number: int):
     # TODO: httpx.get(f"{BASE_URL}/{season}/{round_number}/constructorStandings.json").json()...
     logger.info("jolpica.get_constructor_standings season=%s round=%s (skeleton)", season, round_number)
     return []
+
+
+def get_qualifying_results(circuit_id: str) -> list[dict]:
+    """Every qualifying result on record for a circuit (its Ergast/Jolpica
+    circuitId), paginating through all seasons.
+
+    Each row: {season:int, race:str, driver:str, best_time:str} where best_time
+    is the driver's best of Q3/Q2/Q1 (results with no Q time are skipped — e.g.
+    the pre-2006 single-lap qualifying era exposes no Q1/Q2/Q3). Raises
+    httpx.HTTPError on a network/HTTP failure (incl. 429 rate limiting).
+    """
+    rows: list[dict] = []
+    offset = 0
+    while True:
+        resp = httpx.get(
+            f"{BASE_URL}/circuits/{circuit_id}/qualifying.json",
+            params={"limit": _PAGE_SIZE, "offset": offset},
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        time.sleep(_REQUEST_DELAY_S)
+        mrdata = resp.json()["MRData"]
+        races = mrdata["RaceTable"]["Races"]
+        if not races:
+            break
+        for race in races:
+            for result in race.get("QualifyingResults", []):
+                best_time = result.get("Q3") or result.get("Q2") or result.get("Q1")
+                if not best_time:
+                    continue
+                rows.append(
+                    {
+                        "season": int(race["season"]),
+                        "race": race["raceName"],
+                        "driver": result["Driver"]["familyName"],
+                        "best_time": best_time,
+                    }
+                )
+        offset += _PAGE_SIZE
+        if offset >= int(mrdata["total"]):
+            break
+
+    logger.info(
+        "jolpica.get_qualifying_results circuit=%s rows=%d", circuit_id, len(rows)
+    )
+    return rows

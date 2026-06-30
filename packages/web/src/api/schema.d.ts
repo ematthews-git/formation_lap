@@ -168,6 +168,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/strategies/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Strategies
+         * @description Generated strategy options for a race weekend, each with its ordered stints.
+         *
+         *     e.g. /strategies/?season=2026&round=11. Returns an empty list if the weekend
+         *     has no strategies generated yet.
+         */
+        get: operations["list_strategies_strategies__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/weather/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Weather
+         * @description Per-session weather forecast for a race weekend.
+         *
+         *     e.g. /weather/?season=2026&round=11. Returns an empty list if no forecast
+         *     has been loaded for the weekend yet.
+         */
+        get: operations["list_weather_weather__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -296,6 +342,44 @@ export interface components {
             /** Points */
             points: number;
         };
+        /** StrategyStint */
+        StrategyStint: {
+            /** Id */
+            id?: number | null;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Stint Order */
+            stint_order: number;
+            /** Compound */
+            compound: string;
+            /** Pit Lap Window Start */
+            pit_lap_window_start: number;
+            /** Pit Lap Window End */
+            pit_lap_window_end: number;
+        };
+        /**
+         * StrategyWithStints
+         * @description A strategy plus its ordered stints — API read shape (not a seed/upsert type).
+         */
+        StrategyWithStints: {
+            /** Id */
+            id?: number | null;
+            /** Race Weekend Id */
+            race_weekend_id: number;
+            /** Is Base */
+            is_base: boolean;
+            /** Num Stops */
+            num_stops: number;
+            /** Label */
+            label: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Stints
+             * @default []
+             */
+            stints: components["schemas"]["StrategyStint"][];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -308,6 +392,32 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WeatherForecast */
+        WeatherForecast: {
+            /** Id */
+            id?: number | null;
+            /** Race Weekend Id */
+            race_weekend_id: number;
+            /** Session Name */
+            session_name: string;
+            /**
+             * Session Date
+             * Format: date
+             */
+            session_date: string;
+            /** Condition */
+            condition: string;
+            /** Temp High C */
+            temp_high_c: number;
+            /** Temp Low C */
+            temp_low_c: number;
+            /** Rain Probability */
+            rain_probability: number;
+            /** Wind Speed Kph */
+            wind_speed_kph: number;
+            /** Updated At */
+            updated_at?: string | null;
         };
     };
     responses: never;
@@ -567,6 +677,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Standing"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_strategies_strategies__get: {
+        parameters: {
+            query: {
+                season: number;
+                round: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyWithStints"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_weather_weather__get: {
+        parameters: {
+            query: {
+                season: number;
+                round: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeatherForecast"][];
                 };
             };
             /** @description Validation Error */

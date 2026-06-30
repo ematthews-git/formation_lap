@@ -30,6 +30,9 @@ class Circuit(_Base):
     fastf1_location: str
     lat: float
     lon: float
+    # SVG path (viewBox 0 0 400 248) of the circuit outline; None until generated
+    # by jobs.pre_season.track_maps.
+    track_outline: str | None = None
 
 
 class LapRecord(_Base):
@@ -107,6 +110,18 @@ class StrategyStint(_Base):
     pit_lap_window_end: int
 
 
+class StrategyWithStints(_Base):
+    """A strategy plus its ordered stints — API read shape (not a seed/upsert type)."""
+
+    id: int | None = None
+    race_weekend_id: int
+    is_base: bool
+    num_stops: int
+    label: str
+    updated_at: datetime | None = None
+    stints: list[StrategyStint] = []
+
+
 class RaceResult(_Base):
     id: int | None = None
     circuit_id: str
@@ -136,6 +151,7 @@ __all__ = [
     "WeatherForecast",
     "Strategy",
     "StrategyStint",
+    "StrategyWithStints",
     "RaceResult",
     "Standing",
 ]
