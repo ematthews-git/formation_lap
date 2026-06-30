@@ -1,0 +1,46 @@
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.label {
+  color: var(--text-fainter);
+}
+
+.hint {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-ghost);
+  text-transform: none;
+}
+
+.loading {
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-fainter);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--live);
+  display: inline-block;
+  animation: flpulse 1.8s ease-in-out infinite;
+}
+
+.empty {
+  border-left: 2px solid var(--border);
+}
+
+.error {
+  border-left: 2px solid var(--accent);
+  color: var(--accent-hot);
+}

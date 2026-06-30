@@ -40,8 +40,8 @@ formation-lap/               # uv workspace root
 │   ├── api/                 # formation-api — FastAPI app
 │   │   └── src/formation_api/
 │   │       ├── main.py
-│   │       └── routers/    # health, circuits (minimal — most endpoints not yet built)
-│   └── web/                 # planned React frontend (empty)
+│   │       └── routers/    # health, circuits, drivers, race_weekends, standings
+│   └── web/                 # formation-web — Vite + React + TS Strategy Briefing page
 ├── docker-compose.yml       # postgres + one-shot worker container
 └── pyproject.toml           # workspace config
 ```
@@ -94,21 +94,19 @@ Three orchestrated flows in `orchestrator.py`, triggered by CLI or scheduler:
 
 ## Implementation status
 
-Most jobs are **skeletons** — they log intent but don't fetch or write data yet. What's implemented:
-- `circuits seed` — fully working, hand-curated data
-- `list_circuits` repository read + API endpoint
+Most data-pipeline jobs are **skeletons** — they log intent but don't fetch or write data yet. What's implemented:
+- Static seeds (fully working, hand-curated): `circuits seed`, `drivers seed`, `weekends seed`
+- Repository reads + API endpoints for: circuits (+ `/stats`, `/lap-record`), race-weekends, drivers, standings, health
 - Generic `upsert()` in repositories.py
 - CLI wiring (all subcommands registered)
 - Docker Compose for local Postgres
 - FastF1 cache setup
+- **Frontend** (`packages/web`): Vite + React + TS Strategy Briefing page, wired to the live API (see Frontend section under Running locally)
 
 What's skeleton/TODO:
 - All source client methods (Jolpica, weather, most of FastF1)
-- All pre-season jobs except circuits
-- All pre-race and post-race jobs
-- Most repository read functions
-- API endpoints beyond `/circuits/` and `/health`
-- Frontend (empty `packages/web/`)
+- Data jobs beyond the static seeds (lap records, circuit-stats recompute, weather, strategies, results, standings) — so `/standings`, `/circuits/{id}/stats`, and `/circuits/{id}/lap-record` may return empty / 404 until those run
+- API routers not yet built: weather, strategies, race-results — the matching frontend sections render empty states until these land
 
 ## Architecture patterns
 
@@ -125,17 +123,29 @@ What's skeleton/TODO:
 # Start Postgres
 docker compose up -d db
 
-# Install dependencies
-uv sync
+# Install dependencies (--all-packages installs the workspace members
+# formation-data + formation-api into .venv; plain `uv sync` does not)
+uv sync --all-packages
 
-# Create tables (Postgres must be running)
-uv run python -c "from formation_data.schema import metadata; from formation_data.db import engine; metadata.create_all(engine)"
+# Create tables (Postgres must be running; the engine is created lazily)
+uv run python -c "from formation_data.schema import metadata; from formation_data.db import get_engine; metadata.create_all(get_engine())"
 
-# Seed circuits
+# Seed the static data (idempotent upserts)
 uv run formation-data circuits seed
+uv run formation-data drivers seed --season 2026
+uv run formation-data weekends seed --season 2026
 
 # Run API
 uv run uvicorn formation_api.main:app --reload
+```
+
+### Frontend (packages/web)
+
+```bash
+cd packages/web
+npm install
+npm run gen:api   # regenerate API types from http://localhost:8000/openapi.json (API must be running)
+npm run dev       # http://localhost:5173 (port is fixed — it's the only CORS-allowed origin)
 ```
 
 ## Environment variables

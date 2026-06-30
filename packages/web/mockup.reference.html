@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="12726666-bfc1-4521-8c79-e2c1f24cedf7"></script>
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<style>/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("54e088d4-3f43-4bbc-a7fc-785166b20a05") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("29a0c5ad-caaf-4d57-bf86-f43ddb2128a6") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("e5749d47-74c7-4c1f-a3d1-fdec469a3188") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("46afcf40-1a95-4aa0-9b01-f61f6f30153d") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("27dcfb0e-2c14-4447-9b99-a40d7d30a4a1") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("8f929694-dd2d-4a62-adb1-261c277f612f") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("445e23b6-8ce0-44b9-8118-160c92f4e58e") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("a0b1e0e0-c856-401b-b8b6-48d7270512c6") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("db07389a-7159-4e0f-b985-4e957567555c") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("f740ba23-bfba-49d5-909d-a9bd867eea08") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("dc9b43d8-19fc-495f-9cce-2f48a905e114") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("52f2ff84-1fae-47dc-962e-ce674917d73f") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("37c30488-b2f4-4177-9298-8e9ce08e7c99") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("bbe474d1-c0fe-4351-90a2-0139f9ab2e66") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("7058779b-e8f7-42fb-b756-7a114a729925") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("69b00958-eeaa-442d-86a8-9167cad6dd7d") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("46c5ce48-b821-4135-b50f-0775ad1e8ff4") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("7053a6fd-765d-4c2d-8ee3-587aba16eede") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("1a946496-1902-419b-a54f-29326a2e01d2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("7947431d-0f14-47fa-a861-3583161956a2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("516fa076-9791-4a41-bbed-e5f151754018") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("69b00958-eeaa-442d-86a8-9167cad6dd7d") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("46c5ce48-b821-4135-b50f-0775ad1e8ff4") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("7053a6fd-765d-4c2d-8ee3-587aba16eede") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("1a946496-1902-419b-a54f-29326a2e01d2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("7947431d-0f14-47fa-a861-3583161956a2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("516fa076-9791-4a41-bbed-e5f151754018") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("69b00958-eeaa-442d-86a8-9167cad6dd7d") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("46c5ce48-b821-4135-b50f-0775ad1e8ff4") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("7053a6fd-765d-4c2d-8ee3-587aba16eede") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("1a946496-1902-419b-a54f-29326a2e01d2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("7947431d-0f14-47fa-a861-3583161956a2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("516fa076-9791-4a41-bbed-e5f151754018") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("2d1ea8f9-223f-489d-8736-2dbd553565f6") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("27416d8d-075c-41d5-930f-c52eb1f0d8bc") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("8c8b5be6-f45a-4d18-8806-41f50048ace3") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("8d9f2e5e-54fd-4ab2-99e6-ee28d3cf5d2e") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("e5a54412-d67a-4437-967d-d259a58a7823") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("1bbec6c1-02cc-4585-b211-7afdc8f69ab2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("969eeeb1-8e24-44ee-897e-8b328999d5ca") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("b07dbcc5-d57c-4f97-930b-16057f72c76f") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Saira Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("22f059d1-cce7-4abe-b492-4a7968129c8e") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#161514}
+  @keyframes flpulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @keyframes flscan{0%{top:-2px}100%{top:100%}}
+  ::selection{background:#C13A40;color:#fff}
+</style>
+</helmet>
+
+<div style="background:#161514;color:#E6E3E0;font-family:'IBM Plex Sans',system-ui,sans-serif;min-height:100vh;padding-bottom:56px;-webkit-font-smoothing:antialiased">
+
+  <!-- ============ HEADER BAND ============ -->
+  <header style="position:relative;overflow:hidden;border-bottom:1px solid #3C3A36;background:linear-gradient(180deg,#201F1E 0%,#161514 100%)">
+    <div style="position:absolute;left:0;right:0;height:2px;background:rgba(235,232,228,.09);animation:flscan 6s linear infinite;pointer-events:none;z-index:0"></div>
+    <svg viewBox="0 0 400 248" width="460" style="position:absolute;right:-40px;top:56%;transform:translateY(-50%);opacity:.05;pointer-events:none;z-index:0"><path d="M58 196 C 80 150, 84 116, 122 116 C 146 116, 152 134, 174 136 C 214 140, 228 92, 262 90 C 308 88, 332 70, 346 90 C 358 108, 332 126, 296 132 C 264 137, 246 152, 260 172 C 274 192, 322 188, 332 208 C 339 223, 314 230, 284 226 C 240 220, 198 214, 176 207 C 138 195, 112 226, 86 216 C 64 207, 50 210, 58 196 Z" fill="none" stroke="#fff" stroke-width="2"></path></svg>
+    <div style="position:relative;z-index:1;max-width:1340px;margin:0 auto;padding:14px 32px 24px">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2E2B28;padding-bottom:12px">
+        <div style="display:flex;align-items:center;gap:11px">
+          <span style="width:7px;height:7px;border-radius:50%;background:#C13A40;display:inline-block;animation:flpulse 1.8s ease-in-out infinite"></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.3em;color:#E6E3E0;font-weight:600">FORMATION_LAP</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#6C6864;padding-left:11px;border-left:1px solid #403D38">// STRATEGY_BRIEFING</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:15px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.13em;color:#8C8884">
+          <span style="display:flex;align-items:center;gap:7px;color:#8A9E8C"><span style="width:6px;height:6px;background:#7E9B82;display:inline-block;animation:flpulse 1.8s ease-in-out infinite"></span>FEED_LIVE</span>
+          <span style="color:#4A4744">|</span>
+          <span style="display:flex;align-items:center;gap:8px;color:#A6A29E"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A6A29E" stroke-width="1.6"><path d="M6 16a4 4 0 0 1 .5-7.97A5.5 5.5 0 0 1 17.5 9H18a3.5 3.5 0 0 1 0 7Z"></path><path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"></path></svg>OVERCAST · 19°C · RAIN 35%</span>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:40px;padding-top:20px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.22em;color:#C13A40;font-weight:600">ROUND_12 / 30</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.18em;color:#6C6864">FIA F1 WORLD CHAMPIONSHIP · 2026</span>
+          </div>
+          <h1 style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:clamp(48px,7vw,92px);line-height:.84;letter-spacing:-.005em;text-transform:uppercase;color:#F4F2EF">British Grand Prix</h1>
+          <div style="display:flex;align-items:center;gap:16px;margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.04em;color:#A6A29E;flex-wrap:wrap">
+            <span style="color:#BBB7B3">Silverstone Circuit</span>
+            <span style="color:#4A4744">//</span>
+            <span>Northamptonshire, GBR</span>
+            <span style="color:#4A4744">//</span>
+            <span>Sun 5 Jul 2026</span>
+            <span style="color:#4A4744">//</span>
+            <span style="color:#BBB7B3">Lights out 15:00 BST</span>
+          </div>
+        </div>
+
+        <!-- countdown -->
+        <div style="flex:none">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.26em;color:#827E7A;text-align:right;margin-bottom:9px">LIGHTS OUT IN</div>
+          <div style="display:flex;gap:8px">
+            <div style="background:#242322;border:1px solid #3C3A36;padding:11px 16px;min-width:74px;text-align:center">
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:46px;line-height:1;color:#F1EEEB;font-variant-numeric:tabular-nums">{{ d }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.2em;color:#827E7A;margin-top:5px">DAYS</div>
+            </div>
+            <div style="background:#242322;border:1px solid #3C3A36;padding:11px 16px;min-width:74px;text-align:center">
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:46px;line-height:1;color:#F1EEEB;font-variant-numeric:tabular-nums">{{ h }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.2em;color:#827E7A;margin-top:5px">HRS</div>
+            </div>
+            <div style="background:#242322;border:1px solid #3C3A36;padding:11px 16px;min-width:74px;text-align:center">
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:46px;line-height:1;color:#F1EEEB;font-variant-numeric:tabular-nums">{{ m }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.2em;color:#827E7A;margin-top:5px">MIN</div>
+            </div>
+            <div style="background:#242322;border:1px solid #5C3A3B;padding:11px 16px;min-width:74px;text-align:center">
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:46px;line-height:1;color:#D6555A;font-variant-numeric:tabular-nums">{{ s }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.2em;color:#827E7A;margin-top:5px">SEC</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ BODY ============ -->
+  <main style="max-width:1340px;margin:0 auto;padding:28px 32px 0;display:flex;flex-direction:column;gap:22px">
+
+    <!-- ROW: circuit + weather -->
+    <section style="display:grid;grid-template-columns:1.85fr 1fr;gap:22px">
+
+      <!-- circuit panel -->
+      <div style="border:1px solid #3C3A36;background:#1E1D1C">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #36332F;background:#2A2928">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;color:#B4B0AB;font-weight:600">TRK_PROFILE <span style="color:#5C5854">//</span> SILVERSTONE</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6C6864">5.891 KM · CLOCKWISE</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:0">
+          <div style="padding:18px 20px;border-right:1px solid #322F2B;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 400 248" width="100%" style="max-width:360px;overflow:visible">
+              <path d="M58 196 C 80 150, 84 116, 122 116 C 146 116, 152 134, 174 136 C 214 140, 228 92, 262 90 C 308 88, 332 70, 346 90 C 358 108, 332 126, 296 132 C 264 137, 246 152, 260 172 C 274 192, 322 188, 332 208 C 339 223, 314 230, 284 226 C 240 220, 198 214, 176 207 C 138 195, 112 226, 86 216 C 64 207, 50 210, 58 196 Z" fill="none" stroke="#4A4744" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"></path>
+              <path d="M58 196 C 80 150, 84 116, 122 116 C 146 116, 152 134, 174 136 C 214 140, 228 92, 262 90 C 308 88, 332 70, 346 90 C 358 108, 332 126, 296 132 C 264 137, 246 152, 260 172 C 274 192, 322 188, 332 208 C 339 223, 314 230, 284 226 C 240 220, 198 214, 176 207 C 138 195, 112 226, 86 216 C 64 207, 50 210, 58 196 Z" fill="none" stroke="#E6E3E0" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"></path>
+              <line x1="52" y1="190" x2="64" y2="202" stroke="#C13A40" stroke-width="3.2"></line>
+              <circle cx="58" cy="196" r="3.4" fill="#1E1D1C" stroke="#E6E3E0" stroke-width="1.6"></circle>
+            </svg>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr">
+            <div style="padding:15px 18px;border-bottom:1px solid #322F2B">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#827E7A;margin-bottom:6px">LAPS</div>
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:34px;line-height:.9;color:#F1EEEB">52</div>
+            </div>
+            <div style="padding:15px 18px;border-bottom:1px solid #322F2B;border-left:1px solid #322F2B">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#827E7A;margin-bottom:6px">DISTANCE</div>
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:34px;line-height:.9;color:#F1EEEB">306<span style="font-size:18px;color:#8C8884">km</span></div>
+            </div>
+            <div style="padding:15px 18px;border-bottom:1px solid #322F2B">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#827E7A;margin-bottom:6px">DRS ZONES</div>
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:34px;line-height:.9;color:#F1EEEB">2</div>
+            </div>
+            <div style="padding:15px 18px;border-bottom:1px solid #322F2B;border-left:1px solid #322F2B">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#827E7A;margin-bottom:6px">PIT STOPS</div>
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:34px;line-height:.9;color:#F1EEEB">1–2</div>
+            </div>
+            <div style="padding:15px 18px;grid-column:1 / -1">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#827E7A;margin-bottom:6px">LAP RECORD</div>
+              <div style="display:flex;align-items:baseline;gap:10px">
+                <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:30px;line-height:.9;color:#F1EEEB;font-variant-numeric:tabular-nums">1:27.097</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8884">M. Verstappen ’20</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- weather forecast strip -->
+      <div style="border:1px solid #3C3A36;background:#1E1D1C;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #36332F;background:#2A2928">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;color:#B4B0AB;font-weight:600">MET_FORECAST <span style="color:#5C5854">//</span> RACE_WINDOW</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6C6864">14:00–16:30</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr">
+          <div style="padding:14px 18px;border-bottom:1px solid #322F2B;border-right:1px solid #322F2B">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#827E7A;margin-bottom:6px">AIR TEMP</div>
+            <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:30px;line-height:.9;color:#F1EEEB">19<span style="font-size:15px;color:#8C8884">°C</span></div>
+          </div>
+          <div style="padding:14px 18px;border-bottom:1px solid #322F2B">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#827E7A;margin-bottom:6px">TRACK TEMP</div>
+            <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:30px;line-height:.9;color:#F1EEEB">31<span style="font-size:15px;color:#8C8884">°C</span></div>
+          </div>
+          <div style="padding:14px 18px;border-bottom:1px solid #322F2B;border-right:1px solid #322F2B">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#827E7A;margin-bottom:6px">RAIN CHANCE</div>
+            <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:30px;line-height:.9;color:#6F8BA6">35<span style="font-size:15px;color:#8C8884">%</span></div>
+          </div>
+          <div style="padding:14px 18px;border-bottom:1px solid #322F2B">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#827E7A;margin-bottom:6px">WIND</div>
+            <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:30px;line-height:.9;color:#F1EEEB">18<span style="font-size:15px;color:#8C8884">km/h WSW</span></div>
+          </div>
+        </div>
+        <div style="padding:15px 18px 18px;margin-top:auto">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#827E7A;margin-bottom:11px">RAIN PROBABILITY · BY 30 MIN</div>
+          <div style="display:flex;align-items:flex-end;gap:7px;height:54px">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;background:#2C2A27;height:20px"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6C6864">14:00</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;background:#3A4750;height:28px"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6C6864">14:30</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;background:#52697B;height:35px"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6C6864">15:00</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;background:#6F8BA6;height:42px"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6C6864">15:30</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;background:#52697B;height:30px"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6C6864">16:00</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;background:#3A4750;height:22px"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6C6864">16:30</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TYRE & STRATEGY (CENTREPIECE) ============ -->
+    <section style="border:1px solid #46433E;background:#1E1D1C">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 18px;border-bottom:1px solid #3C3A36;background:#2C2B29">
+        <div style="display:flex;align-items:center;gap:11px">
+          <span style="width:3px;height:14px;background:#C13A40;display:inline-block"></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.16em;color:#ECE9E6;font-weight:600">TYRE_STRATEGY <span style="color:#5C5854">//</span> SILVERSTONE</span>
+        </div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6C6864">PIRELLI C2–C4 · MODEL v4.2</span>
+      </div>
+
+      <!-- top row: compounds / undercut / safety car -->
+      <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr">
+
+        <!-- compounds -->
+        <div style="padding:18px 20px;border-right:1px solid #322F2B">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;color:#827E7A;margin-bottom:14px">AVAILABLE COMPOUNDS</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:13px">
+              <div style="width:38px;height:38px;flex:none;border:2px solid #DAD7D2;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#DAD7D2">C2</div>
+              <div><div style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:20px;line-height:1;color:#F1EEEB;text-transform:uppercase">Hard</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884;margin-top:3px">DURABLE · LOW DEG</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:13px">
+              <div style="width:38px;height:38px;flex:none;border:2px solid #CBA552;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#CBA552">C3</div>
+              <div><div style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:20px;line-height:1;color:#F1EEEB;text-transform:uppercase">Medium</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884;margin-top:3px">BALANCED · GO-TO</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:13px">
+              <div style="width:38px;height:38px;flex:none;border:2px solid #C95852;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#C95852">C4</div>
+              <div><div style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:20px;line-height:1;color:#F1EEEB;text-transform:uppercase">Soft</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884;margin-top:3px">PEAK GRIP · QUALI</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- undercut window -->
+        <div style="padding:18px 22px;border-right:1px solid #322F2B;background:#242322">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;color:#827E7A;margin-bottom:10px">UNDERCUT WINDOW</div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:76px;line-height:.82;color:#F1EEEB;font-variant-numeric:tabular-nums">2.4</span>
+            <span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:28px;color:#8C8884">s</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#827E7A;margin-left:4px;align-self:flex-end;padding-bottom:8px">GAP THRESHOLD</span>
+          </div>
+          <p style="font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;line-height:1.5;color:#B2AEAA;margin-top:12px;max-width:42ch;text-wrap:pretty">Track position is gold here. With a <span style="color:#E6E3E0">21.8s pit loss</span>, a stop pays off inside a 2.4s gap — fresh rubber fired through Maggotts–Becketts claws it straight back.</p>
+          <div style="display:flex;gap:24px;margin-top:14px;padding-top:13px;border-top:1px solid #322F2B">
+            <div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#827E7A">PIT LOSS</div><div style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:22px;color:#E6E3E0;margin-top:2px">21.8s</div></div>
+            <div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#827E7A">DEG / LAP</div><div style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:22px;color:#E6E3E0;margin-top:2px">0.11s</div></div>
+            <div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#827E7A">FAVOURS</div><div style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:22px;color:#E6E3E0;margin-top:2px">UNDERCUT</div></div>
+          </div>
+        </div>
+
+        <!-- safety car -->
+        <div style="padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;color:#827E7A">SAFETY CAR PROBABILITY</div>
+          <div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin:6px 0 4px">
+              <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:76px;line-height:.82;color:#CBA552;font-variant-numeric:tabular-nums">45</span>
+              <span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:30px;color:#8A7B45">%</span>
+            </div>
+            <div style="height:5px;background:#2A2724;width:100%;margin:8px 0 4px"><div style="height:5px;width:45%;background:#CBA552"></div></div>
+            <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6C6864"><span>0%</span><span>GRID AVG 38%</span><span>100%</span></div>
+          </div>
+          <p style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;line-height:1.5;color:#B2AEAA;margin-top:10px;text-wrap:pretty">Above grid average. Abbey gravel and a 35% shower chance keep the window open all afternoon.</p>
+        </div>
+      </div>
+
+      <!-- stint timeline -->
+      <div style="padding:18px 20px 22px;border-top:1px solid #3C3A36">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;color:#827E7A">STINT PLAN · 52 LAPS</span>
+          <div style="display:flex;gap:16px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884">
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:18px;height:3px;background:#C95852;display:inline-block"></span>SOFT</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:18px;height:3px;background:#CBA552;display:inline-block"></span>MEDIUM</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:18px;height:3px;background:#DAD7D2;display:inline-block"></span>HARD</span>
+          </div>
+        </div>
+
+        <!-- 1-stop -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+          <div style="width:108px;flex:none;display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:19px;color:#F1EEEB">1-STOP</span><sc-if value="{{ rec1 }}" hint-placeholder-val="{{ true }}"><span style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.1em;color:#161514;background:#CBA552;padding:2px 5px;font-weight:600">REC</span></sc-if></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#827E7A">M → H</span>
+          </div>
+          <div style="flex:1;display:flex;gap:3px;height:38px">
+            <div style="width:42.3%;background:#2A2519;border-top:2.5px solid #CBA552;display:flex;align-items:center;padding:0 12px;justify-content:space-between"><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:15px;color:#E6E3E0">MEDIUM</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884">L1–22</span></div>
+            <div style="flex:1;background:#262420;border-top:2.5px solid #DAD7D2;display:flex;align-items:center;padding:0 12px;justify-content:space-between"><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:15px;color:#E6E3E0">HARD</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884">L23–52</span></div>
+          </div>
+        </div>
+
+        <!-- 2-stop -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+          <div style="width:108px;flex:none;display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:19px;color:#F1EEEB">2-STOP</span><sc-if value="{{ rec2 }}" hint-placeholder-val="{{ false }}"><span style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.1em;color:#161514;background:#CBA552;padding:2px 5px;font-weight:600">REC</span></sc-if></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#827E7A">S → H → M</span>
+          </div>
+          <div style="flex:1;display:flex;gap:3px;height:38px">
+            <div style="width:28.8%;background:#2C211F;border-top:2.5px solid #C95852;display:flex;align-items:center;padding:0 12px;justify-content:space-between"><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:15px;color:#E6E3E0">SOFT</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884">L1–15</span></div>
+            <div style="width:36.5%;background:#262420;border-top:2.5px solid #DAD7D2;display:flex;align-items:center;padding:0 12px;justify-content:space-between"><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:15px;color:#E6E3E0">HARD</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884">L16–34</span></div>
+            <div style="flex:1;background:#2A2519;border-top:2.5px solid #CBA552;display:flex;align-items:center;padding:0 12px;justify-content:space-between"><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:15px;color:#E6E3E0">MED</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C8884">L35–52</span></div>
+          </div>
+        </div>
+
+        <!-- lap axis -->
+        <div style="display:flex;align-items:center;gap:16px">
+          <div style="width:108px;flex:none"></div>
+          <div style="flex:1;display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#6C6864;border-top:1px solid #36332F;padding-top:5px">
+            <span>L0</span><span>L13</span><span>L26</span><span>L39</span><span>L52</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DRIVER FORM + CIRCUIT HISTORY ============ -->
+    <section style="display:grid;grid-template-columns:1.85fr 1fr;gap:22px;align-items:start">
+
+      <!-- driver form table -->
+      <div style="border:1px solid #3C3A36;background:#1E1D1C">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #36332F;background:#2A2928">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;color:#B4B0AB;font-weight:600">DRIVER_FORM <span style="color:#5C5854">//</span> TOP_10</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6C6864">CHAMPIONSHIP · AFTER R11</span>
+        </div>
+        <div style="display:grid;grid-template-columns:34px 1fr 116px 96px 60px 74px;padding:9px 18px;border-bottom:1px solid #322F2B;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#6C6864">
+          <span>#</span><span>DRIVER</span><span>TEAM</span><span style="text-align:center">LAST 5</span><span style="text-align:center">LAST</span><span style="text-align:right">PTS</span>
+        </div>
+        <sc-for list="{{ drivers }}" as="dr" hint-placeholder-count="10">
+          <div style="display:grid;grid-template-columns:34px 1fr 116px 96px 60px 74px;align-items:center;padding:11px 18px 11px 0;border-bottom:1px solid #2A2724;position:relative" style-hover="background:#272523">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:2px;background:{{ dr.color }}"></span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8C8884;padding-left:18px">{{ dr.posLabel }}</span>
+            <span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:21px;color:#F1EEEB;text-transform:uppercase;letter-spacing:.01em">{{ dr.name }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#A6A29E">{{ dr.team }}</span>
+            <span style="display:flex;justify-content:center">
+              <svg width="84" height="26" viewBox="0 0 84 26" style="overflow:visible"><polyline points="{{ dr.spark }}" fill="none" stroke="{{ dr.sparkColor }}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></polyline><circle cx="{{ dr.lastX }}" cy="{{ dr.lastY }}" r="2" fill="{{ dr.color }}"></circle></svg>
+            </span>
+            <span style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#BBB7B3;font-weight:500">{{ dr.last }}</span>
+            <span style="text-align:right;padding-right:18px;font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:23px;color:#F1EEEB;font-variant-numeric:tabular-nums">{{ dr.pts }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- circuit history -->
+      <div style="display:flex;flex-direction:column;gap:22px">
+        <div style="border:1px solid #3C3A36;background:#1E1D1C">
+          <div style="padding:10px 16px;border-bottom:1px solid #36332F;background:#2A2928">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;color:#B4B0AB;font-weight:600">LEGACY_ARCHIVE <span style="color:#5C5854">//</span> SILVERSTONE</span>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid #2A2724"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8C8884;width:34px">’25</span><span style="width:8px;height:8px;background:#E07F2A;flex:none"></span><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:19px;color:#F1EEEB;text-transform:uppercase;flex:1">L. Norris</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8884">McLaren</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid #2A2724"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8C8884;width:34px">’24</span><span style="width:8px;height:8px;background:#3FB0A0;flex:none"></span><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:19px;color:#F1EEEB;text-transform:uppercase;flex:1">L. Hamilton</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8884">Mercedes</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid #2A2724"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8C8884;width:34px">’23</span><span style="width:8px;height:8px;background:#4674AE;flex:none"></span><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:19px;color:#F1EEEB;text-transform:uppercase;flex:1">M. Verstappen</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8884">Red Bull</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid #2A2724"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8C8884;width:34px">’22</span><span style="width:8px;height:8px;background:#C5343C;flex:none"></span><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:19px;color:#F1EEEB;text-transform:uppercase;flex:1">C. Sainz</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8884">Ferrari</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 18px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8C8884;width:34px">’21</span><span style="width:8px;height:8px;background:#3FB0A0;flex:none"></span><span style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:19px;color:#F1EEEB;text-transform:uppercase;flex:1">L. Hamilton</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8884">Mercedes</span></div>
+          </div>
+        </div>
+        <div style="border:1px solid #3C3A36;background:#1E1D1C;padding:18px 20px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#827E7A;margin-bottom:8px">POLE CONVERTED TO WIN</div>
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:60px;line-height:.82;color:#F1EEEB">43<span style="font-size:28px;color:#8C8884">%</span></span>
+            <span style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;color:#A6A29E;line-height:1.4">of the time here<br><span style="color:#827E7A">last 14 editions</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ KEY STORYLINES ============ -->
+    <section style="border-top:1px solid #403D38;padding-top:22px">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:16px">
+        <span style="width:3px;height:14px;background:#C13A40;display:inline-block"></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.16em;color:#ECE9E6;font-weight:600">EDITORIAL_INSIGHT <span style="color:#5C5854">//</span> BRIEFING</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px">
+        <div style="border:1px solid #3C3A36;background:#1E1D1C;padding:20px">
+          <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:15px;color:#6C6864;margin-bottom:10px">01</div>
+          <h3 style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:25px;line-height:1;color:#F1EEEB;text-transform:uppercase;margin-bottom:8px">Eleven points, one home crowd</h3>
+          <p style="font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;line-height:1.55;color:#A6A29E;text-wrap:pretty">Norris leads Verstappen by 11 with the title fight razor-thin — and 140,000 Brits willing him on.</p>
+        </div>
+        <div style="border:1px solid #3C3A36;background:#1E1D1C;padding:20px">
+          <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:15px;color:#6C6864;margin-bottom:10px">02</div>
+          <h3 style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:25px;line-height:1;color:#F1EEEB;text-transform:uppercase;margin-bottom:8px">Ferrari’s floor gamble</h3>
+          <p style="font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;line-height:1.55;color:#A6A29E;text-wrap:pretty">A new floor debuts Friday. Leclerc needs Silverstone’s fast corners to validate the direction.</p>
+        </div>
+        <div style="border:1px solid #3C3A36;background:#1E1D1C;padding:20px">
+          <div style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:15px;color:#6C6864;margin-bottom:10px">03</div>
+          <h3 style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:25px;line-height:1;color:#F1EEEB;text-transform:uppercase;margin-bottom:8px">Rain roulette at 15:30</h3>
+          <p style="font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;line-height:1.55;color:#A6A29E;text-wrap:pretty">A 42% shower peak mid-race could rewrite every stop and reward whoever gambles on the crossover.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- footer -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#5C5854">
+      <span>FORMATION LAP · STRATEGY MODELLED FOR ILLUSTRATION</span>
+      <span>BRIEFING UPDATED {{ updated }}</span>
+    </div>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1340,&quot;height&quot;:1500},&quot;accentIntensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;restrained&quot;,&quot;moderate&quot;],&quot;default&quot;:&quot;restrained&quot;,&quot;tsType&quot;:&quot;'restrained'|'moderate'&quot;},&quot;recommendedStop&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1-stop&quot;,&quot;2-stop&quot;],&quot;default&quot;:&quot;1-stop&quot;,&quot;tsType&quot;:&quot;'1-stop'|'2-stop'&quot;}}">
+class Component extends DCLogic {
+  state = { d:'--', h:'--', m:'--', s:'--' };
+
+  componentDidMount(){
+    this.target = new Date('2026-07-05T15:00:00+01:00').getTime();
+    this.tick();
+    this.timer = setInterval(()=>this.tick(), 1000);
+  }
+  componentWillUnmount(){ if(this.timer) clearInterval(this.timer); }
+
+  tick(){
+    const p = n => String(n).padStart(2,'0');
+    let diff = this.target - Date.now();
+    if(diff <= 0){ this.setState({d:'00',h:'00',m:'00',s:'00'}); return; }
+    this.setState({
+      d: p(Math.floor(diff/86400000)),
+      h: p(Math.floor(diff%86400000/3600000)),
+      m: p(Math.floor(diff%3600000/60000)),
+      s: p(Math.floor(diff%60000/1000))
+    });
+  }
+
+  spark(form){
+    // map finishing positions (1=best) to a thin sparkline in an 84x26 box
+    const W = 84, H = 26, pad = 2, maxP = 14;
+    const pts = form.map((pos,i)=>{
+      const x = pad + (W - pad*2) * (i/(form.length-1));
+      const y = pad + (H - pad*2) * ((pos-1)/(maxP-1));
+      return { x:+x.toFixed(1), y:+y.toFixed(1) };
+    });
+    return {
+      points: pts.map(p=>p.x+','+p.y).join(' '),
+      lastX: pts[pts.length-1].x,
+      lastY: pts[pts.length-1].y
+    };
+  }
+
+  renderVals(){
+    const accentOn = (this.props.accentIntensity ?? 'restrained') === 'moderate';
+    const rec = this.props.recommendedStop ?? '1-stop';
+
+    const raw = [
+      { name:'Norris',     team:'McLaren',      color:'#E07F2A', pts:198, last:'P1',  form:[3,1,2,1,1] },
+      { name:'Verstappen', team:'Red Bull',     color:'#4674AE', pts:187, last:'P2',  form:[1,2,1,4,2] },
+      { name:'Piastri',    team:'McLaren',      color:'#E07F2A', pts:176, last:'P3',  form:[2,3,4,2,3] },
+      { name:'Leclerc',    team:'Ferrari',      color:'#C5343C', pts:142, last:'P4',  form:[5,4,3,6,4] },
+      { name:'Russell',    team:'Mercedes',     color:'#3FB0A0', pts:138, last:'P5',  form:[4,6,5,3,5] },
+      { name:'Hamilton',   team:'Ferrari',      color:'#C5343C', pts:121, last:'P6',  form:[7,5,8,5,6] },
+      { name:'Antonelli',  team:'Mercedes',     color:'#3FB0A0', pts:98,  last:'P8',  form:[6,8,7,9,8] },
+      { name:'Alonso',     team:'Aston Martin', color:'#38886A', pts:67,  last:'P9',  form:[9,7,10,8,9] },
+      { name:'Albon',      team:'Williams',     color:'#4674C4', pts:54,  last:'P7',  form:[8,11,9,12,7] },
+      { name:'Hadjar',     team:'Racing Bulls', color:'#7088C6', pts:41,  last:'P12', form:[12,10,13,11,12] },
+    ];
+
+    const drivers = raw.map((dr,i)=>{
+      const sp = this.spark(dr.form);
+      return {
+        ...dr,
+        posLabel: String(i+1).padStart(2,'0'),
+        spark: sp.points,
+        lastX: sp.lastX,
+        lastY: sp.lastY,
+        sparkColor: accentOn ? dr.color : 'rgba(255,255,255,.5)'
+      };
+    });
+
+    return {
+      ...this.state,
+      drivers,
+      rec1: rec === '1-stop',
+      rec2: rec === '2-stop',
+      updated: '18 JUN · 09:00 UTC'
+    };
+  }
+}
+</script>
+
+
+</body></html>

@@ -1,0 +1,50 @@
+.wrap {
+  flex: none;
+}
+
+.caption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  color: var(--text-fainter);
+  text-align: right;
+  margin-bottom: 9px;
+}
+
+.cells {
+  display: flex;
+  gap: 8px;
+}
+
+.cell {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  padding: 11px 16px;
+  min-width: 74px;
+  text-align: center;
+}
+
+.hot {
+  border-color: #5c3a3b;
+}
+
+.value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 46px;
+  line-height: 1;
+  color: var(--text-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.valueHot {
+  color: var(--accent-hot);
+}
+
+.unit {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  color: var(--text-fainter);
+  margin-top: 5px;
+}

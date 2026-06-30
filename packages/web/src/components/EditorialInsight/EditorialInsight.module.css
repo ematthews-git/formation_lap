@@ -1,0 +1,67 @@
+.section {
+  border-top: 1px solid #403d38;
+  padding-top: 22px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 16px;
+}
+
+.tick {
+  width: 3px;
+  height: 14px;
+  background: var(--accent);
+  display: inline-block;
+}
+
+.headLabel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: #ece9e6;
+  font-weight: 600;
+}
+
+.slash {
+  color: var(--text-rule);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--gap);
+}
+
+.card {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 20px;
+}
+
+.num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-ghost);
+  margin-bottom: 10px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 25px;
+  line-height: 1;
+  color: var(--text-num);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.body {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}

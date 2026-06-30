@@ -1,0 +1,46 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-header);
+  background: var(--panel-header);
+}
+
+.accentHeader {
+  padding: 11px 18px;
+  background: var(--panel-header-accent);
+  border-bottom-color: var(--border);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.tick {
+  width: 3px;
+  height: 14px;
+  background: var(--accent);
+  display: inline-block;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.slash {
+  color: var(--text-rule);
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-ghost);
+}

@@ -1,0 +1,184 @@
+.header {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--bg-header-top) 0%, var(--bg) 100%);
+}
+
+.scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(235, 232, 228, 0.09);
+  animation: flscan 6s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ghostTrack {
+  position: absolute;
+  right: -40px;
+  top: 56%;
+  transform: translateY(-50%);
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 14px 32px 24px;
+}
+
+.statusBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #2e2b28;
+  padding-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brandDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  animation: flpulse 1.8s ease-in-out infinite;
+}
+
+.brandName {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.brandTag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-ghost);
+  padding-left: 11px;
+  border-left: 1px solid #403d38;
+}
+
+.statusRight {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  color: var(--text-faint);
+}
+
+.feedLive {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #8a9e8c;
+}
+
+.feedDot {
+  width: 6px;
+  height: 6px;
+  background: var(--live);
+  display: inline-block;
+  animation: flpulse 1.8s ease-in-out infinite;
+}
+
+.divider {
+  color: #4a4744;
+}
+
+.metPending {
+  color: var(--text-fainter);
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 40px;
+  padding-top: 20px;
+  flex-wrap: wrap;
+}
+
+.titleMain {
+  min-width: 0;
+}
+
+.roundLine {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.round {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.championship {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--text-ghost);
+}
+
+.sprint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--bg);
+  background: var(--gold);
+  padding: 2px 7px;
+  font-weight: 600;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(48px, 7vw, 92px);
+  line-height: 0.84;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  color: var(--text-bright);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.metaStrong {
+  color: var(--text-dim);
+}
+
+.metaSlash {
+  color: #4a4744;
+}
