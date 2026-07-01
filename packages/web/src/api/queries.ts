@@ -5,6 +5,7 @@ import type {
   CircuitStats,
   Driver,
   LapRecord,
+  RaceResult,
   RaceWeekend,
   Standing,
   StrategyWithStints,
@@ -41,6 +42,13 @@ export function useStandings(season: number, type: 'driver' | 'constructor' = 'd
     queryKey: ['standings', season, type],
     queryFn: () =>
       api.get<Standing[]>(`/standings/?season=${season}&type=${type}`),
+  })
+}
+
+export function useRaceResults(season: number) {
+  return useQuery({
+    queryKey: ['race-results', season],
+    queryFn: () => api.get<RaceResult[]>(`/race-results/?season=${season}`),
   })
 }
 

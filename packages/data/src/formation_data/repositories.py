@@ -223,6 +223,19 @@ def list_standings(
     return [domain.Standing.model_validate(row._mapping) for row in rows]
 
 
+def list_race_results(conn: Connection, season: int) -> list[domain.RaceResult]:
+    """All race results for a season, ordered by round then finishing position."""
+    rows = conn.execute(
+        select(schema.race_results)
+        .where(schema.race_results.c.season == season)
+        .order_by(
+            schema.race_results.c.round_number,
+            schema.race_results.c.position,
+        )
+    ).all()
+    return [domain.RaceResult.model_validate(row._mapping) for row in rows]
+
+
 def next_race_weekend_within(
     conn: Connection, today: date, window: timedelta
 ) -> domain.RaceWeekend | None:

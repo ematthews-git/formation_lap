@@ -5,6 +5,7 @@ from formation_api.routers import (
     circuits,
     drivers,
     health,
+    race_results,
     race_weekends,
     standings,
     strategies,
@@ -28,3 +29,4 @@ app.include_router(drivers.router)
 app.include_router(standings.router)
 app.include_router(strategies.router)
 app.include_router(weather.router)
+app.include_router(race_results.router)

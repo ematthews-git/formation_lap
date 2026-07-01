@@ -29,6 +29,15 @@ _PAGE_SIZE = 100
 _REQUEST_DELAY_S = 0.34
 
 
+def _get_json(path: str, params: dict | None = None) -> dict:
+    """GET {BASE_URL}{path} and return parsed JSON, with a polite inter-request
+    pause. Raises httpx.HTTPError on failure (incl. 429 rate limiting)."""
+    resp = httpx.get(f"{BASE_URL}{path}", params=params, timeout=_TIMEOUT)
+    resp.raise_for_status()
+    time.sleep(_REQUEST_DELAY_S)
+    return resp.json()
+
+
 def get_drivers(season: int):
     # TODO: httpx.get(f"{BASE_URL}/{season}/drivers.json").json()["MRData"]["DriverTable"]["Drivers"]
     logger.info("jolpica.get_drivers season=%s (skeleton)", season)
@@ -41,22 +50,30 @@ def get_schedule(season: int):
     return []
 
 
-def get_race_results(season: int, round_number: int):
-    # TODO: httpx.get(f"{BASE_URL}/{season}/{round_number}/results.json").json()["MRData"]["RaceTable"]["Races"][0]["Results"]
-    logger.info("jolpica.get_race_results season=%s round=%s (skeleton)", season, round_number)
-    return []
+def get_race(season: int, round_number: int) -> dict | None:
+    """The race object for a round (Circuit + Results + ...), or None if absent.
+
+    Returning the whole race lets callers read the actual Circuit.circuitId
+    rather than trusting a round number to line up with our seed calendar.
+    """
+    races = _get_json(f"/{season}/{round_number}/results.json")["MRData"][
+        "RaceTable"
+    ]["Races"]
+    return races[0] if races else None
 
 
-def get_driver_standings(season: int, round_number: int):
-    # TODO: httpx.get(f"{BASE_URL}/{season}/{round_number}/driverStandings.json").json()...
-    logger.info("jolpica.get_driver_standings season=%s round=%s (skeleton)", season, round_number)
-    return []
+def get_driver_standings(season: int, round_number: int) -> list[dict]:
+    lists = _get_json(f"/{season}/{round_number}/driverStandings.json")["MRData"][
+        "StandingsTable"
+    ]["StandingsLists"]
+    return lists[0]["DriverStandings"] if lists else []
 
 
-def get_constructor_standings(season: int, round_number: int):
-    # TODO: httpx.get(f"{BASE_URL}/{season}/{round_number}/constructorStandings.json").json()...
-    logger.info("jolpica.get_constructor_standings season=%s round=%s (skeleton)", season, round_number)
-    return []
+def get_constructor_standings(season: int, round_number: int) -> list[dict]:
+    lists = _get_json(f"/{season}/{round_number}/constructorStandings.json")[
+        "MRData"
+    ]["StandingsTable"]["StandingsLists"]
+    return lists[0]["ConstructorStandings"] if lists else []
 
 
 def get_race_fastest_laps(circuit_id: str) -> list[dict]:

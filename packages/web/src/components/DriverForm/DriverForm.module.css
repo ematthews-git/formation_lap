@@ -1,12 +1,19 @@
 .headRow,
 .row {
   display: grid;
-  grid-template-columns: 34px 1fr 116px 96px 60px 74px;
+  /* # | driver | team | last 5 | last | pts. The wide driver column pushes
+     team/last5/last toward pts; last is right-aligned so the last→pts gap
+     matches the last5→last gap. */
+  grid-template-columns: 24px 1fr 112px 92px 48px 64px;
   align-items: center;
+  /* Identical horizontal padding on header + rows so every column lines up. */
+  padding-left: 18px;
+  padding-right: 18px;
 }
 
 .headRow {
-  padding: 9px 18px;
+  padding-top: 9px;
+  padding-bottom: 9px;
   border-bottom: 1px solid var(--border-soft);
   font-family: var(--font-mono);
   font-size: 9.5px;
@@ -16,7 +23,8 @@
 
 .row {
   position: relative;
-  padding: 11px 18px 11px 0;
+  padding-top: 11px;
+  padding-bottom: 11px;
   border-bottom: 1px solid var(--border-hair);
 }
 
@@ -36,7 +44,6 @@
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-faint);
-  padding-left: 18px;
 }
 
 .name {
@@ -78,7 +85,6 @@
 
 .pts {
   text-align: right;
-  padding-right: 18px;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 23px;

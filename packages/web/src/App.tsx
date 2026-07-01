@@ -7,6 +7,7 @@ import {
   useCircuitStats,
   useDrivers,
   useLapRecord,
+  useRaceResults,
   useRaceWeekends,
   useStandings,
   useStrategies,
@@ -52,6 +53,7 @@ export default function App() {
   const weather = useWeather(SEASON, featured?.round_number)
   const drivers = useDrivers(SEASON)
   const standings = useStandings(SEASON)
+  const raceResults = useRaceResults(SEASON)
 
   if (weekends.isError) {
     return (
@@ -120,6 +122,7 @@ export default function App() {
             driversLoading={drivers.isLoading}
             driversError={drivers.isError}
             standings={standings.data}
+            raceResults={raceResults.data}
           />
           <LegacyArchive circuitId={featured.circuit_id} />
         </section>

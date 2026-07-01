@@ -214,6 +214,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/race-results/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Race Results
+         * @description All race finishing positions for a season, e.g. /race-results/?season=2026.
+         *
+         *     Ordered by round then position. Returns an empty list if none loaded yet.
+         */
+        get: operations["list_race_results_race_results__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -240,6 +262,8 @@ export interface components {
             lat: number;
             /** Lon */
             lon: number;
+            /** Layout Since Year */
+            layout_since_year?: number | null;
             /** Track Outline */
             track_outline?: string | null;
         };
@@ -300,6 +324,23 @@ export interface components {
             year: number;
             /** Lap Time Seconds */
             lap_time_seconds: number;
+        };
+        /** RaceResult */
+        RaceResult: {
+            /** Id */
+            id?: number | null;
+            /** Circuit Id */
+            circuit_id: string;
+            /** Season */
+            season: number;
+            /** Round Number */
+            round_number: number;
+            /** Position */
+            position: number;
+            /** Driver Id */
+            driver_id: string;
+            /** Team */
+            team: string;
         };
         /** RaceWeekend */
         RaceWeekend: {
@@ -743,6 +784,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeatherForecast"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_race_results_race_results__get: {
+        parameters: {
+            query: {
+                season: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RaceResult"][];
                 };
             };
             /** @description Validation Error */

@@ -54,6 +54,16 @@ export interface Standing {
   points: number
 }
 
+export interface RaceResult {
+  id: number | null
+  circuit_id: string
+  season: number
+  round_number: number
+  position: number
+  driver_id: string
+  team: string
+}
+
 export interface CircuitStats {
   id: number | null
   circuit_id: string
