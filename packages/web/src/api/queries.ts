@@ -85,6 +85,15 @@ export function useStrategies(season: number, round: number | undefined) {
   })
 }
 
+export function useCircuitPodiums(circuitId: string | undefined, limit = 5) {
+  return useQuery({
+    queryKey: ['podiums', circuitId, limit],
+    enabled: !!circuitId,
+    queryFn: () =>
+      api.get<RaceResult[]>(`/circuits/${circuitId}/podiums?limit=${limit}`),
+  })
+}
+
 export function useLapRecord(circuitId: string | undefined) {
   return useQuery({
     queryKey: ['lap-record', circuitId],

@@ -147,6 +147,19 @@ def results_refresh(
         race_results.run(conn, season=season, round_number=round)
 
 
+@results_app.command("backfill")
+def results_backfill(
+    start: int = typer.Option(2025, help="Most recent season to backfill."),
+    count: int = typer.Option(6, help="Number of seasons back from --start."),
+    circuit: str | None = typer.Option(None, "--circuit", help="Single circuit_id; default all."),
+) -> None:
+    """Backfill past race results (for the past-results archive)."""
+    seasons = list(range(start, start - count, -1))
+    circuit_ids = [circuit] if circuit else None
+    with connection_scope() as conn:
+        race_results.backfill(conn, seasons=seasons, circuit_ids=circuit_ids)
+
+
 @standings_app.command("refresh")
 def standings_refresh(
     season: int = typer.Option(...),

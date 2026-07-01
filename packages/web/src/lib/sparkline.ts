@@ -8,14 +8,20 @@ const H = 26
 const PAD = 2
 const MAX_POS = 20 // bottom of the chart (positions worse than this are clamped)
 
+export interface Point {
+  x: number
+  y: number
+}
+
 export interface Sparkline {
   points: string
+  coords: Point[] // one per race finish, oldest → newest
   lastX: number
   lastY: number
 }
 
 export function buildSparkline(form: number[]): Sparkline {
-  if (form.length === 0) return { points: '', lastX: PAD, lastY: PAD }
+  if (form.length === 0) return { points: '', coords: [], lastX: PAD, lastY: PAD }
   const pts = form.map((pos, i) => {
     const clamped = Math.min(Math.max(pos, 1), MAX_POS)
     const x = PAD + (W - PAD * 2) * (form.length > 1 ? i / (form.length - 1) : 0)
@@ -25,6 +31,7 @@ export function buildSparkline(form: number[]): Sparkline {
   const last = pts[pts.length - 1]
   return {
     points: pts.map((p) => `${p.x},${p.y}`).join(' '),
+    coords: pts,
     lastX: last.x,
     lastY: last.y,
   }

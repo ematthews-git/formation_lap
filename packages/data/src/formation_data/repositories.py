@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from datetime import date, timedelta
 
 from pydantic import BaseModel
-from sqlalchemy import Connection, Table, delete, func, select
+from sqlalchemy import Connection, Table, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 
 from formation_data import domain, schema
@@ -221,6 +221,40 @@ def list_standings(
         .order_by(table.c.position)
     ).all()
     return [domain.Standing.model_validate(row._mapping) for row in rows]
+
+
+def list_circuit_podiums(
+    conn: Connection, circuit_id: str, limit: int = 5
+) -> list[domain.RaceResult]:
+    """Top-3 finishers for the most recent `limit` races at a circuit.
+
+    Rows are ordered most-recent race first, then finishing position; the caller
+    groups consecutive rows sharing (season, round_number) into one race. Returns
+    fewer than `limit` races (or `[]`) when the circuit lacks that much history.
+    """
+    rr = schema.race_results
+    races = conn.execute(
+        select(rr.c.season, rr.c.round_number)
+        .where(rr.c.circuit_id == circuit_id)
+        .distinct()
+        .order_by(rr.c.season.desc(), rr.c.round_number.desc())
+        .limit(limit)
+    ).all()
+    if not races:
+        return []
+    pairs = [(r.season, r.round_number) for r in races]
+    rows = conn.execute(
+        select(rr)
+        .where(
+            rr.c.circuit_id == circuit_id,
+            rr.c.position <= 3,
+            tuple_(rr.c.season, rr.c.round_number).in_(pairs),
+        )
+        .order_by(
+            rr.c.season.desc(), rr.c.round_number.desc(), rr.c.position.asc()
+        )
+    ).all()
+    return [domain.RaceResult.model_validate(row._mapping) for row in rows]
 
 
 def list_race_results(conn: Connection, season: int) -> list[domain.RaceResult]:

@@ -24,17 +24,43 @@ BASE_URL = "https://api.jolpi.ca/ergast/f1"
 
 _TIMEOUT = httpx.Timeout(30.0)
 _PAGE_SIZE = 100
-# Jolpica's unauthenticated burst limit is ~4 req/s; pause between paged
-# requests to stay comfortably under it (a 429 would abort a circuit).
+# Jolpica's unauthenticated burst limit is ~4 req/s; pause between requests to
+# stay under it. The sustained hourly limit is handled by 429 retry/backoff.
 _REQUEST_DELAY_S = 0.34
+_MAX_RETRIES = 5
+_MAX_BACKOFF_S = 60.0
 
 
 def _get_json(path: str, params: dict | None = None) -> dict:
-    """GET {BASE_URL}{path} and return parsed JSON, with a polite inter-request
-    pause. Raises httpx.HTTPError on failure (incl. 429 rate limiting)."""
-    resp = httpx.get(f"{BASE_URL}{path}", params=params, timeout=_TIMEOUT)
-    resp.raise_for_status()
-    time.sleep(_REQUEST_DELAY_S)
+    """GET {BASE_URL}{path} and return parsed JSON.
+
+    Retries on 429 with backoff (honouring a Retry-After header when present) so
+    a batch job rides through Jolpica's sustained rate limit instead of dropping
+    requests. Raises httpx.HTTPError on non-429 failures or once retries are
+    exhausted.
+    """
+    for attempt in range(_MAX_RETRIES + 1):
+        resp = httpx.get(f"{BASE_URL}{path}", params=params, timeout=_TIMEOUT)
+        if resp.status_code == 429 and attempt < _MAX_RETRIES:
+            retry_after = resp.headers.get("Retry-After")
+            wait = (
+                min(float(retry_after), _MAX_BACKOFF_S)
+                if retry_after and retry_after.isdigit()
+                else min(2**attempt, _MAX_BACKOFF_S)
+            )
+            logger.warning(
+                "jolpica 429 on %s; backing off %.1fs (attempt %d/%d)",
+                path,
+                wait,
+                attempt + 1,
+                _MAX_RETRIES,
+            )
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        time.sleep(_REQUEST_DELAY_S)
+        return resp.json()
+    resp.raise_for_status()  # retries exhausted on a 429
     return resp.json()
 
 
@@ -59,6 +85,18 @@ def get_race(season: int, round_number: int) -> dict | None:
     races = _get_json(f"/{season}/{round_number}/results.json")["MRData"][
         "RaceTable"
     ]["Races"]
+    return races[0] if races else None
+
+
+def get_circuit_race(season: int, jolpica_circuit_id: str) -> dict | None:
+    """The race (Circuit + Results) held at a circuit in a season, or None.
+
+    Lets callers backfill a circuit's history without knowing each season's
+    round number.
+    """
+    races = _get_json(f"/{season}/circuits/{jolpica_circuit_id}/results.json")[
+        "MRData"
+    ]["RaceTable"]["Races"]
     return races[0] if races else None
 
 

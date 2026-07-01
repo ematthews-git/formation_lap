@@ -89,6 +89,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/circuits/{circuit_id}/podiums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Circuit Podiums
+         * @description Top-3 finishers for the last `limit` races at a circuit (most recent first).
+         */
+        get: operations["get_circuit_podiums_circuits__circuit_id__podiums_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/race-weekends/": {
         parameters: {
             query?: never;
@@ -593,6 +613,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LapRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_circuit_podiums_circuits__circuit_id__podiums_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                circuit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RaceResult"][];
                 };
             };
             /** @description Validation Error */

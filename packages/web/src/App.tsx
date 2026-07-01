@@ -6,6 +6,7 @@ import {
   useCircuit,
   useCircuitStats,
   useDrivers,
+  useCircuitPodiums,
   useLapRecord,
   useRaceResults,
   useRaceWeekends,
@@ -21,7 +22,7 @@ import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
 import { TyreStrategy } from './components/TyreStrategy/TyreStrategy'
 import { DriverForm } from './components/DriverForm/DriverForm'
-import { LegacyArchive } from './components/LegacyArchive/LegacyArchive'
+import { PastResults } from './components/PastResults/PastResults'
 import { EditorialInsight } from './components/EditorialInsight/EditorialInsight'
 import { LoadingState, ErrorState } from './components/common/Status'
 import styles from './App.module.css'
@@ -54,6 +55,7 @@ export default function App() {
   const drivers = useDrivers(SEASON)
   const standings = useStandings(SEASON)
   const raceResults = useRaceResults(SEASON)
+  const podiums = useCircuitPodiums(featured?.circuit_id)
 
   if (weekends.isError) {
     return (
@@ -124,7 +126,11 @@ export default function App() {
             standings={standings.data}
             raceResults={raceResults.data}
           />
-          <LegacyArchive circuitId={featured.circuit_id} />
+          <PastResults
+            circuitId={featured.circuit_id}
+            podiums={podiums.data}
+            loading={podiums.isLoading}
+          />
         </section>
 
         <EditorialInsight />
