@@ -39,6 +39,7 @@ def upsert(
     table: Table,
     items: Iterable[BaseModel],
     conflict_cols: list[str],
+    update_exclude: set[str] | None = None,
 ) -> int:
     """Upsert a batch of domain models into `table`, keyed on `conflict_cols`.
 
@@ -46,6 +47,11 @@ def upsert(
     `exclude_none` — that would also drop legitimately-None values once nullable
     columns exist, and multi-row inserts need homogeneous keys). On conflict,
     every other non-conflict column is replaced with the incoming row's value.
+
+    `update_exclude` names columns to leave untouched on conflict — used when a
+    hand-authored seed shares a table with columns another job populates (e.g.
+    the circuits seed must not clobber `track_outline`). Those columns are still
+    set on insert (to the incoming value, typically None), just not on update.
     """
     payload = [
         item.model_dump(exclude={"id"} | _SERVER_MANAGED_COLS) for item in items
@@ -53,12 +59,13 @@ def upsert(
     if not payload:
         return 0
     stmt = insert(table).values(payload)
+    preserve = _SERVER_MANAGED_COLS | (update_exclude or set())
     update_cols = [
         c.name
         for c in table.c
         if c.name not in conflict_cols
         and not c.primary_key
-        and c.name not in _SERVER_MANAGED_COLS
+        and c.name not in preserve
     ]
     if update_cols:
         set_ = {col: stmt.excluded[col] for col in update_cols}

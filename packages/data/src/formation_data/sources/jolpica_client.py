@@ -59,20 +59,20 @@ def get_constructor_standings(season: int, round_number: int):
     return []
 
 
-def get_qualifying_results(circuit_id: str) -> list[dict]:
-    """Every qualifying result on record for a circuit (its Ergast/Jolpica
-    circuitId), paginating through all seasons.
+def get_race_fastest_laps(circuit_id: str) -> list[dict]:
+    """Each race's fastest lap set at a circuit (its Ergast/Jolpica circuitId).
 
-    Each row: {season:int, race:str, driver:str, best_time:str} where best_time
-    is the driver's best of Q3/Q2/Q1 (results with no Q time are skipped — e.g.
-    the pre-2006 single-lap qualifying era exposes no Q1/Q2/Q3). Raises
-    httpx.HTTPError on a network/HTTP failure (incl. 429 rate limiting).
+    Uses the `fastest/1/results` filter, so each race contributes the single
+    result whose driver set that race's fastest lap. Each row:
+    {season:int, race:str, driver:str, best_time:str}. Rows with no fastest-lap
+    time (pre-2004 races predate the data) are skipped. Raises httpx.HTTPError
+    on a network/HTTP failure (incl. 429 rate limiting).
     """
     rows: list[dict] = []
     offset = 0
     while True:
         resp = httpx.get(
-            f"{BASE_URL}/circuits/{circuit_id}/qualifying.json",
+            f"{BASE_URL}/circuits/{circuit_id}/fastest/1/results.json",
             params={"limit": _PAGE_SIZE, "offset": offset},
             timeout=_TIMEOUT,
         )
@@ -83,8 +83,8 @@ def get_qualifying_results(circuit_id: str) -> list[dict]:
         if not races:
             break
         for race in races:
-            for result in race.get("QualifyingResults", []):
-                best_time = result.get("Q3") or result.get("Q2") or result.get("Q1")
+            for result in race.get("Results", []):
+                best_time = result.get("FastestLap", {}).get("Time", {}).get("time")
                 if not best_time:
                     continue
                 rows.append(
@@ -100,6 +100,6 @@ def get_qualifying_results(circuit_id: str) -> list[dict]:
             break
 
     logger.info(
-        "jolpica.get_qualifying_results circuit=%s rows=%d", circuit_id, len(rows)
+        "jolpica.get_race_fastest_laps circuit=%s rows=%d", circuit_id, len(rows)
     )
     return rows

@@ -30,6 +30,10 @@ class Circuit(_Base):
     fastf1_location: str
     lat: float
     lon: float
+    # First season of the *current* track layout. Used to scope the lap-record
+    # search so laps set on a superseded configuration (e.g. Silverstone pre-2010)
+    # aren't counted. None = layout stable across all available data.
+    layout_since_year: int | None = None
     # SVG path (viewBox 0 0 400 248) of the circuit outline; None until generated
     # by jobs.pre_season.track_maps.
     track_outline: str | None = None

@@ -240,6 +240,8 @@ export interface components {
             lat: number;
             /** Lon */
             lon: number;
+            /** Track Outline */
+            track_outline?: string | null;
         };
         /** CircuitStats */
         CircuitStats: {

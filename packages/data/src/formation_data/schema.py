@@ -43,6 +43,9 @@ circuits = Table(
     Column("fastf1_location", String(50), nullable=False, unique=True),
     Column("lat", Float, nullable=False),
     Column("lon", Float, nullable=False),
+    # First season of the current layout — scopes the lap-record search so laps
+    # from a superseded configuration aren't counted. Nullable: null = stable.
+    Column("layout_since_year", Integer, nullable=True),
     # SVG path (viewBox 0 0 400 248) of the circuit outline, generated from
     # FastF1 fastest-lap telemetry by jobs.pre_season.track_maps. Nullable:
     # new venues without prior telemetry stay null until backfilled.
