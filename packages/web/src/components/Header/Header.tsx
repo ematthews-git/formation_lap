@@ -9,8 +9,8 @@ interface HeaderProps {
   circuit: Circuit | undefined
   totalRounds: number
   raceWeather: WeatherForecast | undefined
-  /** The next few race weekends after the upcoming one (calendar order). */
-  lookahead: RaceWeekend[]
+  /** The upcoming race weekend plus the next few, in calendar order — each is a selector. */
+  races: RaceWeekend[]
   /** round_number of the weekend currently shown (for highlighting). */
   activeRound: number
   onSelectRound: (round: number) => void
@@ -30,7 +30,7 @@ export function Header({
   circuit,
   totalRounds,
   raceWeather,
-  lookahead,
+  races,
   activeRound,
   onSelectRound,
 }: HeaderProps) {
@@ -49,10 +49,9 @@ export function Header({
             <span className={styles.brandDot} />
             <span className={styles.brandName}>FORMATION_LAP</span>
             <span className={styles.brandTag}>// STRATEGY_BRIEFING</span>
-            {lookahead.length > 0 && (
+            {races.length > 0 && (
               <span className={styles.lookahead}>
-                <span className={styles.lookaheadLabel}>NEXT</span>
-                {lookahead.map((w) => (
+                {races.map((w) => (
                   <button
                     key={w.round_number}
                     type="button"
@@ -116,7 +115,7 @@ export function Header({
             </div>
           </div>
 
-          <Countdown raceDate={weekend.race_date} />
+          <Countdown raceDate={weekend.race_date} circuitId={weekend.circuit_id} />
         </div>
       </div>
     </header>

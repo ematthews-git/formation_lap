@@ -38,6 +38,8 @@ export default function App() {
   const weekends = useRaceWeekends(SEASON)
   const upcoming = pickFeaturedWeekend(weekends.data)
   const lookahead = lookaheadWeekends(weekends.data, 3)
+  // The upcoming race plus the next few, in calendar order — each is a selector button.
+  const raceOptions = upcoming ? [upcoming, ...lookahead] : lookahead
   const featured =
     selectedRound != null
       ? (weekendByRound(weekends.data, selectedRound) ?? upcoming)
@@ -94,7 +96,7 @@ export default function App() {
         circuit={circuit.data}
         totalRounds={totalRounds}
         raceWeather={raceSession(weather.data)}
-        lookahead={lookahead}
+        races={raceOptions}
         activeRound={featured.round_number}
         onSelectRound={onSelectRound}
       />

@@ -83,25 +83,21 @@
   flex-wrap: wrap;
 }
 
-.lookaheadLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  color: var(--accent);
-  font-weight: 600;
-}
-
 .lookaheadItem {
   background: none;
-  border: none;
   padding: 2px 0;
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 10.5px;
+  line-height: 1;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-faint);
-  border-bottom: 1px solid transparent;
+  /* Transparent top + bottom borders keep the text centred when the active
+     underline turns red (a bottom-only border would nudge the text up). */
+  border: 1px solid transparent;
+  border-left: none;
+  border-right: none;
   transition: color 0.12s ease, border-color 0.12s ease;
 }
 
@@ -110,7 +106,8 @@
   border-bottom-color: var(--text-rule);
 }
 
-.lookaheadActive {
+.lookaheadActive,
+.lookaheadActive:hover {
   color: var(--text-bright);
   border-bottom-color: var(--accent);
 }

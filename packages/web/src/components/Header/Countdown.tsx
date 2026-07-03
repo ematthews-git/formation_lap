@@ -1,4 +1,5 @@
 import { useCountdown } from '../../lib/useCountdown'
+import { circuitTimezone, formatClock } from '../../lib/circuitTime'
 import styles from './Countdown.module.css'
 
 /**
@@ -6,18 +7,34 @@ import styles from './Countdown.module.css'
  * yet, so the target is approximated at 13:00 UTC on race day — refine once a
  * sessions/weather endpoint provides the real start time.
  */
-export function Countdown({ raceDate }: { raceDate: string | undefined }) {
+export function Countdown({
+  raceDate,
+  circuitId,
+}: {
+  raceDate: string | undefined
+  circuitId: string | undefined
+}) {
   const target = raceDate ? `${raceDate}T13:00:00Z` : undefined
   const { d, h, m, s } = useCountdown(target)
+  const circuitTz = circuitTimezone(circuitId)
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.caption}>LIGHTS OUT IN</div>
       <div className={styles.cells}>
         <Cell value={d} unit="DAYS" />
         <Cell value={h} unit="HRS" />
         <Cell value={m} unit="MIN" />
         <Cell value={s} unit="SEC" hot />
+      </div>
+      <div className={styles.times}>
+        <div className={styles.timeRow}>
+          <span className={styles.timeLabel}>LIGHTS OUT · CIRCUIT</span>
+          <span className={styles.timeValue}>{formatClock(target, circuitTz)}</span>
+        </div>
+        <div className={styles.timeRow}>
+          <span className={styles.timeLabel}>LIGHTS OUT · LOCAL</span>
+          <span className={styles.timeValue}>{formatClock(target)}</span>
+        </div>
       </div>
     </div>
   )

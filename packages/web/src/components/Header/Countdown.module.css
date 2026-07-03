@@ -1,26 +1,23 @@
 .wrap {
   flex: none;
-}
-
-.caption {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.26em;
-  color: var(--text-fainter);
-  text-align: right;
-  margin-bottom: 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
 }
 
 .cells {
   display: flex;
-  gap: 8px;
+  gap: 20px;
 }
 
 .cell {
   background: var(--panel-raised);
   border: 1px solid var(--border);
-  padding: 11px 16px;
-  min-width: 74px;
+  padding: 11px 12px;
+  /* Fixed width (not min-width) so a "1" and an "88" occupy the same space and
+     the units don't shift, with headroom for a 3-digit day count. */
+  width: 74px;
   text-align: center;
 }
 
@@ -47,4 +44,31 @@
   letter-spacing: 0.2em;
   color: var(--text-fainter);
   margin-top: 5px;
+}
+
+.times {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+}
+
+.timeRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.timeLabel {
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  color: var(--text-fainter);
+}
+
+.timeValue {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
