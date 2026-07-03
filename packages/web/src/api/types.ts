@@ -35,6 +35,14 @@ export interface RaceWeekend {
   hard_compound: string
 }
 
+export interface Session {
+  id: number | null
+  race_weekend_id: number
+  session_order: number
+  name: string
+  start_time: string // ISO datetime (UTC)
+}
+
 export interface Driver {
   id: number | null
   driver_id: string

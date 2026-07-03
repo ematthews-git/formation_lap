@@ -83,6 +83,15 @@ class RaceWeekend(_Base):
     hard_compound: str
 
 
+class Session(_Base):
+    id: int | None = None
+    race_weekend_id: int
+    session_order: int
+    name: str
+    # UTC instant; consumers convert to circuit-local / viewer-local time.
+    start_time: datetime
+
+
 class WeatherForecast(_Base):
     id: int | None = None
     race_weekend_id: int

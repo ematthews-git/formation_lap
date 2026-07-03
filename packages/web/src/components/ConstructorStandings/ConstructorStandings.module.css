@@ -1,0 +1,79 @@
+.headRow,
+.row {
+  display: grid;
+  /* # | team | last-year finish | pts. Mirrors DriverForm's row so the rows
+     line up in size; the team column flexes. */
+  grid-template-columns: 24px 1fr 52px 64px;
+  align-items: center;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+.headRow {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-ghost);
+}
+
+.row {
+  position: relative;
+  /* Same vertical rhythm as DriverForm rows (11 teams just makes this panel
+     one row taller than the 10-driver panel). */
+  padding-top: 11px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.accentBar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.pos {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.team {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 21px;
+  color: var(--text-num);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.right {
+  text-align: right;
+}
+
+.lastYr {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.pts {
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 23px;
+  color: var(--text-num);
+  font-variant-numeric: tabular-nums;
+}

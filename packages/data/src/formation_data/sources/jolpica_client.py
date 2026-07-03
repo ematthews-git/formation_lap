@@ -114,6 +114,32 @@ def get_constructor_standings(season: int, round_number: int) -> list[dict]:
     return lists[0]["ConstructorStandings"] if lists else []
 
 
+def get_final_standings(season: int) -> tuple[int | None, list[dict], list[dict]]:
+    """End-of-season driver + constructor standings for a completed season.
+
+    Uses the round-less standings endpoints, which return the latest (i.e. final,
+    for a finished season) standings list. Returns
+    (final_round, driver_standings, constructor_standings); `final_round` is read
+    from the standings list's own `round` so callers don't hardcode calendar
+    lengths. Empty lists (and None round) when the season has no standings yet.
+    Raises httpx.HTTPError on a network/HTTP failure.
+    """
+    d_lists = _get_json(f"/{season}/driverStandings.json")["MRData"][
+        "StandingsTable"
+    ]["StandingsLists"]
+    c_lists = _get_json(f"/{season}/constructorStandings.json")["MRData"][
+        "StandingsTable"
+    ]["StandingsLists"]
+    drivers = d_lists[0]["DriverStandings"] if d_lists else []
+    constructors = c_lists[0]["ConstructorStandings"] if c_lists else []
+    final_round: int | None = None
+    if d_lists:
+        final_round = int(d_lists[0]["round"])
+    elif c_lists:
+        final_round = int(c_lists[0]["round"])
+    return final_round, drivers, constructors
+
+
 def get_race_fastest_laps(circuit_id: str) -> list[dict]:
     """Each race's fastest lap set at a circuit (its Ergast/Jolpica circuitId).
 

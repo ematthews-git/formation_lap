@@ -20,6 +20,34 @@ export function teamColorVar(team: string): string {
   return 'var(--team-default)'
 }
 
+/**
+ * Normalise a constructor name to a stable lineage key so a team can be matched
+ * across seasons despite rebrands (Sauber → Audi, Toro Rosso → AlphaTauri → RB).
+ * Same substring approach as teamColorVar. Used to line a team's current
+ * standing up with its finish in a prior season.
+ */
+export function constructorKey(team: string): string {
+  const k = team.toLowerCase()
+  if (k.includes('mclaren')) return 'mclaren'
+  if (k.includes('mercedes')) return 'mercedes'
+  if (k.includes('red bull') || k.includes('redbull')) return 'red_bull'
+  if (k.includes('ferrari')) return 'ferrari'
+  if (k.includes('williams')) return 'williams'
+  if (
+    k.includes('racing bull') ||
+    k.includes('alphatauri') ||
+    k.includes('toro rosso') ||
+    k.includes('rb')
+  )
+    return 'rb'
+  if (k.includes('aston')) return 'aston_martin'
+  if (k.includes('haas')) return 'haas'
+  if (k.includes('audi') || k.includes('sauber')) return 'audi'
+  if (k.includes('alpine') || k.includes('renault')) return 'alpine'
+  if (k.includes('cadillac')) return 'cadillac'
+  return k
+}
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',

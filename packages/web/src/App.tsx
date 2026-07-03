@@ -10,6 +10,7 @@ import {
   useLapRecord,
   useRaceResults,
   useRaceWeekends,
+  useSessions,
   useStandings,
   useStrategies,
   useWeather,
@@ -22,8 +23,9 @@ import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
 import { TyreStrategy } from './components/TyreStrategy/TyreStrategy'
 import { DriverForm } from './components/DriverForm/DriverForm'
+import { ConstructorStandings } from './components/ConstructorStandings/ConstructorStandings'
 import { PastResults } from './components/PastResults/PastResults'
-import { EditorialInsight } from './components/EditorialInsight/EditorialInsight'
+import { WeekendSchedule } from './components/WeekendSchedule/WeekendSchedule'
 import { LoadingState, ErrorState } from './components/common/Status'
 import styles from './App.module.css'
 
@@ -54,8 +56,13 @@ export default function App() {
   const stats = useCircuitStats(featured?.circuit_id, SEASON)
   const strategies = useStrategies(SEASON, featured?.round_number)
   const weather = useWeather(SEASON, featured?.round_number)
+  const sessions = useSessions(SEASON, featured?.round_number)
   const drivers = useDrivers(SEASON)
   const standings = useStandings(SEASON)
+  const constructorStandings = useStandings(SEASON, 'constructor')
+  // Previous season's final standings feed the "LAST" column; derived from SEASON
+  // so it rolls over cleanly when the app advances to the next season.
+  const lastSeasonConstructors = useStandings(SEASON - 1, 'constructor')
   const raceResults = useRaceResults(SEASON)
   const podiums = useCircuitPodiums(featured?.circuit_id)
 
@@ -121,12 +128,10 @@ export default function App() {
         />
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>
-          <DriverForm
-            drivers={drivers.data}
-            driversLoading={drivers.isLoading}
-            driversError={drivers.isError}
-            standings={standings.data}
-            raceResults={raceResults.data}
+          <WeekendSchedule
+            circuitId={featured.circuit_id}
+            sessions={sessions.data}
+            loading={sessions.isLoading}
           />
           <PastResults
             circuitId={featured.circuit_id}
@@ -135,7 +140,20 @@ export default function App() {
           />
         </section>
 
-        <EditorialInsight />
+        <section className={`${styles.splitWide} ${styles.alignStart}`}>
+          <DriverForm
+            drivers={drivers.data}
+            driversLoading={drivers.isLoading}
+            driversError={drivers.isError}
+            standings={standings.data}
+            raceResults={raceResults.data}
+          />
+          <ConstructorStandings
+            standings={constructorStandings.data}
+            loading={constructorStandings.isLoading}
+            error={constructorStandings.isError}
+          />
+        </section>
 
         <footer className={styles.footer}>
           <span>FORMATION LAP · LIVE API · STRATEGY MODELLED FOR ILLUSTRATION</span>

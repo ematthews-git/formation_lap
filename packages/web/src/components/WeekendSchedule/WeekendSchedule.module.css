@@ -1,0 +1,78 @@
+.headRow,
+.row {
+  display: grid;
+  /* session | date | circuit time | local time. */
+  grid-template-columns: 1fr 120px 108px 108px;
+  align-items: center;
+  /* Identical horizontal padding on header + rows so every column lines up. */
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+.headRow {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-ghost);
+}
+
+.row {
+  position: relative;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.accentBar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.race {
+  background: var(--accent);
+}
+
+.sprint {
+  background: var(--gold);
+}
+
+.session {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--text-num);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.circuit {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.local {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

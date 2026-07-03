@@ -6,8 +6,9 @@ will reconcile Jolpica + FastF1 once those source clients are implemented.
 Data is hand written. VERIFY before relying on it:
   - race_date values are best-known 2026 dates and need a final check against the
     official FIA calendar.
-  - is_sprint is set from the 2025 sprint venues as a placeholder; confirm the
-    2026 sprint rounds.
+  - is_sprint reflects the 2026 sprint venues (Shanghai, Miami, Montréal,
+    Silverstone, Zandvoort, Singapore), cross-checked against FastF1's
+    get_event_schedule(2026) EventFormat == "sprint_qualifying".
   - Compounds default to C3/C4/C5 (hard/medium/soft) for every round. Pirelli
     publishes a per-race allocation; fill _COMPOUNDS_BY_ROUND to override.
 
@@ -45,23 +46,23 @@ _CALENDAR_2026 = [
     (2, "shanghai", "Chinese Grand Prix", date(2026, 3, 15), True),
     (3, "suzuka", "Japanese Grand Prix", date(2026, 3, 29), False),
     (6, "miami", "Miami Grand Prix", date(2026, 5, 3), True),
-    (7, "montreal", "Canadian Grand Prix", date(2026, 5, 24), False),
+    (7, "montreal", "Canadian Grand Prix", date(2026, 5, 24), True),
     (8, "monaco", "Monaco Grand Prix", date(2026, 6, 7), False),
     (9, "barcelona", "Spanish Grand Prix", date(2026, 6, 14), False),
     (10, "red_bull_ring", "Austrian Grand Prix", date(2026, 6, 28), False),
-    (11, "silverstone", "British Grand Prix", date(2026, 7, 5), False),
-    (12, "spa", "Belgian Grand Prix", date(2026, 7, 19), True),
+    (11, "silverstone", "British Grand Prix", date(2026, 7, 5), True),
+    (12, "spa", "Belgian Grand Prix", date(2026, 7, 19), False),
     (13, "hungaroring", "Hungarian Grand Prix", date(2026, 7, 26), False),
-    (14, "zandvoort", "Dutch Grand Prix", date(2026, 8, 23), False),
+    (14, "zandvoort", "Dutch Grand Prix", date(2026, 8, 23), True),
     (15, "monza", "Italian Grand Prix", date(2026, 9, 6), False),
     (16, "madrid", "Spanish Grand Prix", date(2026, 9, 13), False),
     (17, "baku", "Azerbaijan Grand Prix", date(2026, 9, 27), False),
-    (18, "singapore", "Singapore Grand Prix", date(2026, 10, 11), False),
-    (19, "austin", "United States Grand Prix", date(2026, 10, 25), True),
+    (18, "singapore", "Singapore Grand Prix", date(2026, 10, 11), True),
+    (19, "austin", "United States Grand Prix", date(2026, 10, 25), False),
     (20, "mexico_city", "Mexico City Grand Prix", date(2026, 11, 1), False),
-    (21, "sao_paulo", "São Paulo Grand Prix", date(2026, 11, 8), True),
+    (21, "sao_paulo", "São Paulo Grand Prix", date(2026, 11, 8), False),
     (22, "las_vegas", "Las Vegas Grand Prix", date(2026, 11, 21), False),
-    (23, "lusail", "Qatar Grand Prix", date(2026, 11, 29), True),
+    (23, "lusail", "Qatar Grand Prix", date(2026, 11, 29), False),
     (24, "abu_dhabi", "Abu Dhabi Grand Prix", date(2026, 12, 6), False),
 ]
 

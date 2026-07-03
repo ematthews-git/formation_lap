@@ -24,6 +24,7 @@ from formation_data.jobs.pre_season import (
     drivers,
     lap_records as pre_season_lap_records,
     race_weekends,
+    sessions,
     track_maps,
 )
 from formation_data.jobs.static import (
@@ -37,6 +38,7 @@ app = typer.Typer(help="Formation Lap data loader.")
 circuits_app = typer.Typer(help="Static circuit seed.")
 drivers_app = typer.Typer(help="Driver lineup per season.")
 weekends_app = typer.Typer(help="Season calendar.")
+sessions_app = typer.Typer(help="Weekend session timetable.")
 lap_records_app = typer.Typer(help="All-time race lap records.")
 circuit_stats_app = typer.Typer(help="Per-circuit per-season stats.")
 weather_app = typer.Typer(help="Race weekend weather forecast.")
@@ -47,6 +49,7 @@ standings_app = typer.Typer(help="Driver + constructor standings.")
 app.add_typer(circuits_app, name="circuits")
 app.add_typer(drivers_app, name="drivers")
 app.add_typer(weekends_app, name="weekends")
+app.add_typer(sessions_app, name="sessions")
 app.add_typer(lap_records_app, name="lap-records")
 app.add_typer(circuit_stats_app, name="circuit-stats")
 app.add_typer(weather_app, name="weather")
@@ -106,6 +109,13 @@ def weekends_seed(season: int = typer.Option(2026)) -> None:
 def weekends_refresh(season: int = typer.Option(...)) -> None:
     with connection_scope() as conn:
         race_weekends.run(conn, season=season)
+
+
+@sessions_app.command("refresh")
+def sessions_refresh(season: int = typer.Option(2026)) -> None:
+    """Load each weekend's session timetable (names + UTC start times) from FastF1."""
+    with connection_scope() as conn:
+        sessions.run(conn, season=season)
 
 
 @lap_records_app.command("refresh")
@@ -170,6 +180,17 @@ def standings_refresh(
         # post_race.lap_records is also part of T+1, expose it via the orchestrator command;
         # standings alone is a fine manual operation.
         _ = post_race_lap_records  # silence unused
+
+
+@standings_app.command("backfill")
+def standings_backfill(
+    start: int = typer.Option(2025, help="Most recent season to backfill."),
+    count: int = typer.Option(1, help="Number of seasons back from --start."),
+) -> None:
+    """Backfill past seasons' final standings (the "last season" reference panel)."""
+    seasons = list(range(start, start - count, -1))
+    with connection_scope() as conn:
+        standings.backfill(conn, seasons=seasons)
 
 
 # --- orchestrator flows ---

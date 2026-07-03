@@ -12,7 +12,10 @@ from __future__ import annotations
 import logging
 import fastf1
 import os
+from datetime import date, datetime, timezone
 from functools import lru_cache
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +84,42 @@ def rounds_for_location(season: int, fastf1_location: str) -> list[int]:
         for _, event in schedule.iterrows()
         if event.Location in aliases
     ]
+
+
+def get_event_sessions(
+    season: int, fastf1_location: str, race_date: date
+) -> list[tuple[int, str, datetime]]:
+    """Ordered sessions for the event at `fastf1_location` in `season`.
+
+    Returns a list of (session_order, name, start_utc) — e.g.
+    (1, "Practice 1", 2026-07-03 11:30+00:00) ... (5, "Race", ...). `start_utc`
+    is a timezone-aware UTC datetime, taken from FastF1's SessionNDateUtc.
+
+    The event is matched on Location (not round number — FastF1 numbers the full
+    calendar while our seed skips unseeded circuits, so the two disagree). When a
+    location hosts two rounds in a season (a double-header), `race_date`
+    disambiguates against the event's Sunday. Returns `[]` if no event matches or
+    the schedule carries no session data.
+    """
+    aliases = _LOCATION_ALIASES.get(fastf1_location, {fastf1_location})
+    schedule = get_event_schedule(season)
+    schedule = schedule[schedule["EventFormat"] != "testing"]
+    events = schedule[schedule["Location"].isin(aliases)]
+    if len(events) > 1:
+        events = events[events["EventDate"].dt.date == race_date]
+    if events.empty:
+        return []
+
+    event = events.iloc[0]
+    sessions: list[tuple[int, str, datetime]] = []
+    for order in range(1, 6):
+        name = event.get(f"Session{order}")
+        start = event.get(f"Session{order}DateUtc")
+        if name is None or pd.isna(name) or pd.isna(start):
+            continue
+        start_utc = start.to_pydatetime().replace(tzinfo=timezone.utc)
+        sessions.append((order, str(name), start_utc))
+    return sessions
 
 
 def get_race_session(season: int, round_number: int):

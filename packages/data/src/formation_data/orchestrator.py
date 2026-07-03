@@ -24,6 +24,7 @@ from formation_data.jobs.pre_season import (
     drivers,
     lap_records as pre_season_lap_records,
     race_weekends,
+    sessions,
 )
 from formation_data.jobs.static import circuits as static_circuits
 
@@ -43,6 +44,7 @@ def run_pre_season(season: int) -> None:
         static_circuits.run(conn)            # cheap no-op if already seeded
         drivers.run(conn, season=season)
         race_weekends.run(conn, season=season)
+        sessions.run(conn, season=season)    # needs race_weekends in place
         pre_season_lap_records.run(conn)
         circuit_stats.run(conn, season=season)
 

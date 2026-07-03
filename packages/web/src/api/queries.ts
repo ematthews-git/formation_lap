@@ -7,6 +7,7 @@ import type {
   LapRecord,
   RaceResult,
   RaceWeekend,
+  Session,
   Standing,
   StrategyWithStints,
   WeatherForecast,
@@ -73,6 +74,15 @@ export function useWeather(season: number, round: number | undefined) {
     enabled: round != null,
     queryFn: () =>
       api.get<WeatherForecast[]>(`/weather/?season=${season}&round=${round}`),
+  })
+}
+
+export function useSessions(season: number, round: number | undefined) {
+  return useQuery({
+    queryKey: ['sessions', season, round],
+    enabled: round != null,
+    queryFn: () =>
+      api.get<Session[]>(`/sessions/?season=${season}&round=${round}`),
   })
 }
 

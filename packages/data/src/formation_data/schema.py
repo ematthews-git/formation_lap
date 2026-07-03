@@ -125,6 +125,23 @@ race_weekends = Table(
 )
 
 
+sessions = Table(
+    "sessions",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
+    # 1..5 in running order (FP1 → Race). Sprint weekends reuse the same slots
+    # for different session *names* ("Sprint Qualifying", "Sprint"), so the name
+    # carries the format, not the order.
+    Column("session_order", Integer, nullable=False),
+    Column("name", String, nullable=False),
+    # Session start, stored as a UTC instant (timestamptz). The frontend renders
+    # it in both the circuit's local zone and the viewer's local zone.
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("race_weekend_id", "session_order"),
+)
+
+
 weather_forecasts = Table(
     "weather_forecasts",
     metadata,
@@ -216,6 +233,7 @@ __all__ = [
     "circuit_stats",
     "drivers",
     "race_weekends",
+    "sessions",
     "weather_forecasts",
     "strategies",
     "strategy_stints",

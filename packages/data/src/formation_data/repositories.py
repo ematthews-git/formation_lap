@@ -357,6 +357,24 @@ def list_strategies_for_weekend(
     ]
 
 
+def list_sessions_for_weekend(
+    conn: Connection, season: int, round_number: int
+) -> list[domain.Session]:
+    """Session timetable for a race weekend, in running order (FP1 → Race).
+
+    Returns `[]` when the weekend doesn't exist or has no sessions loaded yet.
+    """
+    rw = get_race_weekend(conn, season, round_number)
+    if rw is None:
+        return []
+    rows = conn.execute(
+        select(schema.sessions)
+        .where(schema.sessions.c.race_weekend_id == rw.id)
+        .order_by(schema.sessions.c.session_order)
+    ).all()
+    return [domain.Session.model_validate(row._mapping) for row in rows]
+
+
 def list_weather_for_weekend(
     conn: Connection, season: int, round_number: int
 ) -> list[domain.WeatherForecast]:

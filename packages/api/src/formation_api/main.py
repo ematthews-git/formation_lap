@@ -7,6 +7,7 @@ from formation_api.routers import (
     health,
     race_results,
     race_weekends,
+    sessions,
     standings,
     strategies,
     weather,
@@ -30,3 +31,4 @@ app.include_router(standings.router)
 app.include_router(strategies.router)
 app.include_router(weather.router)
 app.include_router(race_results.router)
+app.include_router(sessions.router)
