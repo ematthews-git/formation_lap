@@ -1,0 +1,124 @@
+/* Full-bleed grey band pinned to the top; content aligns to the page column. */
+.topBar {
+  background: var(--panel-header);
+  border-bottom: 1px solid var(--border-header);
+}
+
+.inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 10px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brandDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  animation: flpulse 1.8s ease-in-out infinite;
+}
+
+.brandName {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.brandTag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-ghost);
+  padding-left: 11px;
+  border-left: 1px solid #403d38;
+}
+
+.lookahead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-left: 11px;
+  border-left: 1px solid #403d38;
+  flex-wrap: wrap;
+}
+
+.lookaheadItem {
+  background: none;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  /* Transparent top + bottom borders keep the text centred when the active
+     underline turns red (a bottom-only border would nudge the text up). */
+  border: 1px solid transparent;
+  border-left: none;
+  border-right: none;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.lookaheadItem:hover {
+  color: var(--text);
+  border-bottom-color: var(--text-rule);
+}
+
+.lookaheadActive,
+.lookaheadActive:hover {
+  color: var(--text-bright);
+  border-bottom-color: var(--accent);
+}
+
+.statusRight {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  color: var(--text-faint);
+}
+
+.feedLive {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #8a9e8c;
+}
+
+.feedDot {
+  width: 6px;
+  height: 6px;
+  background: var(--live);
+  display: inline-block;
+  animation: flpulse 1.8s ease-in-out infinite;
+}
+
+.divider {
+  color: #4a4744;
+}
+
+.metPending {
+  color: var(--text-fainter);
+}
+
+.metLive {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}

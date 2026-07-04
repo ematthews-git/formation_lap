@@ -1,19 +1,10 @@
 .header {
   position: relative;
+  z-index: 1;
   overflow: hidden;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--bg-header-top) 0%, var(--bg) 100%);
-}
-
-.scanline {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: rgba(235, 232, 228, 0.09);
-  animation: flscan 6s linear infinite;
-  pointer-events: none;
-  z-index: 0;
+  /* Transparent — the header sits over the hero photo with no frosted glass;
+     only the circuit/weather panels below are frosted. */
+  background: transparent;
 }
 
 .ghostTrack {
@@ -31,125 +22,7 @@
   z-index: 1;
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 14px 32px 24px;
-}
-
-.statusBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #2e2b28;
-  padding-bottom: 12px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.brandDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  display: inline-block;
-  animation: flpulse 1.8s ease-in-out infinite;
-}
-
-.brandName {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  color: var(--text);
-  font-weight: 600;
-}
-
-.brandTag {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  color: var(--text-ghost);
-  padding-left: 11px;
-  border-left: 1px solid #403d38;
-}
-
-.lookahead {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding-left: 11px;
-  border-left: 1px solid #403d38;
-  flex-wrap: wrap;
-}
-
-.lookaheadItem {
-  background: none;
-  padding: 2px 0;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  line-height: 1;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  /* Transparent top + bottom borders keep the text centred when the active
-     underline turns red (a bottom-only border would nudge the text up). */
-  border: 1px solid transparent;
-  border-left: none;
-  border-right: none;
-  transition: color 0.12s ease, border-color 0.12s ease;
-}
-
-.lookaheadItem:hover {
-  color: var(--text);
-  border-bottom-color: var(--text-rule);
-}
-
-.lookaheadActive,
-.lookaheadActive:hover {
-  color: var(--text-bright);
-  border-bottom-color: var(--accent);
-}
-
-.statusRight {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.13em;
-  color: var(--text-faint);
-}
-
-.feedLive {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: #8a9e8c;
-}
-
-.feedDot {
-  width: 6px;
-  height: 6px;
-  background: var(--live);
-  display: inline-block;
-  animation: flpulse 1.8s ease-in-out infinite;
-}
-
-.divider {
-  color: #4a4744;
-}
-
-.metPending {
-  color: var(--text-fainter);
-}
-
-.metLive {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
+  padding: 26px 32px 24px;
 }
 
 .titleRow {
@@ -157,7 +30,6 @@
   justify-content: space-between;
   align-items: flex-end;
   gap: 40px;
-  padding-top: 20px;
   flex-wrap: wrap;
 }
 
@@ -185,7 +57,8 @@
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.18em;
-  color: var(--text-ghost);
+  /* Black rather than grey — legible against the bright hero photo. */
+  color: #000;
 }
 
 .sprint {
@@ -216,14 +89,15 @@
   font-family: var(--font-mono);
   font-size: 13px;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  /* Black rather than grey — legible against the bright hero photo. */
+  color: #000;
   flex-wrap: wrap;
 }
 
 .metaStrong {
-  color: var(--text-dim);
+  color: #000;
 }
 
 .metaSlash {
-  color: #4a4744;
+  color: #000;
 }

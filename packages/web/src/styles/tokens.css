@@ -61,6 +61,11 @@
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   --font-display: 'Saira Condensed', 'IBM Plex Sans', sans-serif;
 
+  /* ---- Frosted glass (panels layered over the hero photo) ---- */
+  --glass-bg: rgba(30, 29, 28, 0.3);
+  --glass-border: rgba(232, 229, 224, 0.14);
+  --glass-blur: blur(28px) saturate(1.25);
+
   /* ---- Layout ---- */
   --maxw: 1340px;
   --gap: 22px;

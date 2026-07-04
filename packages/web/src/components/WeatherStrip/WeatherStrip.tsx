@@ -14,7 +14,7 @@ export function WeatherStrip({ weather, weatherLoading }: Props) {
   const race = raceSession(weather)
 
   return (
-    <Panel>
+    <Panel frosted>
       <PanelHeader
         label="MET_FORECAST"
         sub="RACE_WINDOW"

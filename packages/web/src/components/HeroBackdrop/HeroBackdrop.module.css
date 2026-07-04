@@ -1,0 +1,59 @@
+/*
+ * Masked to fade toward the right and top/bottom, so the photo dissolves into
+ * the theme rather than ending on a hard edge. Sits at z-index 0; the header
+ * and main content are layered above (z-index 1) and blur it via backdrop-filter.
+ */
+.backdrop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: min(1060px, 76%);
+  height: 760px;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 62%, transparent 99%),
+    linear-gradient(to bottom, #000 0%, #000 90%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, #000 0%, #000 62%, transparent 99%),
+    linear-gradient(to bottom, #000 0%, #000 90%, transparent 100%);
+  mask-composite: intersect;
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 48% 62%;
+  filter: saturate(1.05) contrast(1.02) blur(1.6px);
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.12;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+      to right,
+      rgba(22, 21, 20, 0.62) 0%,
+      rgba(22, 21, 20, 0.34) 44%,
+      rgba(22, 21, 20, 0.08) 78%,
+      transparent 100%
+    ),
+    linear-gradient(
+      to top,
+      rgba(22, 21, 20, 0.86) 0%,
+      rgba(22, 21, 20, 0.4) 30%,
+      transparent 60%
+    );
+}

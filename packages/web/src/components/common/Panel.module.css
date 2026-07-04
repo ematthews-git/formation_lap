@@ -6,3 +6,12 @@
 .strong {
   border-color: var(--border-strong);
 }
+
+.frosted {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}

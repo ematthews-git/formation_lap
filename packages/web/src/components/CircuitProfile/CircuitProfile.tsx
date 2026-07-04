@@ -32,7 +32,7 @@ export function CircuitProfile({
   const [startX, startY] = pathStartPoint(trackPath)
 
   return (
-    <Panel>
+    <Panel frosted>
       <PanelHeader
         label="TRK_PROFILE"
         sub={circuit ? prettifyCircuit(circuit.circuit_id).toUpperCase() : undefined}

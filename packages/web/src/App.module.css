@@ -1,9 +1,19 @@
 .page {
+  position: relative;
+  overflow: hidden;
   min-height: 100vh;
   padding-bottom: 56px;
 }
 
+/* Wraps the hero photo + header + main so the photo (absolute, top:0) starts
+   just below the top bar rather than behind it. */
+.stage {
+  position: relative;
+}
+
 .main {
+  position: relative;
+  z-index: 1;
   max-width: var(--maxw);
   margin: 0 auto;
   padding: 28px 32px 0;

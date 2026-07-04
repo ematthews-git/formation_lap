@@ -18,6 +18,8 @@ import {
 } from './api/queries'
 import { roundOverrideFromUrl } from './lib/format'
 import { raceSession } from './lib/weather'
+import { HeroBackdrop } from './components/HeroBackdrop/HeroBackdrop'
+import { TopBar } from './components/TopBar/TopBar'
 import { Header } from './components/Header/Header'
 import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
@@ -98,17 +100,22 @@ export default function App() {
 
   return (
     <div className={styles.page}>
-      <Header
-        weekend={featured}
-        circuit={circuit.data}
-        totalRounds={totalRounds}
+      <TopBar
         raceWeather={raceSession(weather.data)}
         races={raceOptions}
         activeRound={featured.round_number}
         onSelectRound={onSelectRound}
       />
 
-      <main className={styles.main}>
+      <div className={styles.stage}>
+        <HeroBackdrop />
+        <Header
+          weekend={featured}
+          circuit={circuit.data}
+          totalRounds={totalRounds}
+        />
+
+        <main className={styles.main}>
         <section className={styles.splitWide}>
           <CircuitProfile
             circuit={circuit.data}
@@ -150,6 +157,7 @@ export default function App() {
           />
           <ConstructorStandings
             standings={constructorStandings.data}
+            lastSeason={lastSeasonConstructors.data}
             loading={constructorStandings.isLoading}
             error={constructorStandings.isError}
           />
@@ -159,7 +167,8 @@ export default function App() {
           <span>FORMATION LAP · LIVE API · STRATEGY MODELLED FOR ILLUSTRATION</span>
           <span>BRIEFING RENDERED {updated}</span>
         </footer>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
