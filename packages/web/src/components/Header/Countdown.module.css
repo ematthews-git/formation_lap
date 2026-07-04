@@ -1,49 +1,24 @@
-.wrap {
+/* Sized to match the header title (.title) so the clock sits on its baseline.
+   The fixed `width` is what stops the jitter (the box never resizes as digits
+   tick) AND is the horizontal-position knob: because the clock is anchored to
+   the right, DECREASING the width pushes it toward the right edge, INCREASING
+   it pulls it left. Tune in ch (roughly one digit each). */
+.clock {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.cells {
-  display: flex;
-  gap: 20px;
-}
-
-.cell {
-  background: var(--panel-raised);
-  border: 1px solid var(--border);
-  padding: 11px 12px;
-  /* Fixed width (not min-width) so a "1" and an "88" occupy the same space and
-     the units don't shift, with headroom for a 3-digit day count. */
-  width: 74px;
-  text-align: center;
-}
-
-.hot {
-  border-color: #5c3a3b;
-}
-
-.value {
+  width: 8.25ch;
+  text-align: left;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 46px;
-  line-height: 1;
+  font-size: clamp(48px, 7vw, 92px);
+  line-height: 0.84;
+  letter-spacing: -0.005em;
   color: var(--text-num);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.valueHot {
+.seconds {
   color: var(--accent-hot);
-}
-
-.unit {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
-  color: var(--text-fainter);
-  margin-top: 5px;
 }
 
 .times {

@@ -25,16 +25,21 @@
   padding: 26px 32px 24px;
 }
 
-.titleRow {
+.titleLine {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: baseline;
   gap: 40px;
   flex-wrap: wrap;
 }
 
-.titleMain {
-  min-width: 0;
+.metaLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 40px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
 .roundLine {
@@ -85,7 +90,6 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-top: 14px;
   font-family: var(--font-mono);
   font-size: 13px;
   letter-spacing: 0.04em;

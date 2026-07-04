@@ -1,7 +1,7 @@
 import type { Circuit, RaceWeekend } from '../../api/types'
 import { formatRaceDate, prettifyCircuit } from '../../lib/format'
 import { FALLBACK_TRACK_PATH } from '../../lib/trackPath'
-import { Countdown } from './Countdown'
+import { Countdown, LightsOut } from './Countdown'
 import styles from './Header.module.css'
 
 interface HeaderProps {
@@ -19,36 +19,40 @@ export function Header({ weekend, circuit, totalRounds }: HeaderProps) {
       </svg>
 
       <div className={styles.inner}>
-        {/* title row */}
-        <div className={styles.titleRow}>
-          <div className={styles.titleMain}>
-            <div className={styles.roundLine}>
-              <span className={styles.round}>
-                ROUND_{String(weekend.round_number).padStart(2, '0')} / {totalRounds}
-              </span>
-              <span className={styles.championship}>
-                FIA F1 WORLD CHAMPIONSHIP · {weekend.season}
-              </span>
-              {weekend.is_sprint && <span className={styles.sprint}>SPRINT</span>}
-            </div>
-            <h1 className={styles.title}>{weekend.event_name}</h1>
-            <div className={styles.meta}>
-              <span className={styles.metaStrong}>
-                {circuit ? prettifyCircuit(circuit.circuit_id) : prettifyCircuit(weekend.circuit_id)}{' '}
-                Circuit
-              </span>
-              {circuit && (
-                <>
-                  <span className={styles.metaSlash}>//</span>
-                  <span>{circuit.country}</span>
-                </>
-              )}
-              <span className={styles.metaSlash}>//</span>
-              <span>{formatRaceDate(weekend.race_date)}</span>
-            </div>
+        <div className={styles.roundLine}>
+          <span className={styles.round}>
+            ROUND_{String(weekend.round_number).padStart(2, '0')} / {totalRounds}
+          </span>
+          <span className={styles.championship}>
+            FIA F1 WORLD CHAMPIONSHIP · {weekend.season}
+          </span>
+          {weekend.is_sprint && <span className={styles.sprint}>SPRINT</span>}
+        </div>
+
+        {/* title + countdown share a baseline */}
+        <div className={styles.titleLine}>
+          <h1 className={styles.title}>{weekend.event_name}</h1>
+          <Countdown raceDate={weekend.race_date} />
+        </div>
+
+        {/* circuit meta + lights-out times */}
+        <div className={styles.metaLine}>
+          <div className={styles.meta}>
+            <span className={styles.metaStrong}>
+              {circuit ? prettifyCircuit(circuit.circuit_id) : prettifyCircuit(weekend.circuit_id)}{' '}
+              Circuit
+            </span>
+            {circuit && (
+              <>
+                <span className={styles.metaSlash}>//</span>
+                <span>{circuit.country}</span>
+              </>
+            )}
+            <span className={styles.metaSlash}>//</span>
+            <span>{formatRaceDate(weekend.race_date)}</span>
           </div>
 
-          <Countdown raceDate={weekend.race_date} circuitId={weekend.circuit_id} />
+          <LightsOut raceDate={weekend.race_date} circuitId={weekend.circuit_id} />
         </div>
       </div>
     </header>
