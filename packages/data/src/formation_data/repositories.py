@@ -15,15 +15,19 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel
-from sqlalchemy import Connection, Table, delete, func, select, tuple_
+from sqlalchemy import Connection, Table, and_, delete, exists, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 
 from formation_data import domain, schema
 
 logger = logging.getLogger(__name__)
+
+# A postquali sim becomes due this many minutes after the Qualifying session *starts*
+# (≈1h session + 1h30 buffer for FastF1's delayed data upload).
+POSTQUALI_DELAY_MIN = 150
 
 # Columns the database owns. Excluded from upsert payloads so server defaults
 # apply on insert; refreshed explicitly on conflict (ON CONFLICT DO UPDATE does
@@ -83,17 +87,20 @@ def upsert_strategy_with_stints(
     """Upsert a Strategy and its stints atomically; returns the strategy id.
 
     The strategy row is inserted (or updated, keyed on its unique
-    (race_weekend_id, label)) with RETURNING so its auto-id lands before the
-    child stints are written — each stint's `strategy_id` is swapped to the
+    (race_weekend_id, source, label)) with RETURNING so its auto-id lands before
+    the child stints are written — each stint's `strategy_id` is swapped to the
     returned id, then the stints upsert keyed on (strategy_id, stint_order).
     """
     strat_payload = strategy.model_dump(exclude={"id"} | _SERVER_MANAGED_COLS)
     strat_stmt = insert(schema.strategies).values(strat_payload)
     strat_stmt = strat_stmt.on_conflict_do_update(
-        index_elements=["race_weekend_id", "label"],
+        index_elements=["race_weekend_id", "source", "label"],
         set_={
             "is_base": strat_stmt.excluded.is_base,
             "num_stops": strat_stmt.excluded.num_stops,
+            "phase": strat_stmt.excluded.phase,
+            "plausibility": strat_stmt.excluded.plausibility,
+            "tier": strat_stmt.excluded.tier,
             "updated_at": func.now(),
         },
     ).returning(schema.strategies.c.id)
@@ -105,22 +112,21 @@ def upsert_strategy_with_stints(
     return strategy_id
 
 
-def delete_strategies_for_weekend(conn: Connection, race_weekend_id: int) -> int:
-    """Delete every strategy (and its stints) for a race weekend.
+def delete_strategies_for_weekend(
+    conn: Connection, race_weekend_id: int, source: str | None = None
+) -> int:
+    """Delete strategies (and their stints) for a race weekend.
 
     Used before a fresh strategy generation so strategies that are no longer in
-    the current top-N don't linger. There's no ON DELETE CASCADE on the FK, so
-    the child stints are removed first. Returns the number of strategies deleted.
+    the current top-N don't linger. Pass `source` to scope the delete to one
+    provenance ("historical" / "sim") so regenerating one doesn't wipe the other.
+    There's no ON DELETE CASCADE on the FK, so the child stints are removed first.
+    Returns the number of strategies deleted.
     """
-    ids = (
-        conn.execute(
-            select(schema.strategies.c.id).where(
-                schema.strategies.c.race_weekend_id == race_weekend_id
-            )
-        )
-        .scalars()
-        .all()
-    )
+    cond = [schema.strategies.c.race_weekend_id == race_weekend_id]
+    if source is not None:
+        cond.append(schema.strategies.c.source == source)
+    ids = conn.execute(select(schema.strategies.c.id).where(*cond)).scalars().all()
     if not ids:
         return 0
     conn.execute(
@@ -130,6 +136,27 @@ def delete_strategies_for_weekend(conn: Connection, race_weekend_id: int) -> int
     )
     conn.execute(delete(schema.strategies).where(schema.strategies.c.id.in_(ids)))
     return len(ids)
+
+
+def upsert_sim_race_stats(
+    conn: Connection, race_weekend_id: int, phase: str, stats: dict
+) -> None:
+    """Upsert the race-context stats blob for a weekend (one row per weekend).
+
+    A later phase overwrites an earlier one — postquali supersedes prelim.
+    """
+    stmt = insert(schema.sim_race_stats).values(
+        race_weekend_id=race_weekend_id, phase=phase, stats=stats
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["race_weekend_id"],
+        set_={
+            "phase": stmt.excluded.phase,
+            "stats": stmt.excluded.stats,
+            "generated_at": func.now(),
+        },
+    )
+    conn.execute(stmt)
 
 
 # --- read ---
@@ -273,28 +300,72 @@ def list_race_results(conn: Connection, season: int) -> list[domain.RaceResult]:
 def next_race_weekend_within(
     conn: Connection, today: date, window: timedelta
 ) -> domain.RaceWeekend | None:
-    # TODO:
-    #   stmt = (select(schema.race_weekends)
-    #           .where(schema.race_weekends.c.race_date >= today)
-    #           .where(schema.race_weekends.c.race_date <= today + window)
-    #           .order_by(schema.race_weekends.c.race_date.asc())
-    #           .limit(1))
-    logger.info(
-        "repositories.next_race_weekend_within today=%s window=%s (skeleton)",
-        today,
-        window,
-    )
-    return None
+    """The soonest race weekend whose race falls in [today, today+window], or None."""
+    row = conn.execute(
+        select(schema.race_weekends)
+        .where(
+            schema.race_weekends.c.race_date >= today,
+            schema.race_weekends.c.race_date <= today + window,
+        )
+        .order_by(schema.race_weekends.c.race_date.asc())
+        .limit(1)
+    ).first()
+    return domain.RaceWeekend.model_validate(row._mapping) if row else None
 
 
 def most_recent_race_weekend_before(
     conn: Connection, today: date
 ) -> domain.RaceWeekend | None:
-    # TODO: order_by(race_date.desc()).limit(1) where race_date < today
-    logger.info(
-        "repositories.most_recent_race_weekend_before today=%s (skeleton)", today
+    """The latest race weekend whose race is strictly before `today`, or None."""
+    row = conn.execute(
+        select(schema.race_weekends)
+        .where(schema.race_weekends.c.race_date < today)
+        .order_by(schema.race_weekends.c.race_date.desc())
+        .limit(1)
+    ).first()
+    return domain.RaceWeekend.model_validate(row._mapping) if row else None
+
+
+def next_race_weekend_after(
+    conn: Connection, race_date: date
+) -> domain.RaceWeekend | None:
+    """The soonest race weekend strictly after `race_date` — the weekend to run a
+    prelim sim for once the previous one has finished. None if none is seeded yet."""
+    row = conn.execute(
+        select(schema.race_weekends)
+        .where(schema.race_weekends.c.race_date > race_date)
+        .order_by(schema.race_weekends.c.race_date.asc())
+        .limit(1)
+    ).first()
+    return domain.RaceWeekend.model_validate(row._mapping) if row else None
+
+
+def weekends_postquali_due(
+    conn: Connection, now: datetime
+) -> list[domain.RaceWeekend]:
+    """Weekends whose postquali sim is due but not yet produced.
+
+    Due = Qualifying started ≥ POSTQUALI_DELAY_MIN ago, the Race hasn't started yet,
+    and no postquali `sim_race_stats` row exists. `now` must be timezone-aware (UTC),
+    to compare against the timestamptz session start times. Drives the idempotent
+    catch-up flow: safe to call repeatedly — a weekend drops out once its postquali runs.
+    """
+    cutoff = now - timedelta(minutes=POSTQUALI_DELAY_MIN)
+    rw = schema.race_weekends
+    quali = schema.sessions.alias("quali")
+    race = schema.sessions.alias("race")
+    srs = schema.sim_race_stats
+    postquali_done = exists().where(
+        and_(srs.c.race_weekend_id == rw.c.id, srs.c.phase == "postquali")
     )
-    return None
+    rows = conn.execute(
+        select(rw)
+        .join(quali, and_(quali.c.race_weekend_id == rw.c.id, quali.c.name == "Qualifying"))
+        .join(race, and_(race.c.race_weekend_id == rw.c.id, race.c.name == "Race"))
+        .where(quali.c.start_time <= cutoff, race.c.start_time > now, ~postquali_done)
+        .order_by(rw.c.race_date.asc())
+    ).all()
+    return [domain.RaceWeekend.model_validate(row._mapping) for row in rows]
 
 
 def get_lap_record_for_circuit(
@@ -310,20 +381,24 @@ def get_lap_record_for_circuit(
 
 
 def list_strategies_for_weekend(
-    conn: Connection, season: int, round_number: int
+    conn: Connection, season: int, round_number: int, source: str | None = None
 ) -> list[domain.StrategyWithStints]:
     """Generated strategies (each with its ordered stints) for a race weekend.
 
-    Base strategy first, then by stop count. Returns `[]` when the weekend
-    doesn't exist or has no strategies generated yet.
+    Base strategy first, then by stop count. Pass `source` ("historical" / "sim")
+    to scope to one provenance. Returns `[]` when the weekend doesn't exist or has
+    no matching strategies yet.
     """
     rw = get_race_weekend(conn, season, round_number)
     if rw is None:
         return []
 
+    cond = [schema.strategies.c.race_weekend_id == rw.id]
+    if source is not None:
+        cond.append(schema.strategies.c.source == source)
     strat_rows = conn.execute(
         select(schema.strategies)
-        .where(schema.strategies.c.race_weekend_id == rw.id)
+        .where(*cond)
         .order_by(
             schema.strategies.c.is_base.desc(),
             schema.strategies.c.num_stops,
@@ -407,3 +482,21 @@ def get_circuit_stats(
         )
     ).first()
     return domain.CircuitStats.model_validate(row._mapping) if row else None
+
+
+def get_sim_race_stats(
+    conn: Connection, season: int, round_number: int
+) -> domain.SimRaceStats | None:
+    """The race-context stats blob from the latest sim run for a weekend, or None.
+
+    One row per weekend; `phase` says whether it came from the prelim or postquali run.
+    """
+    rw = get_race_weekend(conn, season, round_number)
+    if rw is None:
+        return None
+    row = conn.execute(
+        select(schema.sim_race_stats).where(
+            schema.sim_race_stats.c.race_weekend_id == rw.id
+        )
+    ).first()
+    return domain.SimRaceStats.model_validate(row._mapping) if row else None

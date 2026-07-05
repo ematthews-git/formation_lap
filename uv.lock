@@ -651,6 +651,7 @@ version = "0.1.0"
 source = { editable = "packages/data" }
 dependencies = [
     { name = "fastf1" },
+    { name = "formation-sim" },
     { name = "httpx" },
     { name = "numpy" },
     { name = "pandas" },
@@ -663,6 +664,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastf1", specifier = ">=3.4.0" },
+    { name = "formation-sim", editable = "packages/sim" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.0" },

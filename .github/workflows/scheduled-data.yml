@@ -12,6 +12,11 @@ on:
     # pre-race refresh: Thursday + Saturday 06:00 UTC. No-ops if no race within 7 days.
     - cron: "0 6 * * THU" #TODO: consider earlier
     - cron: "0 6 * * SAT"
+    # postquali sim: Sat afternoon/evening + Sun early UTC. Idempotent catch-up — each fire
+    # runs run-postquali-sim, which only acts on weekends whose Qualifying finished ≥2h30 ago
+    # and has no postquali yet. Multiple times cover quali across all race timezones.
+    - cron: "0 15,18,21 * * SAT"
+    - cron: "0 0,3 * * SUN"
     # pre-season: 15 January 06:00 UTC.
     - cron: "0 6 15 1 *"
   workflow_dispatch:
@@ -47,6 +52,9 @@ jobs:
               ;;
             "0 6 * * THU"|"0 6 * * SAT")
               uv run --package formation-data formation-data run-pre-race
+              ;;
+            "0 15,18,21 * * SAT"|"0 0,3 * * SUN")
+              uv run --package formation-data formation-data run-postquali-sim
               ;;
             "0 6 15 1 *")
               # Adjust the season once a year, or trigger manually via workflow_dispatch.

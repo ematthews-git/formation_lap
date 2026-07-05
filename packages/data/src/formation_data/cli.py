@@ -11,14 +11,14 @@ import logging
 
 import typer
 
-from formation_data import orchestrator
+from formation_data import db, orchestrator
 from formation_data.db import connection_scope
 from formation_data.jobs.post_race import (
     lap_records as post_race_lap_records,
     race_results,
     standings,
 )
-from formation_data.jobs.pre_race import strategies, weather
+from formation_data.jobs.pre_race import sim_strategies, strategies, weather
 from formation_data.jobs.pre_season import (
     circuit_stats,
     drivers,
@@ -42,9 +42,11 @@ sessions_app = typer.Typer(help="Weekend session timetable.")
 lap_records_app = typer.Typer(help="All-time race lap records.")
 circuit_stats_app = typer.Typer(help="Per-circuit per-season stats.")
 weather_app = typer.Typer(help="Race weekend weather forecast.")
-strategies_app = typer.Typer(help="Generated strategy options.")
+strategies_app = typer.Typer(help="Historical (mined) strategy options.")
+sim_strategies_app = typer.Typer(help="Simulated strategy options.")
 results_app = typer.Typer(help="Race finishing order.")
 standings_app = typer.Typer(help="Driver + constructor standings.")
+db_app = typer.Typer(help="Database schema management.")
 
 app.add_typer(circuits_app, name="circuits")
 app.add_typer(drivers_app, name="drivers")
@@ -54,8 +56,10 @@ app.add_typer(lap_records_app, name="lap-records")
 app.add_typer(circuit_stats_app, name="circuit-stats")
 app.add_typer(weather_app, name="weather")
 app.add_typer(strategies_app, name="strategies")
+app.add_typer(sim_strategies_app, name="sim-strategies")
 app.add_typer(results_app, name="results")
 app.add_typer(standings_app, name="standings")
+app.add_typer(db_app, name="db")
 
 
 @app.callback()
@@ -148,6 +152,18 @@ def strategies_generate(
         strategies.run(conn, season=season, round_number=round)
 
 
+@sim_strategies_app.command("generate")
+def sim_strategies_generate(
+    season: int = typer.Option(...),
+    round: int = typer.Option(..., "--round"),
+    mode: str = typer.Option("postquali", help="Sim mode: 'prelim' or 'postquali'."),
+    sims: int = typer.Option(None, "--sims", help="Monte-Carlo count override (default: sim config)."),
+) -> None:
+    """Run the strategy simulator and persist the race-level shown-5 + race-context stats."""
+    with connection_scope() as conn:
+        sim_strategies.run(conn, season=season, round_number=round, mode=mode, n_sims=sims)
+
+
 @results_app.command("refresh")
 def results_refresh(
     season: int = typer.Option(...),
@@ -209,6 +225,27 @@ def run_pre_race() -> None:
 @app.command("run-post-race")
 def run_post_race() -> None:
     orchestrator.run_post_race_for_last_weekend()
+
+
+@app.command("run-prelim-sim")
+def run_prelim_sim() -> None:
+    """Prelim sim for the next upcoming weekend (end-of-previous-weekend cadence)."""
+    orchestrator.run_prelim_sim_for_next_weekend()
+
+
+@app.command("run-postquali-sim")
+def run_postquali_sim() -> None:
+    """Postquali sim for any weekend whose quali finished ≥2h30 ago (idempotent catch-up)."""
+    orchestrator.run_postquali_sim()
+
+
+# --- schema ---
+
+
+@db_app.command("upgrade")
+def db_upgrade() -> None:
+    """Apply the schema to DATABASE_URL (idempotent; safe on fresh or existing DBs)."""
+    db.upgrade()
 
 
 def main() -> None:

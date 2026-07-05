@@ -108,9 +108,16 @@ class WeatherForecast(_Base):
 class Strategy(_Base):
     id: int | None = None
     race_weekend_id: int
+    # "historical" (mined) or "sim" (simulated). Defaults keep pre-sim callers valid.
+    source: str = "historical"
+    # Sim only: "prelim" | "postquali". None for historical.
+    phase: str | None = None
     is_base: bool
     num_stops: int
     label: str
+    # Sim only: field-plausibility share and coarse tier. None for historical.
+    plausibility: float | None = None
+    tier: str | None = None
     updated_at: datetime | None = None
 
 
@@ -128,11 +135,25 @@ class StrategyWithStints(_Base):
 
     id: int | None = None
     race_weekend_id: int
+    source: str = "historical"
+    phase: str | None = None
     is_base: bool
     num_stops: int
     label: str
+    plausibility: float | None = None
+    tier: str | None = None
     updated_at: datetime | None = None
     stints: list[StrategyStint] = []
+
+
+class SimRaceStats(_Base):
+    """Race-context numbers from a sim run (the JSONB `stats` blob), API read shape."""
+
+    id: int | None = None
+    race_weekend_id: int
+    phase: str
+    generated_at: datetime | None = None
+    stats: dict
 
 
 class RaceResult(_Base):
@@ -165,6 +186,7 @@ __all__ = [
     "Strategy",
     "StrategyStint",
     "StrategyWithStints",
+    "SimRaceStats",
     "RaceResult",
     "Standing",
 ]

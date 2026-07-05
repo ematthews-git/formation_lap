@@ -11,6 +11,8 @@ import {
   useRaceResults,
   useRaceWeekends,
   useSessions,
+  useSimStats,
+  useSimStrategies,
   useStandings,
   useStrategies,
   useWeather,
@@ -57,6 +59,8 @@ export default function App() {
   const lapRecord = useLapRecord(featured?.circuit_id)
   const stats = useCircuitStats(featured?.circuit_id, SEASON)
   const strategies = useStrategies(SEASON, featured?.round_number)
+  const simStrategies = useSimStrategies(SEASON, featured?.round_number)
+  const simStats = useSimStats(SEASON, featured?.round_number)
   const weather = useWeather(SEASON, featured?.round_number)
   const sessions = useSessions(SEASON, featured?.round_number)
   const drivers = useDrivers(SEASON)
@@ -130,8 +134,11 @@ export default function App() {
           weekend={featured}
           stats={stats.data}
           statsLoading={stats.isLoading}
-          strategies={strategies.data}
-          strategiesLoading={strategies.isLoading}
+          historicalStrategies={strategies.data}
+          historicalStrategiesLoading={strategies.isLoading}
+          simStrategies={simStrategies.data}
+          simStrategiesLoading={simStrategies.isLoading}
+          simStats={simStats.data}
         />
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>

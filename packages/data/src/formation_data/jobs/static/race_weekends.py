@@ -12,11 +12,10 @@ Data is hand written. VERIFY before relying on it:
   - Compounds default to C3/C4/C5 (hard/medium/soft) for every round. Pirelli
     publishes a per-race allocation; fill _COMPOUNDS_BY_ROUND to override.
 
-Coverage gap: the circuits seed has 22 tracks and is missing Bahrain (Sakhir) and
-Jeddah, which are rounds 4 and 5 of the real 2026 calendar. Those rounds are
-omitted here (a race_weekend FK-references an existing circuit_id), so round
-numbers below skip 4 and 5 deliberately. Add those two circuits to
-jobs/static/circuits.py, then add their rounds here, for a complete calendar.
+Round numbers match FastF1's get_event_schedule(2026).RoundNumber, so the same round
+identifies a weekend to both this table and the simulator's FastF1 lookups. Bahrain and
+Jeddah were cancelled for 2026, so the calendar is a contiguous 22 rounds with no gap —
+the seed's 22 circuits are exactly the 22 rounds FastF1 lists.
 
 Upsert key: RaceWeekend UniqueConstraint(season, round_number).
 """
@@ -45,25 +44,25 @@ _CALENDAR_2026 = [
     (1, "melbourne", "Australian Grand Prix", date(2026, 3, 8), False),
     (2, "shanghai", "Chinese Grand Prix", date(2026, 3, 15), True),
     (3, "suzuka", "Japanese Grand Prix", date(2026, 3, 29), False),
-    (6, "miami", "Miami Grand Prix", date(2026, 5, 3), True),
-    (7, "montreal", "Canadian Grand Prix", date(2026, 5, 24), True),
-    (8, "monaco", "Monaco Grand Prix", date(2026, 6, 7), False),
-    (9, "barcelona", "Spanish Grand Prix", date(2026, 6, 14), False),
-    (10, "red_bull_ring", "Austrian Grand Prix", date(2026, 6, 28), False),
-    (11, "silverstone", "British Grand Prix", date(2026, 7, 5), True),
-    (12, "spa", "Belgian Grand Prix", date(2026, 7, 19), False),
-    (13, "hungaroring", "Hungarian Grand Prix", date(2026, 7, 26), False),
-    (14, "zandvoort", "Dutch Grand Prix", date(2026, 8, 23), True),
-    (15, "monza", "Italian Grand Prix", date(2026, 9, 6), False),
-    (16, "madrid", "Spanish Grand Prix", date(2026, 9, 13), False),
-    (17, "baku", "Azerbaijan Grand Prix", date(2026, 9, 27), False),
-    (18, "singapore", "Singapore Grand Prix", date(2026, 10, 11), True),
-    (19, "austin", "United States Grand Prix", date(2026, 10, 25), False),
-    (20, "mexico_city", "Mexico City Grand Prix", date(2026, 11, 1), False),
-    (21, "sao_paulo", "São Paulo Grand Prix", date(2026, 11, 8), False),
-    (22, "las_vegas", "Las Vegas Grand Prix", date(2026, 11, 21), False),
-    (23, "lusail", "Qatar Grand Prix", date(2026, 11, 29), False),
-    (24, "abu_dhabi", "Abu Dhabi Grand Prix", date(2026, 12, 6), False),
+    (4, "miami", "Miami Grand Prix", date(2026, 5, 3), True),
+    (5, "montreal", "Canadian Grand Prix", date(2026, 5, 24), True),
+    (6, "monaco", "Monaco Grand Prix", date(2026, 6, 7), False),
+    (7, "barcelona", "Spanish Grand Prix", date(2026, 6, 14), False),
+    (8, "red_bull_ring", "Austrian Grand Prix", date(2026, 6, 28), False),
+    (9, "silverstone", "British Grand Prix", date(2026, 7, 5), True),
+    (10, "spa", "Belgian Grand Prix", date(2026, 7, 19), False),
+    (11, "hungaroring", "Hungarian Grand Prix", date(2026, 7, 26), False),
+    (12, "zandvoort", "Dutch Grand Prix", date(2026, 8, 23), True),
+    (13, "monza", "Italian Grand Prix", date(2026, 9, 6), False),
+    (14, "madrid", "Spanish Grand Prix", date(2026, 9, 13), False),
+    (15, "baku", "Azerbaijan Grand Prix", date(2026, 9, 27), False),
+    (16, "singapore", "Singapore Grand Prix", date(2026, 10, 11), True),
+    (17, "austin", "United States Grand Prix", date(2026, 10, 25), False),
+    (18, "mexico_city", "Mexico City Grand Prix", date(2026, 11, 1), False),
+    (19, "sao_paulo", "São Paulo Grand Prix", date(2026, 11, 8), False),
+    (20, "las_vegas", "Las Vegas Grand Prix", date(2026, 11, 21), False),
+    (21, "lusail", "Qatar Grand Prix", date(2026, 11, 29), False),
+    (22, "abu_dhabi", "Abu Dhabi Grand Prix", date(2026, 12, 6), False),
 ]
 
 _CALENDAR_BY_SEASON = {2026: _CALENDAR_2026}
