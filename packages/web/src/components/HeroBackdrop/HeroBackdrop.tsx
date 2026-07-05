@@ -11,7 +11,7 @@ import styles from './HeroBackdrop.module.css'
  * ── To show no photo at all ──
  *   Set HERO_IMAGE to `null`.
  */
-const HERO_IMAGE: string | null = '/hero-silverstone.jpg'
+const HERO_IMAGE: string | null = '/silverstone.jpg'
 
 export function HeroBackdrop() {
   if (!HERO_IMAGE) return null
