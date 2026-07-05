@@ -11,6 +11,7 @@ members = [
     "formation-api",
     "formation-data",
     "formation-lap",
+    "formation-sim",
 ]
 
 [[package]]
@@ -692,6 +693,27 @@ dev = [
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "ruff", specifier = ">=0.8" },
+]
+
+[[package]]
+name = "formation-sim"
+version = "0.1.0"
+source = { editable = "packages/sim" }
+dependencies = [
+    { name = "fastf1" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pyyaml" },
+    { name = "scipy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastf1", specifier = ">=3.4.0" },
+    { name = "numpy", specifier = ">=1.26" },
+    { name = "pandas", specifier = ">=2.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "scipy", specifier = ">=1.11" },
 ]
 
 [[package]]

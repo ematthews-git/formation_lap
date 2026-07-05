@@ -1,0 +1,170 @@
+# formation_sim configuration
+# All paths are relative to the repository root (resolved by formation_sim/settings.py).
+
+data:
+  cache_dir: formation_sim/data/cache/fastf1   # FastF1 raw session cache
+  derived_dir: formation_sim/data/derived      # cleaned parquet / derived tables
+  manifest_path: formation_sim/data/manifest.json
+  circuit_profiles_path: formation_sim/data/circuit_profiles.json
+
+training:
+  # Historical window for parameter estimation.
+  # 2021 is the last pre-ground-effect season; including it dilutes a ground-effect
+  # skew. 2026 is itself a NEW regulation set, so estimators are recency-weighted and
+  # pooled rather than trusting the sparse 2026 sample alone.
+  start_year: 2021
+  end_year: 2026
+  # weight(season) = recency_decay ** (end_year - season). Validated out-of-sample.
+  recency_decay: 0.7
+
+target:
+  year: 2026
+  # In FastF1's 2026 calendar Silverstone (British GP) is ROUND 9 (2026-07-05, a
+  # sprint weekend) and is the upcoming race with no sessions yet -> preliminary mode.
+  # (The brief called it "round 14"; that slot is Madrid. Data-driven numbering wins.)
+  upcoming_round: 9
+  last_completed_round: 8   # rounds 1-8 of 2026 are complete and usable for training
+
+simulation:
+  n_sims: 1000
+  seed: 20260702
+  lap1_penalty: 2.5         # standing-start + cold-tyre time added to lap 1 (s)
+  start_gap_scale: 0.35     # seconds per grid slot when converting start gains to time
+  pit_jitter_sd: 1.5        # SD (laps) on the actual pit lap vs the planned lap
+
+overtaking:
+  min_gap: 0.5              # closest following gap in cumulative time (s)
+  drs_gap: 1.0             # within this gap last lap -> OVERTAKE available
+  drs_bonus: 0.4           # lap-time reduction from OVERTAKE (s)
+  penalty: 0.3             # time both cars lose in a completed pass (s)
+  pass_prob_easy: 0.65     # pass probability on the easiest-to-overtake circuit
+  pass_prob_hard: 0.12     # ... on the hardest
+  threshold_easy: 0.05     # pace advantage needed to attempt a pass, easy circuit (s)
+  threshold_hard: 0.70     # ... hard circuit (s)
+
+safety_car:
+  sc_factor: 1.40          # lap-time multiplier under full safety car
+  vsc_factor: 1.28         # ... under virtual safety car
+  sc_pit_discount: 0.5     # fraction of pit loss actually paid when stopping under SC
+  vsc_pit_discount: 0.65
+  sc_min_laps: 3
+  sc_max_laps: 6
+  vsc_min_laps: 1
+  vsc_max_laps: 3
+
+compounds:
+  dry: [SOFT, MEDIUM, HARD]
+  wet: [INTERMEDIATE, WET]
+  min_distinct_dry: 2       # dry-race rule: at least two different slick compounds
+
+generation:
+  min_stops: 1
+  max_stops: 3
+  min_stint: 6            # minimum laps per stint when placing pit windows
+  # Families kept for Monte-Carlo evaluation. MUST cover the full rule-legal family
+  # space (~20 under allocation_sets S3/M3/H2) — a dropped family is invisible to
+  # selection no matter what history later says (Austin 2025's modal M-S died here).
+  shortlist_k: 20
+  shortlist_prior_weight: 6.0  # history weight ranking WHICH families make the shortlist
+  shortlist_rep_prior_weight: 1.0  # lighter history weight picking the ORDER within a family
+  # Keep a family's 2nd ordering when its (sequence-aware) prior carries at least this
+  # fraction of the primary's — gives selection a real order choice (0 disables).
+  shortlist_second_order_ratio: 0.3
+  window_history_weight: 0.8   # MAX weight on observed windows (scales with history richness)
+  window_history_k: 4.0        # observed windows needed to reach half of that weight
+  undercut_shift_laps: 2.0     # analytic windows shifted earlier (undercut threat), tunable
+  # physical tyre-life caps as a fraction of race distance (guards thin-data deg)
+  max_stint_frac: {SOFT: 0.5, MEDIUM: 0.7, HARD: 1.0}
+  # physical race allocation: max STRATEGIC stints per compound. Teams carry 8 softs /
+  # 3 mediums / 2 hards, so 3 soft or 3 medium stints are legal and do happen
+  # (Barcelona 2025's modal S-M-S-S was impossible under the old SOFT:2 cap).
+  allocation_sets: {SOFT: 3, MEDIUM: 3, HARD: 2}
+
+# Circuit-specific rules: PUBLIC pre-race regulations only (no hindsight). Plain dict =
+# always applies; list entries may carry year / year_from / year_to scoping.
+circuit_rules:
+  Monte Carlo:
+    - {year_from: 2025, min_stops: 2}   # mandatory two pit stops from 2025
+  Lusail:
+    - {year: 2023, max_stint_laps: 18}      # FIA/Pirelli mandated tyre-life cap
+    - {year_from: 2025, max_stint_laps: 25} # Pirelli mandated cap (57-lap race -> 2 stops)
+
+# Weekend practice/sprint long-run ingestion (post-quali mode).
+weekend:
+  use_practice: true
+  min_run_laps: 5          # min laps for a stint to count as a long run
+  min_runs: 6              # min long runs across the weekend to trust the fit
+  k_weekend_laps: 60       # EB blend: weekend laps needed to outweigh history
+  usage_alpha: 8.0         # smoothing of the practice compound-usage prior
+  # Weak by default: teams also PROTECT race sets (low practice use of a compound can
+  # mean "saving it to race it"), so the sign/strength is left to OOS tuning.
+  usage_weight: 0.3        # exponent on the usage prior in candidate plausibility
+
+# Historical plausibility prior (hierarchical: circuit evidence shrunk to global meta).
+prior:
+  alpha: 1.0
+  start_blend_k: 12.0      # circuit start-compound evidence to outweigh the global
+  pattern_blend_k: 10.0    # circuit strategies to outweigh the recency-weighted global meta
+  order_weight: 1.0        # exponent on P(order | multiset): ranks orderings WITHIN a set
+  same_season_boost: 1.0   # extra weight on target-season races (emerging meta vs stale history)
+  # When a circuit's nomination shifted vs the target year, local strategy history is
+  # counted raw with weight (1-x) and C-number-relabeled with weight x. Strategy choice
+  # is part physical (transfers via C-numbers) and part label-relative (teams plan
+  # around the nominated triple); both extremes measurably lose races.
+  relabel_blend: 0.5
+
+selection:
+  # The shown set is chosen to cover the most PLAUSIBILITY MASS under a fixed 5-slot
+  # display budget (fan site), not ranked by race-time optimum. q_i = prior^a * comp^b:
+  # history-led membership, sim competitiveness modulates; greedy submodular set-cover.
+  min_candidates: 2
+  max_candidates: 5         # fixed by the fan-site layout; NOT a coverage knob
+  # Tuned OOS (tuning/tune_selection.py, 2025 8-circuit subset; neutral on 2026 holdout):
+  # history dominates top-5 MEMBERSHIP; the sim's competitiveness barely helps set@k coverage
+  # (it mis-rates strategies) so comp_exp is ~0 — the sim still drives the shown finish
+  # distributions / tiers, just not which 5 strategies are shown.
+  plausibility_prior_exp: 2.39   # a: weight on the historical plausibility prior
+  plausibility_comp_exp: 0.014   # b: weight on Monte-Carlo competitiveness (softmin E[finish])
+  comp_temperature: 2.55         # tau: positions of E[finish] gap -> competitiveness scale
+  order_novelty: 0.588           # mass retained for a 2nd ordering of an already-shown set
+  clone_novelty: 0.299           # mass retained for a near-clone (same compound sequence)
+  comp_gate_positions: 12.14     # soft-drop strategies this many positions slower than the driver's best
+  tier_thresholds: [0.6, 0.2]    # q-ratio cuts -> Most likely / Alternative / Long-shot
+  ci_lo: 5
+  ci_hi: 95
+
+params:
+  # empirical-Bayes shrinkage strengths (laps): larger = shrink harder to global
+  k_circuit: 500
+  k_driver: 800
+  dnf_min_races: 4          # min races before a driver informs the DNF prior
+  start_sigma: 1.0          # Gaussian smoothing of the start position-change kernel
+  start_min_samples: 5      # below this, use the pooled start distribution
+  # tyre degradation cliff (censored from data, so imposed with a data-driven knee)
+  knee_percentile: 80       # cliff onset = this percentile of observed stint lengths
+  cliff_rate: 0.02          # accelerating deg penalty (s/lap^2) beyond the knee
+  # compound pace offsets: regularise the noisy direct estimate toward the known ordering
+  compound_offset_prior: {SOFT: -0.35, MEDIUM: 0.0, HARD: 0.25}
+  offset_prior_weight: 0.5
+
+# Pirelli compound nominations (C-numbers) per year+circuit: translates label-keyed
+# history into the target year's label space (deg/knee fits and circuit-local priors).
+nominations:
+  path: formation_sim/config/nominations.yaml
+  relabel_laps: false   # translate lap rows for deg/knee fits (drops unmatched C-numbers)
+  relabel_prior: true   # blend relabeled circuit-local strategy history (prior.relabel_blend)
+
+validation:
+  # Circuits excluded from the strategy-backtest AGGREGATE metrics (still shown
+  # per-circuit). Empty since the nomination-aware translation landed — Barcelona no
+  # longer needs excusing.
+  strategy_exclude_circuits: []
+
+cleaning:
+  min_strategic_stint: 5   # stints shorter than this are merged (red-flag/SC flurries)
+  drop_lap1: true
+  drop_inlap_outlap: true
+  drop_deleted: true
+  require_accurate: true
+  # drop green-flag laps slower than this fraction of the stint's median (traffic/errors)
+  outlier_pct_of_stint_median: 1.07
