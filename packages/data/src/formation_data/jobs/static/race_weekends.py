@@ -9,8 +9,10 @@ Data is hand written. VERIFY before relying on it:
   - is_sprint reflects the 2026 sprint venues (Shanghai, Miami, Montréal,
     Silverstone, Zandvoort, Singapore), cross-checked against FastF1's
     get_event_schedule(2026) EventFormat == "sprint_qualifying".
-  - Compounds default to C3/C4/C5 (hard/medium/soft) for every round. Pirelli
-    publishes a per-race allocation; fill _COMPOUNDS_BY_ROUND to override.
+  - Compounds come from the simulator's shared Pirelli nomination table
+    (``formation_data.nominations`` -> ``config/nominations.yaml``), keyed by the
+    circuit's fastf1_location. Circuits with no nomination there (e.g. the new Madrid
+    venue) fall back to _DEFAULT_COMPOUNDS.
 
 Round numbers match FastF1's get_event_schedule(2026).RoundNumber, so the same round
 identifies a weekend to both this table and the simulator's FastF1 lookups. Bahrain and
@@ -28,15 +30,13 @@ from datetime import date
 from sqlalchemy import Connection
 
 from formation_data.domain import RaceWeekend
+from formation_data.nominations import compounds_for
 
 logger = logging.getLogger(__name__)
 
-# Default Pirelli allocation applied to every round unless overridden below.
-# (soft, medium, hard) — softer compound = higher C number.
+# Fallback allocation for circuits absent from the shared nomination table (e.g. the
+# new Madrid venue with no history). (soft, medium, hard) — softer = higher C number.
 _DEFAULT_COMPOUNDS = ("C5", "C4", "C3")
-_COMPOUNDS_BY_ROUND: dict[int, tuple[str, str, str]] = {
-    # round_number: (soft, medium, hard)  — e.g. Monza/Las Vegas run harder allocations
-}
 
 # (round_number, circuit_id, event_name, race_date, is_sprint)
 # Rounds 4 (Bahrain) and 5 (Jeddah) intentionally absent — circuits not seeded.
@@ -82,17 +82,29 @@ def run(conn: Connection, *, season: int) -> None:
 
     # Guard the FK: skip (and warn on) any round pointing at an unseeded circuit
     # rather than letting the upsert blow up mid-batch.
-    known = {c.circuit_id for c in repositories.list_circuits(conn)}
+    circuits = {c.circuit_id: c for c in repositories.list_circuits(conn)}
     items: list[RaceWeekend] = []
     for round_number, circuit_id, event_name, race_date, is_sprint in calendar:
-        if circuit_id not in known:
+        circuit = circuits.get(circuit_id)
+        if circuit is None:
             logger.warning(
                 "static.race_weekends.run skipping round=%s: circuit %r not seeded",
                 round_number,
                 circuit_id,
             )
             continue
-        soft, medium, hard = _COMPOUNDS_BY_ROUND.get(round_number, _DEFAULT_COMPOUNDS)
+        compounds = compounds_for(season, circuit.fastf1_location)
+        if compounds is None:
+            logger.warning(
+                "static.race_weekends.run round=%s (%s): no Pirelli nomination for %r; "
+                "using default %s",
+                round_number,
+                circuit_id,
+                circuit.fastf1_location,
+                _DEFAULT_COMPOUNDS,
+            )
+            compounds = _DEFAULT_COMPOUNDS
+        soft, medium, hard = compounds
         items.append(
             RaceWeekend(
                 circuit_id=circuit_id,

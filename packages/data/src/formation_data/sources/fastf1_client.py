@@ -65,6 +65,13 @@ _LOCATION_ALIASES = {
 }
 
 
+def aliases_for(fastf1_location: str) -> set[str]:
+    """Every FastF1 Location string a venue has used across seasons (see
+    `_LOCATION_ALIASES`), including the canonical current name itself. A venue with no
+    recorded rename maps to just its own name."""
+    return _LOCATION_ALIASES.get(fastf1_location, {fastf1_location})
+
+
 def rounds_for_location(season: int, fastf1_location: str) -> list[int]:
     """Round numbers in `season` whose event is held at `fastf1_location`.
 
@@ -76,7 +83,7 @@ def rounds_for_location(season: int, fastf1_location: str) -> list[int]:
 
     Pre-season testing events are excluded so round numbers line up with races.
     """
-    aliases = _LOCATION_ALIASES.get(fastf1_location, {fastf1_location})
+    aliases = aliases_for(fastf1_location)
     schedule = get_event_schedule(season)
     schedule = schedule[schedule["EventFormat"] != "testing"]
     return [
@@ -101,7 +108,7 @@ def get_event_sessions(
     disambiguates against the event's Sunday. Returns `[]` if no event matches or
     the schedule carries no session data.
     """
-    aliases = _LOCATION_ALIASES.get(fastf1_location, {fastf1_location})
+    aliases = aliases_for(fastf1_location)
     schedule = get_event_schedule(season)
     schedule = schedule[schedule["EventFormat"] != "testing"]
     events = schedule[schedule["Location"].isin(aliases)]

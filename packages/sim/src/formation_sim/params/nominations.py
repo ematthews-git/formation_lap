@@ -27,6 +27,7 @@ from functools import lru_cache
 import pandas as pd
 import yaml
 
+from formation_sim.data.schema import normalize_circuit
 from formation_sim.settings import load_settings, resolve_path
 
 _LABELS = ("HARD", "MEDIUM", "SOFT")  # index-aligned with the [hard, medium, soft] yaml rows
@@ -48,6 +49,26 @@ def load_nominations(cfg: dict | None = None) -> dict[tuple[int, str], dict[str,
     cfg = cfg or load_settings()
     path = cfg.get("nominations", {}).get("path", "formation_sim/config/nominations.yaml")
     return _load(str(resolve_path(path)))
+
+
+def compound_nomination(
+    year: int, circuit: str, cfg: dict | None = None
+) -> tuple[int, int, int] | None:
+    """Pirelli C-numbers nominated at ``circuit`` in ``year`` as ``(hard, medium, soft)``.
+
+    ``circuit`` is a FastF1 event Location; it is normalised (``normalize_circuit``)
+    before lookup, so either spelling of a renamed venue that ``normalize_circuit``
+    handles resolves. Returns ``None`` for circuit-years with no nomination — the same
+    graceful-degradation case ``relabel_laps``/``sequence_relabeler`` leave untouched.
+
+    This is the shared read the data pipeline uses to populate race-weekend tyre
+    allocations, so the API and frontend show the real per-track compounds without
+    keeping a second copy of the nominations list.
+    """
+    entry = load_nominations(cfg).get((int(year), normalize_circuit(circuit)))
+    if entry is None:
+        return None
+    return (entry["HARD"], entry["MEDIUM"], entry["SOFT"])
 
 
 def label_map(source: dict[str, int], target: dict[str, int],
