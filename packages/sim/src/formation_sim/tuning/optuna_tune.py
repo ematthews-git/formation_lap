@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import copy
 
-import numpy as np
 import pandas as pd
 
 from formation_sim.data import session_filter

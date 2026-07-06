@@ -8,9 +8,9 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-import fastf1
+import fastf1  # noqa: E402
 
-from formation_sim.settings import cache_dir, load_settings
+from formation_sim.settings import cache_dir, load_settings  # noqa: E402
 
 REQUIRED_LAP_COLS = [
     "Driver", "DriverNumber", "Team", "LapNumber", "LapTime", "Stint",

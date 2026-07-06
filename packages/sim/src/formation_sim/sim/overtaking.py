@@ -26,7 +26,10 @@ class OvertakeParams:
     def for_circuit(cls, difficulty: float, cfg: dict) -> "OvertakeParams":
         o = cfg["overtaking"]
         d = float(np.clip(difficulty, 0.0, 1.0))
-        lerp = lambda a, b: float(a) * (1 - d) + float(b) * d
+
+        def lerp(a, b):
+            return float(a) * (1 - d) + float(b) * d
+
         return cls(
             min_gap=float(o["min_gap"]), drs_gap=float(o["drs_gap"]),
             drs_bonus=float(o["drs_bonus"]), penalty=float(o["penalty"]),

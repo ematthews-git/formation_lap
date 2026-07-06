@@ -19,7 +19,6 @@ from scipy.stats import spearmanr
 
 from formation_sim.context.postquali import build_postquali_context
 from formation_sim.data import clean, collector, session_filter
-from formation_sim.data.schema import DRY_COMPOUNDS
 from formation_sim.evaluation.monte_carlo import evaluate_driver
 from formation_sim.generation.generator import build_pool
 from formation_sim.params import circuit, estimate
@@ -48,7 +47,7 @@ def backtest_race(year: int, rnd: int, ps, profiles, cfg, n_sims: int) -> dict |
     pool_families = {(c.n_stops, tuple(sorted(c.compounds))) for c in pool}
     n_pos = len(wctx.drivers())
 
-    pred_finish, top_stops, top_firstpit = {}, {}, {}
+    pred_finish = {}
     recall_short, recall_top, stop_ok, pit_err = [], [], [], []
     for i, d in enumerate(wctx.drivers()):
         finish, rtime = evaluate_driver(wctx, d, pool, n_sims, int(cfg["simulation"]["seed"]) + i)

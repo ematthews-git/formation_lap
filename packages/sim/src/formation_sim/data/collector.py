@@ -6,13 +6,12 @@ objects, so the rest of the codebase is insulated from FastF1's schema.
 from __future__ import annotations
 
 import warnings
-from typing import Optional
 
 warnings.filterwarnings("ignore")
 
-import fastf1
-import numpy as np
-import pandas as pd
+import fastf1  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
 try:
     from fastf1.exceptions import RateLimitExceededError
@@ -20,8 +19,8 @@ except Exception:  # pragma: no cover - fastf1 version guard
     class RateLimitExceededError(Exception):
         pass
 
-from formation_sim.data import schema
-from formation_sim.settings import cache_dir, load_settings
+from formation_sim.data import schema  # noqa: E402
+from formation_sim.settings import cache_dir, load_settings  # noqa: E402
 
 _CACHE_READY = False
 _RATE_LIMITED = False  # set once FastF1's hourly API budget is exhausted this run

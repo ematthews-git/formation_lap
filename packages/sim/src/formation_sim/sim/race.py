@@ -8,7 +8,7 @@ random numbers across a driver's candidate strategies.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -100,7 +100,6 @@ def simulate_race(ctx: RaceContext, rng: np.random.Generator) -> RaceResult:
             retire_lap[i] = ctx.dnf_model.sample_retire_lap(n, rng)
     start_gain = np.array([ctx.start_model.sample_gain(e.driver, rng) for e in ents])
     schedules = []
-    pit_cost = []  # per-driver dict lap-> loss
     for e in ents:
         pits = _jitter_pits(e.pit_laps, n, rng, jitter_sd, min_stint)
         comp, age, is_pit = _stint_schedule(pits, e.compounds, n)

@@ -42,8 +42,6 @@ def build_prelim_context(year: int, rnd: int, params, profiles, cfg=None) -> Wee
         raise ValueError(f"no completed current-season race to seed prelim (round {last})")
     cur_res = collector.session_results(cur_race)
     teams = {str(r["driver"]): str(r["team"]) for _, r in cur_res.iterrows()}
-    cur_grid = {str(r["driver"]): (int(r["grid"]) if r["grid"] > 0 else len(cur_res))
-                for _, r in cur_res.iterrows()}
     entry = list(teams)
 
     # Expected pace: robust current-season form (many races), re-anchored to the target

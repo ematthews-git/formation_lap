@@ -7,7 +7,7 @@ operating mode; the preliminary (previous-year) mode lives in ``context/prelim.p
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 

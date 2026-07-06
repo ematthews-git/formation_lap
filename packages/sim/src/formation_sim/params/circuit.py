@@ -98,7 +98,6 @@ def build_circuit_profiles(lap_model: LapModel, cfg: dict | None = None,
     # Field-wide fallbacks.
     all_pit = [p for d in per_circuit.values() for p in d["pit"]]
     global_pit = float(np.median(all_pit)) if all_pit else 22.0
-    global_base = float(np.median([np.median(d["base"]) for d in per_circuit.values()])) if per_circuit else 90.0
 
     profiles: dict[str, CircuitProfile] = {}
     passes_vals = {c: float(np.mean(d["passes"])) for c, d in per_circuit.items() if d["passes"]}
@@ -145,7 +144,10 @@ def get_profile(circuit: str, profiles: dict[str, CircuitProfile],
     if circuit in profiles:
         return profiles[circuit]
     vals = list(profiles.values())
-    med = lambda attr: float(np.median([getattr(p, attr) for p in vals])) if vals else 0.0
+
+    def med(attr):
+        return float(np.median([getattr(p, attr) for p in vals])) if vals else 0.0
+
     return CircuitProfile(
         circuit=circuit,
         n_laps=int(med("n_laps")) if vals else 57,
