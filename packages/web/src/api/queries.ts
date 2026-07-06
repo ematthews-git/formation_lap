@@ -8,6 +8,7 @@ import type {
   RaceResult,
   RaceWeekend,
   Session,
+  SimRaceStats,
   Standing,
   StrategyWithStints,
   WeatherForecast,
@@ -92,6 +93,30 @@ export function useStrategies(season: number, round: number | undefined) {
     enabled: round != null,
     queryFn: () =>
       api.get<StrategyWithStints[]>(`/strategies/?season=${season}&round=${round}`),
+  })
+}
+
+/** The officially simulated strategies (race-level shown-5) for a weekend. */
+export function useSimStrategies(season: number, round: number | undefined) {
+  return useQuery({
+    queryKey: ['sim-strategies', season, round],
+    enabled: round != null,
+    queryFn: () =>
+      api.get<StrategyWithStints[]>(
+        `/strategies/simulated?season=${season}&round=${round}`,
+      ),
+  })
+}
+
+/** Race-context numbers from the sim run (null until a sim has run). */
+export function useSimStats(season: number, round: number | undefined) {
+  return useQuery({
+    queryKey: ['sim-stats', season, round],
+    enabled: round != null,
+    queryFn: () =>
+      api.getOptional<SimRaceStats>(
+        `/strategies/simulated/stats?season=${season}&round=${round}`,
+      ),
   })
 }
 

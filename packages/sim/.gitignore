@@ -1,0 +1,9 @@
+# FastF1 raw cache (regenerable, large) — not committed
+src/formation_sim/data/cache/
+# Runtime report output
+src/formation_sim/output/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+src/formation_sim/data/derived

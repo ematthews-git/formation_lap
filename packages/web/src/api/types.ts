@@ -119,9 +119,29 @@ export interface StrategyStint {
 export interface StrategyWithStints {
   id: number | null
   race_weekend_id: number
+  // "historical" (mined) or "sim" (simulated).
+  source: string
+  // Sim only: "prelim" | "postquali". null for historical.
+  phase: string | null
   is_base: boolean
   num_stops: number
   label: string
+  // Sim only: field-plausibility share (0–1) and coarse tier. null for historical.
+  plausibility: number | null
+  tier: string | null
   updated_at: string | null
   stints: StrategyStint[]
+}
+
+/** Race-context numbers from a sim run (the JSONB `stats` blob). */
+export interface SimRaceStats {
+  id: number | null
+  race_weekend_id: number
+  phase: string
+  generated_at: string | null
+  stats: {
+    meta?: Record<string, unknown>
+    circuit_profile?: Record<string, number | null>
+    race_stats?: Record<string, unknown>
+  }
 }

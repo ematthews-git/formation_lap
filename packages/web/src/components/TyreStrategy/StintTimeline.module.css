@@ -76,6 +76,13 @@
   color: var(--text-fainter);
 }
 
+.tier {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
 .bars {
   flex: 1;
   display: flex;

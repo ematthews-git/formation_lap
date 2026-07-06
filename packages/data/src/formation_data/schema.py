@@ -20,6 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 
 metadata = MetaData()
 
@@ -169,16 +170,30 @@ strategies = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
+    # Provenance. "historical" = mined from the last dry running of the circuit
+    # (jobs.pre_race.strategies); "sim" = produced by the strategy simulator
+    # (jobs.pre_race.sim_strategies). Both coexist per weekend, hence source is
+    # part of the uniqueness key so a shared label doesn't collide across sources.
+    Column("source", String, nullable=False, server_default="historical"),
+    # Sim only: which run produced these rows. "prelim" (pre-weekend, season form)
+    # is superseded by "postquali" (grid + quali pace known). Null for historical.
+    Column("phase", String, nullable=True),
     Column("is_base", Boolean, nullable=False),
     Column("num_stops", Integer, nullable=False),
     Column("label", String, nullable=False),
+    # Sim only: this strategy's share of field-aggregated plausibility mass, and its
+    # coarse tier ("Most likely" / "Alternative" / "Long-shot"). Null for historical.
+    Column("plausibility", Float, nullable=True),
+    Column("tier", String, nullable=True),
     Column(
         "updated_at",
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     ),
-    UniqueConstraint("race_weekend_id", "label"),
+    UniqueConstraint(
+        "race_weekend_id", "source", "label", name="uq_strategies_weekend_source_label"
+    ),
 )
 
 
@@ -192,6 +207,28 @@ strategy_stints = Table(
     Column("pit_lap_window_start", Integer, nullable=False),
     Column("pit_lap_window_end", Integer, nullable=False),
     UniqueConstraint("strategy_id", "stint_order"),
+)
+
+
+# Race-context numbers a sim run produces (tyre life, undercut power, pit loss, SC/VSC
+# probability, overtaking difficulty, stop-count split, chaos index, degradation rank,
+# pole-to-win, plus the circuit profile and run meta). Stored as a single JSONB blob —
+# the whole derived-stats feed — rather than a column per number, so the fan-facing set
+# can evolve without a schema change. One row per weekend; the latest phase wins.
+sim_race_stats = Table(
+    "sim_race_stats",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
+    Column("phase", String, nullable=False),  # "prelim" | "postquali"
+    Column(
+        "generated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column("stats", JSONB, nullable=False),
+    UniqueConstraint("race_weekend_id"),
 )
 
 
@@ -237,6 +274,7 @@ __all__ = [
     "weather_forecasts",
     "strategies",
     "strategy_stints",
+    "sim_race_stats",
     "race_results",
     "standings",
 ]

@@ -1,4 +1,10 @@
-import type { CircuitStats, RaceWeekend, StrategyWithStints } from '../../api/types'
+import { useState } from 'react'
+import type {
+  CircuitStats,
+  RaceWeekend,
+  SimRaceStats,
+  StrategyWithStints,
+} from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { EmptyState, LoadingState } from '../common/Status'
@@ -10,8 +16,11 @@ interface Props {
   weekend: RaceWeekend
   stats: CircuitStats | null | undefined
   statsLoading: boolean
-  strategies: StrategyWithStints[] | undefined
-  strategiesLoading: boolean
+  historicalStrategies: StrategyWithStints[] | undefined
+  historicalStrategiesLoading: boolean
+  simStrategies: StrategyWithStints[] | undefined
+  simStrategiesLoading: boolean
+  simStats: SimRaceStats | null | undefined
 }
 
 const COMPOUNDS = [
@@ -20,13 +29,33 @@ const COMPOUNDS = [
   { key: 'soft', name: 'Soft', desc: 'PEAK GRIP · QUALI', color: 'var(--soft)' },
 ] as const
 
+type Source = 'sim' | 'historical'
+
 export function TyreStrategy({
   weekend,
   stats,
   statsLoading,
-  strategies,
-  strategiesLoading,
+  historicalStrategies,
+  historicalStrategiesLoading,
+  simStrategies,
+  simStrategiesLoading,
+  simStats,
 }: Props) {
+  const [source, setSource] = useState<Source>('sim')
+  const showSim = source === 'sim'
+  // Drop strategies whose plausibility rounds to 0% — a "0%" option isn't worth showing.
+  // Historical strategies (null plausibility) are always kept.
+  const selected = (showSim ? simStrategies : historicalStrategies)?.filter(
+    (s) => s.plausibility == null || Math.round(s.plausibility * 100) > 0,
+  )
+  const selectedLoading = showSim
+    ? simStrategiesLoading
+    : historicalStrategiesLoading
+  const phase = simStrategies?.[0]?.phase ?? simStats?.phase ?? null
+  const raceStats = simStats?.stats?.race_stats as
+    | Record<string, number | null>
+    | undefined
+
   const code = {
     hard: weekend.hard_compound,
     medium: weekend.medium_compound,
@@ -108,16 +137,68 @@ export function TyreStrategy({
         </div>
       </div>
 
-      {/* stint timeline — mined from the most recent dry running of this circuit */}
+      {/* source toggle: simulated projection (default) vs historical mining */}
+      <div className={styles.sourceRow}>
+        <div className={styles.sourceToggle}>
+          <button
+            type="button"
+            className={`${styles.sourceBtn} ${showSim ? styles.sourceBtnActive : ''}`}
+            onClick={() => setSource('sim')}
+          >
+            SIMULATED
+          </button>
+          <button
+            type="button"
+            className={`${styles.sourceBtn} ${!showSim ? styles.sourceBtnActive : ''}`}
+            onClick={() => setSource('historical')}
+          >
+            HISTORICAL
+          </button>
+        </div>
+        <span className={styles.sourceNote}>
+          {showSim
+            ? phase
+              ? `MONTE-CARLO · ${phase.toUpperCase()}`
+              : 'MONTE-CARLO PROJECTION'
+            : 'MINED FROM LAST DRY RUNNING'}
+        </span>
+      </div>
+
+      {/* sim race-context numbers — only in the simulated view */}
+      {showSim && raceStats && (
+        <div className={styles.simStats}>
+          <SimStat label="PIT LOSS" value={fmt(raceStats.pit_loss_s, 's', 1)} />
+          <SimStat label="UNDERCUT" value={fmt(raceStats.undercut_s_per_lap, 's/lap', 2)} />
+          <SimStat label="SAFETY CAR" value={pct(raceStats.safety_car_prob)} />
+          <SimStat
+            label="LIKELY STOPS"
+            value={raceStats.most_likely_stops != null ? String(raceStats.most_likely_stops) : '—'}
+          />
+          <SimStat
+            label="OVERTAKING"
+            value={raceStats.overtaking_difficulty_0to100 != null ? `${raceStats.overtaking_difficulty_0to100}/100` : '—'}
+          />
+          <SimStat
+            label="CHAOS"
+            value={raceStats.chaos_index_0to100 != null ? `${raceStats.chaos_index_0to100}/100` : '—'}
+          />
+        </div>
+      )}
+
+      {/* stint timeline */}
       <div className={styles.stintArea}>
-        {strategiesLoading ? (
+        {selectedLoading ? (
           <LoadingState label="LOADING STRATEGIES" />
-        ) : strategies && strategies.length > 0 ? (
-          <StintTimeline strategies={strategies} />
+        ) : selected && selected.length > 0 ? (
+          <StintTimeline strategies={selected} />
         ) : (
           <EmptyState
             label="NO STRATEGY DATA"
-            hint="run: formation-data strategies generate --season … --round …"
+            hint={
+              showSim
+                ? `run: formation-data sim-strategies generate --season ${weekend.season} --round ${weekend.round_number} --mode postquali`
+                : `run: formation-data strategies generate --season ${weekend.season} --round ${weekend.round_number}`
+            }
           />
         )}
       </div>
@@ -125,11 +206,28 @@ export function TyreStrategy({
   )
 }
 
+function fmt(v: number | null | undefined, unit: string, digits: number): string {
+  return v == null ? '—' : `${v.toFixed(digits)}${unit}`
+}
+
+function pct(v: number | null | undefined): string {
+  return v == null ? '—' : `${Math.round(v * 100)}%`
+}
+
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className={styles.miniLabel}>{label}</div>
       <div className={styles.miniValue}>{value}</div>
+    </div>
+  )
+}
+
+function SimStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.simStat}>
+      <div className={styles.simStatValue}>{value}</div>
+      <div className={styles.simStatLabel}>{label}</div>
     </div>
   )
 }

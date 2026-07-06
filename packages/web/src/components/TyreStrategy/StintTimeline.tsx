@@ -9,6 +9,14 @@ const COMPOUND_STYLE: Record<string, { color: string; bg: string; short: string 
 const FALLBACK = { color: 'var(--text-faint)', bg: 'var(--panel-raised)', short: '?' }
 const styleFor = (c: string) => COMPOUND_STYLE[c] ?? FALLBACK
 
+/** Colour a plausibility tier: most likely = gold, alternative = neutral, long-shot = faint. */
+function tierColor(tier: string): string {
+  const t = tier.toLowerCase()
+  if (t.startsWith('most')) return 'var(--gold)'
+  if (t.startsWith('alt')) return 'var(--text)'
+  return 'var(--text-faint)'
+}
+
 interface Bar {
   compound: string
   startLap: number
@@ -75,6 +83,13 @@ export function StintTimeline({ strategies }: { strategies: StrategyWithStints[]
                 {strategy.is_base && <span className={styles.rec}>REC</span>}
               </div>
               <span className={styles.seq}>{seq}</span>
+              {strategy.tier && (
+                <span className={styles.tier} style={{ color: tierColor(strategy.tier) }}>
+                  {strategy.tier.toUpperCase()}
+                  {strategy.plausibility != null &&
+                    ` · ${Math.round(strategy.plausibility * 100)}%`}
+                </span>
+              )}
             </div>
             <div className={styles.bars}>
               {bars.map((b, i) => (

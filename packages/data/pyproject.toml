@@ -12,10 +12,14 @@ dependencies = [
     "pydantic>=2.0",
     "pandas>=2.0",
     "numpy>=1.26",
+    "formation-sim",
 ]
 
 [project.scripts]
 formation-data = "formation_data.cli:main"
+
+[tool.uv.sources]
+formation-sim = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
