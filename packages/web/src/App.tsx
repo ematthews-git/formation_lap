@@ -25,6 +25,7 @@ import { TopBar } from './components/TopBar/TopBar'
 import { Header } from './components/Header/Header'
 import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
+import { EngineDerivedParameters } from './components/EngineDerivedParameters/EngineDerivedParameters'
 import { TyreStrategy } from './components/TyreStrategy/TyreStrategy'
 import { DriverForm } from './components/DriverForm/DriverForm'
 import { ConstructorStandings } from './components/ConstructorStandings/ConstructorStandings'
@@ -61,6 +62,9 @@ export default function App() {
   const strategies = useStrategies(SEASON, featured?.round_number)
   const simStrategies = useSimStrategies(SEASON, featured?.round_number)
   const simStats = useSimStats(SEASON, featured?.round_number)
+  // Last season's engine parameters — the fallback when this season's sim hasn't
+  // run yet. No previous-season rows exist yet, so this resolves empty for now.
+  const simStatsLastSeason = useSimStats(SEASON - 1, featured?.round_number)
   const weather = useWeather(SEASON, featured?.round_number)
   const sessions = useSessions(SEASON, featured?.round_number)
   const drivers = useDrivers(SEASON)
@@ -130,6 +134,14 @@ export default function App() {
           <WeatherStrip weather={weather.data} weatherLoading={weather.isLoading} />
         </section>
 
+        <EngineDerivedParameters
+          weekend={featured}
+          simStats={simStats.data}
+          simStatsLoading={simStats.isLoading}
+          fallbackStats={simStatsLastSeason.data}
+          fallbackStatsLoading={simStatsLastSeason.isLoading}
+        />
+
         <TyreStrategy
           weekend={featured}
           stats={stats.data}
@@ -139,6 +151,7 @@ export default function App() {
           simStrategies={simStrategies.data}
           simStrategiesLoading={simStrategies.isLoading}
           simStats={simStats.data}
+          simStatsLoading={simStats.isLoading}
         />
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>

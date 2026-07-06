@@ -2,7 +2,7 @@
 
 Used by:
 - jobs.pre_season.lap_records   (fastest historical laps per circuit)
-- jobs.pre_season.circuit_stats (pit losses, SC/RF probabilities, undercut/overcut from prior seasons)
+- jobs.pre_season.circuit_stats (SC/RF probabilities from prior seasons)
 - jobs.post_race.lap_records    (update if a race produced a new fastest lap)
 
 """

@@ -21,12 +21,13 @@ interface Props {
   simStrategies: StrategyWithStints[] | undefined
   simStrategiesLoading: boolean
   simStats: SimRaceStats | null | undefined
+  simStatsLoading: boolean
 }
 
 const COMPOUNDS = [
-  { key: 'hard', name: 'Hard', desc: 'DURABLE · LOW DEG', color: 'var(--hard)' },
-  { key: 'medium', name: 'Medium', desc: 'BALANCED · GO-TO', color: 'var(--gold)' },
-  { key: 'soft', name: 'Soft', desc: 'PEAK GRIP · QUALI', color: 'var(--soft)' },
+  { key: 'hard', name: 'Hard', desc: 'DURABLE', color: 'var(--hard)' },
+  { key: 'medium', name: 'Medium', desc: 'BALANCED', color: 'var(--gold)' },
+  { key: 'soft', name: 'Soft', desc: 'PEAK GRIP', color: 'var(--soft)' },
 ] as const
 
 type Source = 'sim' | 'historical'
@@ -40,6 +41,7 @@ export function TyreStrategy({
   simStrategies,
   simStrategiesLoading,
   simStats,
+  simStatsLoading,
 }: Props) {
   const [source, setSource] = useState<Source>('sim')
   const showSim = source === 'sim'
@@ -52,9 +54,12 @@ export function TyreStrategy({
     ? simStrategiesLoading
     : historicalStrategiesLoading
   const phase = simStrategies?.[0]?.phase ?? simStats?.phase ?? null
+  // Undercut + pit loss now come from the sim's race-context numbers, not circuit stats.
   const raceStats = simStats?.stats?.race_stats as
     | Record<string, number | null>
     | undefined
+  const undercut = raceStats?.undercut_s_per_lap
+  const pitLoss = raceStats?.pit_loss_s
 
   const code = {
     hard: weekend.hard_compound,
@@ -91,28 +96,29 @@ export function TyreStrategy({
           </div>
         </div>
 
-        {/* undercut window — from circuit stats (empty until recomputed) */}
+        {/* undercut window — from the sim's race-context numbers */}
         <div className={styles.undercut}>
           <div className={styles.sectionLabel}>UNDERCUT WINDOW</div>
-          {statsLoading ? (
+          {simStatsLoading ? (
             <LoadingState />
-          ) : stats ? (
+          ) : raceStats ? (
             <>
               <div className={styles.bigValueRow}>
-                <span className={styles.bigValue}>{stats.undercut_strength.toFixed(1)}</span>
-                <span className={styles.bigUnit}>s</span>
-                <span className={styles.bigCaption}>GAP THRESHOLD</span>
+                <span className={styles.bigValue}>
+                  {undercut != null ? undercut.toFixed(2) : '—'}
+                </span>
+                <span className={styles.bigUnit}>s/lap</span>
+                <span className={styles.bigCaption}>FRESH-TYRE GAIN</span>
               </div>
               <div className={styles.miniStats}>
-                <Mini label="PIT LOSS" value={`${stats.pit_loss_normal.toFixed(1)}s`} />
                 <Mini
-                  label="FAVOURS"
-                  value={stats.undercut_strength >= stats.overcut_strength ? 'UNDERCUT' : 'OVERCUT'}
+                  label="PIT LOSS"
+                  value={pitLoss != null ? `${pitLoss.toFixed(1)}s` : '—'}
                 />
               </div>
             </>
           ) : (
-            <EmptyState hint="circuit-stats recompute job not yet run" />
+            <EmptyState hint="sim not yet run for this weekend" />
           )}
         </div>
 
@@ -164,27 +170,6 @@ export function TyreStrategy({
         </span>
       </div>
 
-      {/* sim race-context numbers — only in the simulated view */}
-      {showSim && raceStats && (
-        <div className={styles.simStats}>
-          <SimStat label="PIT LOSS" value={fmt(raceStats.pit_loss_s, 's', 1)} />
-          <SimStat label="UNDERCUT" value={fmt(raceStats.undercut_s_per_lap, 's/lap', 2)} />
-          <SimStat label="SAFETY CAR" value={pct(raceStats.safety_car_prob)} />
-          <SimStat
-            label="LIKELY STOPS"
-            value={raceStats.most_likely_stops != null ? String(raceStats.most_likely_stops) : '—'}
-          />
-          <SimStat
-            label="OVERTAKING"
-            value={raceStats.overtaking_difficulty_0to100 != null ? `${raceStats.overtaking_difficulty_0to100}/100` : '—'}
-          />
-          <SimStat
-            label="CHAOS"
-            value={raceStats.chaos_index_0to100 != null ? `${raceStats.chaos_index_0to100}/100` : '—'}
-          />
-        </div>
-      )}
-
       {/* stint timeline */}
       <div className={styles.stintArea}>
         {selectedLoading ? (
@@ -206,28 +191,11 @@ export function TyreStrategy({
   )
 }
 
-function fmt(v: number | null | undefined, unit: string, digits: number): string {
-  return v == null ? '—' : `${v.toFixed(digits)}${unit}`
-}
-
-function pct(v: number | null | undefined): string {
-  return v == null ? '—' : `${Math.round(v * 100)}%`
-}
-
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className={styles.miniLabel}>{label}</div>
       <div className={styles.miniValue}>{value}</div>
-    </div>
-  )
-}
-
-function SimStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.simStat}>
-      <div className={styles.simStatValue}>{value}</div>
-      <div className={styles.simStatLabel}>{label}</div>
     </div>
   )
 }

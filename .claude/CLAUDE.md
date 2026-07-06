@@ -54,7 +54,7 @@ formation-lap/               # uv workspace root
 |---|---|---|
 | `circuits` | circuit_id (PK), event_name, country, track_length_km, num_corners, num_laps, sm_zones, jolpica_id (unique), lat, lon | circuit_id |
 | `race_weekends` | circuit_id (FK), season, round_number, race_date, is_sprint, soft/medium/hard_compound | (season, round_number) |
-| `circuit_stats` | circuit_id (FK), season, sc_probability, red_flag_probability, pit_loss_*, undercut/overcut_strength, updated_at | (circuit_id, season) |
+| `circuit_stats` | circuit_id (FK), season, sc_probability, red_flag_probability, updated_at | (circuit_id, season) |
 | `lap_records` | circuit_id (FK, unique), driver, year, lap_time_seconds | circuit_id |
 | `drivers` | driver_id, full_name, nationality, team, season | (driver_id, season) |
 | `weather_forecasts` | race_weekend_id (FK), session_name, session_date, condition, temps, rain_probability, wind, updated_at | (race_weekend_id, session_name) |

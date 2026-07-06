@@ -75,11 +75,6 @@ circuit_stats = Table(
     Column("season", Integer, nullable=False),
     Column("sc_probability", Integer, nullable=False),
     Column("red_flag_probability", Integer, nullable=False),
-    Column("pit_loss_normal", Float, nullable=False),
-    Column("pit_loss_sc", Float, nullable=False),
-    Column("pit_loss_vsc", Float, nullable=False),
-    Column("undercut_strength", Float, nullable=False),
-    Column("overcut_strength", Float, nullable=False),
     Column(
         "updated_at",
         DateTime(timezone=True),

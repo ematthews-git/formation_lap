@@ -53,11 +53,6 @@ class CircuitStats(_Base):
     season: int
     sc_probability: int
     red_flag_probability: int
-    pit_loss_normal: float
-    pit_loss_sc: float
-    pit_loss_vsc: float
-    undercut_strength: float
-    overcut_strength: float
     updated_at: datetime | None = None
 
 

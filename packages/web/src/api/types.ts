@@ -78,11 +78,6 @@ export interface CircuitStats {
   season: number
   sc_probability: number
   red_flag_probability: number
-  pit_loss_normal: number
-  pit_loss_sc: number
-  pit_loss_vsc: number
-  undercut_strength: number
-  overcut_strength: number
   updated_at: string | null
 }
 
