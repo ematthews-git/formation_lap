@@ -143,6 +143,10 @@ params:
   # tyre degradation cliff (censored from data, so imposed with a data-driven knee)
   knee_percentile: 80       # cliff onset = this percentile of observed stint lengths
   cliff_rate: 0.02          # accelerating deg penalty (s/lap^2) beyond the knee
+  # Teams pit before the cliff, so the observed stint length overshoots the true cliff
+  # onset — and more so for softer compounds, which are pitted with a larger safety margin.
+  # Subtract these laps from each compound's knee to correct that censoring bias.
+  knee_margin: {SOFT: 4, MEDIUM: 1, HARD: 0}
   # compound pace offsets: regularise the noisy direct estimate toward the known ordering
   compound_offset_prior: {SOFT: -0.35, MEDIUM: 0.0, HARD: 0.25}
   offset_prior_weight: 0.5

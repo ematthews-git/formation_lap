@@ -156,7 +156,9 @@ def generate_candidates(circuit_profile: CircuitProfile, lap_model: LapModel,
 
     hard_cap = rules.get("max_stint_laps")
     n_laps, pit_loss = circuit_profile.n_laps, circuit_profile.pit_loss
-    candidates: list[Candidate] = []
+    # Pass 1 — compound-specific analytic stint plan per rule-legal sequence.
+    # (Analytic optimum is 'clean-air late'; shift earlier for undercut threat.)
+    specs: list[tuple[tuple[str, ...], int, list[float]]] = []
     for seq in _enumerate_sequences(allocation, min_stops, max_stops, min_distinct,
                                     allocation_sets):
         lengths = _optimal_stint_lengths(seq, n_laps, lap_model, circuit, min_stint, max_frac,
@@ -164,23 +166,54 @@ def generate_candidates(circuit_profile: CircuitProfile, lap_model: LapModel,
         if lengths is None:
             continue
         n_stops = len(seq) - 1
-        # Analytic optimum is 'clean-air late': shift for undercut threat, then blend
-        # toward observed windows with weight growing in history richness (observed
-        # windows already embed the real undercut timing).
         pit_analytic = [max(min_stint, sum(lengths[:i + 1]) - undercut) for i in range(n_stops)]
+        specs.append((tuple(seq), n_stops, pit_analytic))
+
+    # Reference (typical) analytic pit laps per stop-count: the prior-weighted mean across
+    # sequences (unweighted fallback when a stop-count carries no prior mass). History is
+    # then applied as a SHIFT around this reference, not as an absolute target — so distinct
+    # compound sets keep their compound-specific spread instead of all collapsing onto the
+    # (stop-count-only) historical median. A shrink-to-median blend would make e.g. MEDIUM-HARD
+    # and MEDIUM-SOFT share a pit lap and window.
+    ref: dict[int, list[float]] = {}
+    for n_stops in {ns for _, ns, _ in specs}:
+        grp = [(pa, max(prior.prior(seq), 0.0)) for seq, ns, pa in specs if ns == n_stops]
+        tot = sum(pw for _, pw in grp)
+        if tot <= 1e-9:
+            grp, tot = [(pa, 1.0) for pa, _ in grp], float(len(grp))
+        ref[n_stops] = [sum(pw * pa[j] for pa, pw in grp) / tot for j in range(n_stops)]
+
+    # Pass 2 — history-shift the analytic, recompute lengths, re-centre the window.
+    candidates: list[Candidate] = []
+    for seq, n_stops, pit_analytic in specs:
         hist = prior.median_pit_laps(n_stops, n_laps)
+        quants = prior.pit_lap_quantiles(n_stops, n_laps)
         if hist and len(hist) == n_stops:
-            w = win_hist_max * prior.n_pit_obs(n_stops) / (prior.n_pit_obs(n_stops) + win_k)
-            pits = [(1 - w) * a + w * h for a, h in zip(pit_analytic, hist)]
+            n_obs = prior.n_pit_obs(n_stops)
+            w = win_hist_max * n_obs / (n_obs + win_k)
+            r = ref[n_stops]
+            # Common correction toward history (the undercut-earlier bias observed on train
+            # data), applied to every sequence — preserves the analytic spread between sets.
+            pits = [pa + w * (h - rj) for pa, h, rj in zip(pit_analytic, hist, r)]
         else:
-            pits = pit_analytic
+            pits = list(pit_analytic)
         pits = tuple(_sanitize_pits(pits, n_laps, min_stint))
         lengths = _lengths_from_pits(pits, n_laps)
         cost = _analytic_cost(seq, lengths, lap_model, circuit, pit_loss)
-        ranges = prior.pit_lap_quantiles(n_stops, n_laps)
-        if not ranges or len(ranges) != n_stops:
+
+        # Window: keep the historical band *width* per stop but re-centre it on THIS
+        # candidate's pit lap, so different compound sets get different windows.
+        if quants and len(quants) == n_stops and hist and len(hist) == n_stops:
+            ranges = []
+            for p, (qlo, qhi), h in zip(pits, quants, hist):
+                lo = max(min_stint, int(round(p + (qlo - h))))
+                hi = min(n_laps - min_stint, int(round(p + (qhi - h))))
+                if hi < lo:
+                    lo = hi = max(min_stint, min(int(p), n_laps - min_stint))
+                ranges.append((lo, hi))
+        else:
             ranges = [(max(min_stint, p - 4), min(n_laps - min_stint, p + 4)) for p in pits]
-        candidates.append(Candidate(tuple(seq), pits, n_stops, lengths, cost,
+        candidates.append(Candidate(seq, pits, n_stops, lengths, cost,
                                     prior.prior(seq), pit_windows=tuple(ranges)))
     return candidates
 

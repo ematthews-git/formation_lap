@@ -28,6 +28,7 @@ from formation_sim.settings import load_settings
 COMPOUNDS = ["SOFT", "MEDIUM", "HARD"]
 _REF = "MEDIUM"
 _MIN_ROWS = 40
+_MIN_KNEE = 8.0  # floor so a large margin can't push the cliff onset absurdly early
 
 
 @dataclass
@@ -173,11 +174,19 @@ def _stint_table(laps: pd.DataFrame) -> pd.DataFrame:
         comp=("compound", "first"), age=("tyre_life", "max")).reset_index()
 
 
-def _knees_from(st: pd.DataFrame, pct: float, min_n: int, default) -> dict:
+def _knees_from(st: pd.DataFrame, pct: float, min_n: int, default,
+                margins: dict | None = None) -> dict:
+    """Cliff onset per compound = the ``pct`` percentile of observed stint lengths, minus a
+    per-compound ``margin`` (laps) that corrects the pit-before-cliff censoring — larger for
+    softer compounds, which are pitted with more margin before the cliff."""
+    margins = margins or {}
     out = {}
     for c in COMPOUNDS:
         vals = pd.to_numeric(st.loc[st["comp"] == c, "age"], errors="coerce").dropna().to_numpy()
-        out[c] = float(np.percentile(vals, pct)) if len(vals) >= min_n else default
+        if len(vals) >= min_n:
+            out[c] = max(_MIN_KNEE, float(np.percentile(vals, pct)) - float(margins.get(c, 0.0)))
+        else:
+            out[c] = default
     return out
 
 
@@ -189,6 +198,8 @@ def fit_lap_model(laps: pd.DataFrame, cfg: dict | None = None) -> LapModel:
     prior = {k.upper(): float(v) for k, v in
              p.get("compound_offset_prior", {"SOFT": -0.35, "MEDIUM": 0.0, "HARD": 0.25}).items()}
     w_prior = float(p.get("offset_prior_weight", 0.5))
+    knee_margin = {k.upper(): float(v) for k, v in
+                   p.get("knee_margin", {"SOFT": 0.0, "MEDIUM": 0.0, "HARD": 0.0}).items()}
 
     glob = _fit_within(laps)
     if glob is None:
@@ -196,10 +207,10 @@ def fit_lap_model(laps: pd.DataFrame, cfg: dict | None = None) -> LapModel:
     model = LapModel(glob=glob, cliff_rate=float(p.get("cliff_rate", 0.02)))
     pct = float(p.get("knee_percentile", 80))
     st = _stint_table(laps)
-    model.knee = _knees_from(st, pct, min_n=10, default=40.0)
+    model.knee = _knees_from(st, pct, min_n=10, default=40.0, margins=knee_margin)
     # Per-circuit tyre life: softs die sooner at abrasive tracks (blend toward global).
     for circ, sub in st.groupby("circuit"):
-        kc = _knees_from(sub, pct, min_n=8, default=None)
+        kc = _knees_from(sub, pct, min_n=8, default=None, margins=knee_margin)
         model.knee_by_circuit[str(circ)] = {
             c: (0.7 * kc[c] + 0.3 * model.knee[c]) if kc[c] is not None else model.knee[c]
             for c in COMPOUNDS}
