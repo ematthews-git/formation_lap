@@ -313,6 +313,36 @@ def next_race_weekend_within(
     return domain.RaceWeekend.model_validate(row._mapping) if row else None
 
 
+def race_weekends_missing_results(
+    conn: Connection, before: date
+) -> list[domain.RaceWeekend]:
+    """Past race weekends (race strictly before `before`) with no results loaded yet.
+
+    Drives the post-race catch-up loop: a missed cron run plus back-to-back weekends
+    would otherwise leave a permanent hole, so we re-scan every past weekend rather than
+    only the most recent. Ordered oldest-first, so cumulative standings load in
+    chronological order.
+
+    Matched on (circuit_id, season), not round_number: `race_weekends` carries our
+    compacted seed round while `race_results` stores the official F1 round, so the two
+    don't share a round space. Unambiguous for current-season use (one race per circuit);
+    a historical double-header would need the round to disambiguate.
+    """
+    rw = schema.race_weekends
+    rr = schema.race_results
+    has_results = (
+        select(rr.c.id)
+        .where(rr.c.circuit_id == rw.c.circuit_id, rr.c.season == rw.c.season)
+        .exists()
+    )
+    rows = conn.execute(
+        select(rw)
+        .where(rw.c.race_date < before, ~has_results)
+        .order_by(rw.c.race_date.asc())
+    ).all()
+    return [domain.RaceWeekend.model_validate(row._mapping) for row in rows]
+
+
 def most_recent_race_weekend_before(
     conn: Connection, today: date
 ) -> domain.RaceWeekend | None:

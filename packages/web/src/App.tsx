@@ -112,7 +112,7 @@ export default function App() {
       />
 
       <div className={styles.stage}>
-        <HeroBackdrop />
+        <HeroBackdrop circuitId={featured.circuit_id} />
         <Header
           weekend={featured}
           circuit={circuit.data}

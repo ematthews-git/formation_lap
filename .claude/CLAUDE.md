@@ -83,9 +83,14 @@ Three orchestrated flows in `orchestrator.py`, triggered by CLI or scheduler:
 4. Lap records refresh (FastF1 historical)
 5. Circuit stats recompute (FastF1, aggregates last 3 seasons)
 
-**Pre-race** (`formation-data run-pre-race`): cron, T-7 with refreshes T-3 and T-1.
-1. Weather forecast (Open-Meteo, mapped to F1 session schedule)
-2. Strategy generation (1-stop, 2-stop, undercut variant, SC gamble)
+**Pre-race** (`formation-data run-pre-race`): cron, finds the next weekend within a
+21-day window and refreshes as it approaches (idempotent, so re-runs are cheap).
+1. Prelim strategy sim (`sim_strategies`, `mode="prelim"` — pre-quali, season form; later superseded by the postquali sim)
+2. Weather forecast (Open-Meteo, mapped to F1 session schedule) — only once the race is <10 days out
+
+The postquali sim is a separate frequent Sat/Sun cron (`formation-data run-postquali-sim`),
+firing ~2h30 after each Qualifying. A per-round sim can be forced with `formation-data
+sim-strategies generate --season YYYY --round N --mode {prelim,postquali}`.
 
 **Post-race** (`formation-data run-post-race`): cron, T+1 day after race.
 1. Race results (Jolpica)

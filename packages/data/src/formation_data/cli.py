@@ -227,12 +227,6 @@ def run_post_race() -> None:
     orchestrator.run_post_race_for_last_weekend()
 
 
-@app.command("run-prelim-sim")
-def run_prelim_sim() -> None:
-    """Prelim sim for the next upcoming weekend (end-of-previous-weekend cadence)."""
-    orchestrator.run_prelim_sim_for_next_weekend()
-
-
 @app.command("run-postquali-sim")
 def run_postquali_sim() -> None:
     """Postquali sim for any weekend whose quali finished ≥2h30 ago (idempotent catch-up)."""

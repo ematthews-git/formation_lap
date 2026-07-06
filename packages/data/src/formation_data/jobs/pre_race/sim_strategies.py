@@ -36,7 +36,11 @@ MODES = ("prelim", "postquali")
 
 
 def run(
-    conn: Connection, *, season: int, round_number: int, mode: str,
+    conn: Connection,
+    *,
+    season: int,
+    round_number: int,
+    mode: str,
     n_sims: int | None = None,
 ) -> None:
     """Simulate and persist strategy options for (season, round_number) in `mode`.
@@ -125,7 +129,8 @@ def _build_strategy(
         race_weekend_id=race_weekend_id,
         source="sim",
         phase=mode,
-        is_base=entry["rank"] == 1,  # field_display's top-q strategy = the recommendation
+        is_base=entry["rank"]
+        == 1,  # field_display's top-q strategy = the recommendation
         num_stops=num_stops,
         label="->".join(compounds),
         plausibility=entry.get("plausibility"),
@@ -135,7 +140,9 @@ def _build_strategy(
     stints: list[domain.StrategyStint] = []
     for order, compound in enumerate(compounds, start=1):
         if order <= num_stops and order - 1 < len(windows):
-            start, end = _clamp(int(windows[order - 1][0]), int(windows[order - 1][1]), race_laps)
+            start, end = _clamp(
+                int(windows[order - 1][0]), int(windows[order - 1][1]), race_laps
+            )
         else:
             # Final stint runs to the flag — no pit window, pin to race end.
             start = end = race_laps

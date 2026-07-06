@@ -4,21 +4,37 @@ import styles from './HeroBackdrop.module.css'
  * Hero photo shown bleeding from the top-left, behind the header and the
  * circuit/weather row. The frosted-glass panels blur it through backdrop-filter.
  *
- * ── To change the photo ──
- *   Drop an image in `packages/web/public/` and point HERO_IMAGE at it
- *   (paths are served from the web root, e.g. '/my-photo.jpg').
+ * The photo tracks the featured race weekend: each circuit maps to an image in
+ * `packages/web/public/`, keyed by `circuit_id`.
  *
- * ── To show no photo at all ──
- *   Set HERO_IMAGE to `null`.
+ * ── To add a photo for a circuit ──
+ *   Drop `<name>.jpg` in `packages/web/public/` and add a
+ *   `<circuit_id>: '/<name>.jpg'` entry to HERO_IMAGES below.
+ *
+ * ── Circuits without their own photo ──
+ *   Fall back to HERO_FALLBACK. Set it to `null` to show no backdrop for them.
  */
-const HERO_IMAGE: string | null = '/silverstone.jpg'
+const HERO_IMAGES: Record<string, string> = {
+  silverstone: '/silverstone.jpg',
+  spa: '/spa.jpg',
+  hungaroring: '/hungary.jpg',
+  monza: '/monza.jpg',
+  baku: '/baku.jpg',
+  singapore: '/singapore.jpg',
+  austin: '/austin.jpg',
+  abu_dhabi: '/abu-dhabi.jpg',
+}
 
-export function HeroBackdrop() {
-  if (!HERO_IMAGE) return null
+const HERO_FALLBACK: string | null = '/silverstone.jpg'
+
+export function HeroBackdrop({ circuitId }: { circuitId?: string }) {
+  const image = (circuitId && HERO_IMAGES[circuitId]) || HERO_FALLBACK
+  if (!image) return null
 
   return (
     <div className={styles.backdrop} aria-hidden="true">
-      <img className={styles.photo} src={HERO_IMAGE} alt="" />
+      {/* key forces a fresh <img> when switching weekends so the swap isn't a flash of the old photo */}
+      <img key={image} className={styles.photo} src={image} alt="" />
       {/* film grain */}
       <svg className={styles.grain} xmlns="http://www.w3.org/2000/svg">
         <filter id="flGrainHero">
