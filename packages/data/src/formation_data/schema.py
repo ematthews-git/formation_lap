@@ -227,6 +227,28 @@ sim_race_stats = Table(
 )
 
 
+# Per-session finishing order / timesheet, one row per session. Session classifications
+# are heterogeneous — a practice timesheet (fastest lap + gap), a qualifying sheet
+# (Q1/Q2/Q3), and a race classification (points, status, time) share almost no columns —
+# so, like sim_race_stats, the whole ordered per-driver list is stored as a single JSONB
+# blob rather than a rigid column-per-field schema. Sourced from FastF1 ~45 min after the
+# session ends (see jobs.post_session.session_results); the frontend renders it later.
+session_results = Table(
+    "session_results",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("session_id", ForeignKey("sessions.id"), nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column("results", JSONB, nullable=False),
+    UniqueConstraint("session_id"),
+)
+
+
 race_results = Table(
     "race_results",
     metadata,
@@ -270,6 +292,7 @@ __all__ = [
     "strategies",
     "strategy_stints",
     "sim_race_stats",
+    "session_results",
     "race_results",
     "standings",
 ]

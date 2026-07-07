@@ -87,6 +87,28 @@ class Session(_Base):
     start_time: datetime
 
 
+class SessionFinisher(_Base):
+    """One top-3 slot in a completed session (driver code only)."""
+
+    position: int
+    driver_id: str
+
+
+class SessionWithResults(_Base):
+    """A session plus its top-3 finishers — API read shape (Session + a results summary).
+
+    `top_finishers` is empty until the session's results have been saved (see
+    jobs.post_session.session_results); the frontend shows it inline after the name.
+    """
+
+    id: int | None = None
+    race_weekend_id: int
+    session_order: int
+    name: str
+    start_time: datetime
+    top_finishers: list[SessionFinisher] = []
+
+
 class WeatherForecast(_Base):
     id: int | None = None
     race_weekend_id: int
@@ -151,6 +173,19 @@ class SimRaceStats(_Base):
     stats: dict
 
 
+class SessionResults(_Base):
+    """One session's ordered per-driver classification (the JSONB `results` blob).
+
+    API read shape. `results` is an ordered list of per-driver dicts whose keys vary
+    by session type (see jobs.post_session.session_results for the normalized shape).
+    """
+
+    id: int | None = None
+    session_id: int
+    updated_at: datetime | None = None
+    results: list[dict]
+
+
 class RaceResult(_Base):
     id: int | None = None
     circuit_id: str
@@ -177,11 +212,15 @@ __all__ = [
     "CircuitStats",
     "Driver",
     "RaceWeekend",
+    "Session",
+    "SessionFinisher",
+    "SessionWithResults",
     "WeatherForecast",
     "Strategy",
     "StrategyStint",
     "StrategyWithStints",
     "SimRaceStats",
+    "SessionResults",
     "RaceResult",
     "Standing",
 ]

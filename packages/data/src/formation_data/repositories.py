@@ -29,6 +29,28 @@ logger = logging.getLogger(__name__)
 # (≈1h session + 1h30 buffer for FastF1's delayed data upload).
 POSTQUALI_DELAY_MIN = 150
 
+# Session results become due this many minutes after a session *ends*. Sessions store
+# only a start time, so the end is estimated as start + SESSION_DURATION_MIN[name].
+SESSION_RESULT_DELAY_MIN = 45
+# Estimated running length per session (FastF1 session names, as stored in sessions.name).
+# Only used to place the "results due" cutoff; red-flag overruns are absorbed by the
+# idempotent retry (a not-yet-available session just lands on a later poll).
+SESSION_DURATION_MIN = {
+    "Practice 1": 60,
+    "Practice 2": 60,
+    "Practice 3": 60,
+    "Qualifying": 60,
+    "Sprint Qualifying": 45,
+    "Sprint Shootout": 45,
+    "Sprint": 60,
+    "Race": 120,
+}
+_DEFAULT_SESSION_DURATION_MIN = 60
+# Don't rescan the whole season on every poll: a session with no results after this long
+# is stale (FastF1 would have had data), so we stop retrying it. Wide enough to catch up a
+# full weekend after a missed cron run.
+SESSION_RESULTS_LOOKBACK = timedelta(days=7)
+
 # Columns the database owns. Excluded from upsert payloads so server defaults
 # apply on insert; refreshed explicitly on conflict (ON CONFLICT DO UPDATE does
 # not run SQLAlchemy `onupdate` hooks).
@@ -159,6 +181,27 @@ def upsert_sim_race_stats(
     conn.execute(stmt)
 
 
+def upsert_session_results(
+    conn: Connection, session_id: int, results: list[dict]
+) -> None:
+    """Upsert one session's classification blob (one row per session).
+
+    Re-running for the same session overwrites the stored results — a later poll,
+    once FastF1's data has firmed up, replaces an earlier partial classification.
+    """
+    stmt = insert(schema.session_results).values(
+        session_id=session_id, results=results
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["session_id"],
+        set_={
+            "results": stmt.excluded.results,
+            "updated_at": func.now(),
+        },
+    )
+    conn.execute(stmt)
+
+
 # --- read ---
 
 
@@ -203,6 +246,18 @@ def get_race_weekend(
         select(schema.race_weekends).where(
             schema.race_weekends.c.season == season,
             schema.race_weekends.c.round_number == round_number,
+        )
+    ).first()
+    return domain.RaceWeekend.model_validate(row._mapping) if row else None
+
+
+def get_race_weekend_by_id(
+    conn: Connection, race_weekend_id: int
+) -> domain.RaceWeekend | None:
+    """Fetch a single race weekend by its surrogate id, or None."""
+    row = conn.execute(
+        select(schema.race_weekends).where(
+            schema.race_weekends.c.id == race_weekend_id
         )
     ).first()
     return domain.RaceWeekend.model_validate(row._mapping) if row else None
@@ -398,6 +453,65 @@ def weekends_postquali_due(
     return [domain.RaceWeekend.model_validate(row._mapping) for row in rows]
 
 
+def get_session(conn: Connection, session_id: int) -> domain.Session | None:
+    """Fetch a single session by its id, or None."""
+    row = conn.execute(
+        select(schema.sessions).where(schema.sessions.c.id == session_id)
+    ).first()
+    return domain.Session.model_validate(row._mapping) if row else None
+
+
+def get_session_by_name(
+    conn: Connection, race_weekend_id: int, name: str
+) -> domain.Session | None:
+    """Fetch a weekend's session by its (FastF1) name, or None. For manual saves."""
+    row = conn.execute(
+        select(schema.sessions).where(
+            schema.sessions.c.race_weekend_id == race_weekend_id,
+            schema.sessions.c.name == name,
+        )
+    ).first()
+    return domain.Session.model_validate(row._mapping) if row else None
+
+
+def results_due_at(session_name: str, start_time: datetime) -> datetime:
+    """The instant a session's results become due to save.
+
+    Estimated as start + running length (SESSION_DURATION_MIN, keyed on the FastF1
+    session name) + SESSION_RESULT_DELAY_MIN, since sessions store only a start time.
+    """
+    duration = SESSION_DURATION_MIN.get(session_name, _DEFAULT_SESSION_DURATION_MIN)
+    return start_time + timedelta(minutes=duration + SESSION_RESULT_DELAY_MIN)
+
+
+def session_results_due(conn: Connection, now: datetime) -> list[domain.Session]:
+    """Sessions whose results are due to be saved but haven't been yet.
+
+    Due = `results_due_at(name, start) <= now` and no session_results row exists yet.
+    `now` must be timezone-aware (UTC), to compare against the timestamptz start times.
+    Bounded to the last SESSION_RESULTS_LOOKBACK so the poll doesn't rescan the season.
+    Drives the idempotent catch-up flow: a session drops out once its results land.
+    """
+    s = schema.sessions
+    sr = schema.session_results
+    has_results = exists().where(sr.c.session_id == s.c.id)
+    rows = conn.execute(
+        select(s)
+        .where(
+            s.c.start_time >= now - SESSION_RESULTS_LOOKBACK,
+            s.c.start_time <= now,
+            ~has_results,
+        )
+        .order_by(s.c.start_time.asc())
+    ).all()
+    due: list[domain.Session] = []
+    for row in rows:
+        sess = domain.Session.model_validate(row._mapping)
+        if results_due_at(sess.name, sess.start_time) <= now:
+            due.append(sess)
+    return due
+
+
 def get_lap_record_for_circuit(
     conn: Connection, circuit_id: str
 ) -> domain.LapRecord | None:
@@ -464,10 +578,11 @@ def list_strategies_for_weekend(
 
 def list_sessions_for_weekend(
     conn: Connection, season: int, round_number: int
-) -> list[domain.Session]:
+) -> list[domain.SessionWithResults]:
     """Session timetable for a race weekend, in running order (FP1 → Race).
 
-    Returns `[]` when the weekend doesn't exist or has no sessions loaded yet.
+    Each session carries its top-3 finishers (empty until results are saved). Returns
+    `[]` when the weekend doesn't exist or has no sessions loaded yet.
     """
     rw = get_race_weekend(conn, season, round_number)
     if rw is None:
@@ -477,7 +592,39 @@ def list_sessions_for_weekend(
         .where(schema.sessions.c.race_weekend_id == rw.id)
         .order_by(schema.sessions.c.session_order)
     ).all()
-    return [domain.Session.model_validate(row._mapping) for row in rows]
+    if not rows:
+        return []
+
+    sr = schema.session_results
+    session_ids = [row.id for row in rows]
+    top_by_session = {
+        sid: _top_finishers(results)
+        for sid, results in conn.execute(
+            select(sr.c.session_id, sr.c.results).where(
+                sr.c.session_id.in_(session_ids)
+            )
+        ).all()
+    }
+    return [
+        domain.SessionWithResults(
+            **row._mapping, top_finishers=top_by_session.get(row.id, [])
+        )
+        for row in rows
+    ]
+
+
+def _top_finishers(results: list[dict], n: int = 3) -> list[domain.SessionFinisher]:
+    """Top-`n` finishers (by position) from a stored session_results blob."""
+    ranked = [
+        r
+        for r in results
+        if isinstance(r.get("position"), int) and 1 <= r["position"] <= n
+    ]
+    ranked.sort(key=lambda r: r["position"])
+    return [
+        domain.SessionFinisher(position=r["position"], driver_id=r["driver_id"])
+        for r in ranked
+    ]
 
 
 def list_weather_for_weekend(

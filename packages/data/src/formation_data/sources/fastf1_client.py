@@ -139,6 +139,166 @@ def get_race_session(season: int, round_number: int):
     return session
 
 
+def get_session_results(
+    season: int, fastf1_location: str, race_date: date, session_name: str
+) -> list[dict]:
+    """Normalized per-driver classification for one session at a venue.
+
+    Resolves the event by `fastf1_location` (our seed round differs from FastF1's, which
+    numbers the full calendar), loads the session named `session_name` (a FastF1 name as
+    stored in `sessions.name`, e.g. "Practice 1", "Qualifying", "Race"), and returns an
+    ordered list of per-driver dicts:
+
+        {position, driver_id, driver_number, driver_name, team, time, status, points,
+         fastest_lap_s}
+
+    Race / Sprint use the official finishing order (with gap, status, points); Qualifying
+    uses its classification and best flying lap; Practice has no official order, so drivers
+    are ranked by their fastest lap.
+
+    Returns `[]` when the event can't be resolved or timing data isn't published yet — the
+    caller retries on a later poll rather than treating an empty session as final.
+    """
+    aliases = aliases_for(fastf1_location)
+    schedule = get_event_schedule(season)
+    schedule = schedule[schedule["EventFormat"] != "testing"]
+    events = schedule[schedule["Location"].isin(aliases)]
+    if len(events) > 1:
+        events = events[events["EventDate"].dt.date == race_date]
+    if events.empty:
+        logger.warning(
+            "get_session_results: no event for %s (%s) %s",
+            fastf1_location,
+            season,
+            race_date,
+        )
+        return []
+    round_number = int(events.iloc[0].RoundNumber)
+
+    try:
+        session = fastf1.get_session(season, round_number, session_name)
+        session.load(laps=True, telemetry=False, weather=False, messages=False)
+    except Exception as exc:  # noqa: BLE001 — data often not yet published; retry later
+        logger.warning(
+            "get_session_results: load failed for %s R%s %r (%s); no results",
+            season,
+            round_number,
+            session_name,
+            exc,
+        )
+        return []
+
+    fastest = _fastest_laps_by_driver(session)
+    results = session.results
+    if results is None or results.empty:
+        logger.warning(
+            "get_session_results: no classification for %s R%s %r; no results",
+            season,
+            round_number,
+            session_name,
+        )
+        return []
+
+    is_practice = str(session_name).startswith("Practice")
+    is_qualifying = "Qualifying" in str(session_name) or "Shootout" in str(session_name)
+
+    rows: list[dict] = []
+    for _, r in results.iterrows():
+        abbr = _to_str(r.get("Abbreviation"))
+        best_q = _best_quali_lap(r) if is_qualifying else None
+        fastest_s = fastest.get(abbr) if abbr else None
+        if is_qualifying and best_q is not None:
+            fastest_s = best_q
+        rows.append(
+            {
+                "position": _to_int(r.get("Position")),
+                "driver_id": abbr,
+                "driver_number": _to_str(r.get("DriverNumber")),
+                "driver_name": _to_str(r.get("FullName")),
+                "team": _to_str(r.get("TeamName")),
+                "status": _to_str(r.get("Status")),
+                "points": _to_float(r.get("Points")),
+                "fastest_lap_s": fastest_s,
+                "time": _fmt_lap(fastest_s)
+                if (is_practice or is_qualifying)
+                else _fmt_time(r.get("Time")),
+            }
+        )
+
+    has_positions = any(r["position"] is not None for r in rows)
+    if is_practice or not has_positions:
+        # No official classification (all practice, and some Sprint Qualifying sheets) —
+        # rank by fastest lap, slowest / no-time last, and number from there.
+        rows.sort(key=lambda d: (d["fastest_lap_s"] is None, d["fastest_lap_s"] or 0.0))
+        for pos, row in enumerate(rows, start=1):
+            row["position"] = pos
+    else:
+        rows.sort(key=lambda d: (d["position"] is None, d["position"] or 0))
+
+    logger.info(
+        "get_session_results season=%s round=%s session=%r drivers=%d",
+        season,
+        round_number,
+        session_name,
+        len(rows),
+    )
+    return rows
+
+
+def _fastest_laps_by_driver(session) -> dict[str, float]:
+    """Each driver's fastest lap time (seconds), keyed by their abbreviation."""
+    laps = session.laps
+    out: dict[str, float] = {}
+    if laps is None or laps.empty:
+        return out
+    for driver, grp in laps.groupby("Driver"):
+        best = grp["LapTime"].min()
+        if pd.notna(best):
+            out[str(driver)] = best.total_seconds()
+    return out
+
+
+def _best_quali_lap(row) -> float | None:
+    """Best of a driver's Q1/Q2/Q3 laps (seconds), or None if they set no time."""
+    times = [row.get("Q1"), row.get("Q2"), row.get("Q3")]
+    secs = [t.total_seconds() for t in times if pd.notna(t)]
+    return min(secs) if secs else None
+
+
+def _fmt_lap(seconds: float | None) -> str | None:
+    """Format a lap time in seconds as m:ss.mmm (or ss.mmm under a minute)."""
+    if seconds is None:
+        return None
+    minutes, secs = divmod(seconds, 60)
+    return f"{int(minutes)}:{secs:06.3f}" if minutes else f"{secs:.3f}"
+
+
+def _fmt_time(value) -> str | None:
+    """Format a race/sprint finishing time or gap (a pandas Timedelta) as a string."""
+    if value is None or pd.isna(value) or not hasattr(value, "total_seconds"):
+        return None
+    total = abs(value.total_seconds())
+    minutes, secs = divmod(total, 60)
+    hours, minutes = divmod(int(minutes), 60)
+    if hours:
+        return f"{hours}:{int(minutes):02d}:{secs:06.3f}"
+    if minutes:
+        return f"{int(minutes)}:{secs:06.3f}"
+    return f"{secs:.3f}"
+
+
+def _to_int(value) -> int | None:
+    return int(value) if pd.notna(value) else None
+
+
+def _to_float(value) -> float | None:
+    return float(value) if pd.notna(value) else None
+
+
+def _to_str(value) -> str | None:
+    return str(value) if pd.notna(value) and str(value) != "" else None
+
+
 def get_fastest_lap_track(season: int, round_number: int):
     """Position trace of the race's fastest lap, plus the circuit rotation.
 

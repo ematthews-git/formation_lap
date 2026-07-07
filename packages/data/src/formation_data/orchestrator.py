@@ -25,6 +25,7 @@ from formation_data.jobs.post_race import (
     race_results,
     standings,
 )
+from formation_data.jobs.post_session import session_results
 from formation_data.jobs.pre_race import sim_strategies, weather
 from formation_data.jobs.pre_season import (
     circuit_stats,
@@ -38,12 +39,14 @@ from formation_data.sources import jolpica_client
 
 logger = logging.getLogger(__name__)
 
-# How far ahead the pre-race cron looks for the next weekend. Wide enough to publish an
-# early prelim sim well before the weekend; idempotent re-runs refine it each cron fire.
-PRE_RACE_WINDOW = timedelta(days=21)
 # Only fetch a weather forecast once the race is within this horizon — Open-Meteo's
 # forecast is only meaningful ~10 days out, so we skip it while the weekend is further off.
+# The daily weather cron leaves a further-off weekend's forecast blank until it enters this
+# window, then refreshes it every day as the forecast firms up.
 WEATHER_WINDOW = timedelta(days=10)
+# The prelim sim runs on the Monday of race week. A 7-day look-ahead uniquely selects that
+# week's race — the following weekend is ≥12 days out on a Monday, so it can't be caught.
+PRELIM_WINDOW = timedelta(days=7)
 
 
 def run_pre_season(season: int) -> None:
@@ -62,26 +65,51 @@ def run_pre_season(season: int) -> None:
         circuit_stats.run(conn, season=season)
 
 
-def run_pre_race_for_next_weekend(today: date | None = None) -> None:
-    """Called on a cron. No-ops if no race is within the next ``PRE_RACE_WINDOW``.
+def run_weather_refresh(today: date | None = None) -> None:
+    """Called daily. Refreshes the weather forecast for the next weekend inside
+    ``WEATHER_WINDOW`` (10 days); no-ops otherwise, so a race >10 days out stays blank
+    until it enters the window.
 
-    Generates the prelim (pre-quali, season-form) strategy sim for the upcoming weekend,
-    and — once the race is within ``WEATHER_WINDOW`` — loads its weather forecast. Both
-    steps are idempotent, so the cron can fire repeatedly (T-14, T-7, T-3, T-1): the sim
-    refreshes each time and is later superseded by the postquali sim once quali runs.
+    Idempotent: the weather job upserts (bumping ``updated_at``) and self-guards
+    Open-Meteo's horizon, so firing every day simply keeps the forecast current as the
+    weekend approaches.
     """
     today = today or date.today()
     with connection_scope() as conn:
-        rw = repositories.next_race_weekend_within(conn, today, PRE_RACE_WINDOW)
+        rw = repositories.next_race_weekend_within(conn, today, WEATHER_WINDOW)
         if rw is None:
             logger.info(
-                "run_pre_race_for_next_weekend: no race within %s days; skipping",
-                PRE_RACE_WINDOW.days,
+                "run_weather_refresh: no race within %s days; leaving weather blank",
+                WEATHER_WINDOW.days,
             )
             return
-
         logger.info(
-            "run_pre_race_for_next_weekend: prelim sim for %s R%s (race %s)",
+            "run_weather_refresh: forecast for %s R%s (race %s)",
+            rw.season,
+            rw.round_number,
+            rw.race_date,
+        )
+        weather.run(conn, season=rw.season, round_number=rw.round_number)
+
+
+def run_prelim_sim(today: date | None = None) -> None:
+    """Called on the Monday of race week. Generates the prelim (pre-quali, season-form)
+    strategy sim for that week's race, then superseded by the postquali sim once quali
+    runs.
+
+    No-ops when no race falls inside ``PRELIM_WINDOW`` (7 days), so it only fires on race
+    weeks. Idempotent — a re-run just refreshes the prelim projection.
+    """
+    today = today or date.today()
+    with connection_scope() as conn:
+        rw = repositories.next_race_weekend_within(conn, today, PRELIM_WINDOW)
+        if rw is None:
+            logger.info(
+                "run_prelim_sim: no race within %s days; skipping", PRELIM_WINDOW.days
+            )
+            return
+        logger.info(
+            "run_prelim_sim: prelim sim for %s R%s (race %s)",
             rw.season,
             rw.round_number,
             rw.race_date,
@@ -89,16 +117,6 @@ def run_pre_race_for_next_weekend(today: date | None = None) -> None:
         sim_strategies.run(
             conn, season=rw.season, round_number=rw.round_number, mode="prelim"
         )
-
-        # Weather firms up inside ~2 weeks; only fetch once the race is close enough to
-        # sit within Open-Meteo's useful horizon (the job also guards its own horizon).
-        if rw.race_date - today < WEATHER_WINDOW:
-            weather.run(conn, season=rw.season, round_number=rw.round_number)
-        else:
-            logger.info(
-                "run_pre_race_for_next_weekend: race is >%s days out; deferring weather",
-                WEATHER_WINDOW.days,
-            )
 
 
 def run_post_race_for_last_weekend(today: date | None = None) -> None:
@@ -185,9 +203,41 @@ def run_postquali_sim(now: datetime | None = None) -> None:
             )
 
 
+def run_post_session(now: datetime | None = None) -> None:
+    """Called on a frequent race-weekend poll. Two independently-gated steps:
+
+    1. Save the classification for any session that ended ≥45 min ago and isn't stored yet
+       (``session_results_due`` — covers practice, quali, sprint, race).
+    2. Run the postquali sim for any weekend whose Qualifying finished ≥2h30 ago and has no
+       postquali yet (``weekends_postquali_due``).
+
+    Both are idempotent catch-up sets keyed on missing rows, so extra fires — or a run
+    spanning several timezones' sessions — are free and safe. The two gates differ on
+    purpose: results save shortly after a session, but the sim keeps its longer buffer for
+    FastF1's delayed quali data (which the sim fetches itself).
+    """
+    now = now or datetime.now(timezone.utc)
+    with connection_scope() as conn:
+        due_sessions = repositories.session_results_due(conn, now)
+        if not due_sessions:
+            logger.info("run_post_session now=%s: no session results due", now)
+        for s in due_sessions:
+            session_results.run(conn, session_id=s.id)
+
+        due_postquali = repositories.weekends_postquali_due(conn, now)
+        if not due_postquali:
+            logger.info("run_post_session now=%s: no postquali sims due", now)
+        for rw in due_postquali:
+            sim_strategies.run(
+                conn, season=rw.season, round_number=rw.round_number, mode="postquali"
+            )
+
+
 __all__ = [
     "run_pre_season",
-    "run_pre_race_for_next_weekend",
+    "run_weather_refresh",
+    "run_prelim_sim",
     "run_post_race_for_last_weekend",
     "run_postquali_sim",
+    "run_post_session",
 ]

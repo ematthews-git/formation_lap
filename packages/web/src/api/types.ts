@@ -35,12 +35,19 @@ export interface RaceWeekend {
   hard_compound: string
 }
 
+export interface SessionFinisher {
+  position: number
+  driver_id: string
+}
+
 export interface Session {
   id: number | null
   race_weekend_id: number
   session_order: number
   name: string
   start_time: string // ISO datetime (UTC)
+  // Top-3 finishers, empty until the session's results have been saved.
+  top_finishers: SessionFinisher[]
 }
 
 export interface Driver {

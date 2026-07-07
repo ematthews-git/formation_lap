@@ -52,12 +52,64 @@
 }
 
 .session {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.sessionName {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 20px;
   color: var(--text-num);
   text-transform: uppercase;
   letter-spacing: 0.01em;
+}
+
+/* Live-session badge: red dot + "NOW", after the session name. */
+.now {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.nowDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: nowPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes nowPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Top-3 finishers, written inline after the session name once results land. */
+.finishers {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.driverCode {
+  color: var(--text-ghost);
+  font-weight: 600;
 }
 
 .date {

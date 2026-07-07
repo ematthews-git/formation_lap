@@ -11,13 +11,14 @@ import logging
 
 import typer
 
-from formation_data import db, orchestrator
+from formation_data import db, orchestrator, repositories
 from formation_data.db import connection_scope
 from formation_data.jobs.post_race import (
     lap_records as post_race_lap_records,
     race_results,
     standings,
 )
+from formation_data.jobs.post_session import session_results as post_session_results
 from formation_data.jobs.pre_race import sim_strategies, strategies, weather
 from formation_data.jobs.pre_season import (
     circuit_stats,
@@ -46,6 +47,7 @@ strategies_app = typer.Typer(help="Historical (mined) strategy options.")
 sim_strategies_app = typer.Typer(help="Simulated strategy options.")
 results_app = typer.Typer(help="Race finishing order.")
 standings_app = typer.Typer(help="Driver + constructor standings.")
+session_results_app = typer.Typer(help="Per-session classification / timesheet.")
 db_app = typer.Typer(help="Database schema management.")
 
 app.add_typer(circuits_app, name="circuits")
@@ -59,6 +61,7 @@ app.add_typer(strategies_app, name="strategies")
 app.add_typer(sim_strategies_app, name="sim-strategies")
 app.add_typer(results_app, name="results")
 app.add_typer(standings_app, name="standings")
+app.add_typer(session_results_app, name="session-results")
 app.add_typer(db_app, name="db")
 
 
@@ -209,6 +212,30 @@ def standings_backfill(
         standings.backfill(conn, seasons=seasons)
 
 
+@session_results_app.command("save")
+def session_results_save(
+    season: int = typer.Option(...),
+    round: int = typer.Option(..., "--round"),
+    session: str = typer.Option(
+        ...,
+        "--session",
+        help='FastF1 session name as stored in sessions.name, e.g. "Practice 1", '
+        '"Qualifying", "Sprint", "Race".',
+    ),
+) -> None:
+    """Fetch + save one session's classification from FastF1 (manual / backfill)."""
+    with connection_scope() as conn:
+        rw = repositories.get_race_weekend(conn, season, round)
+        if rw is None:
+            typer.echo(f"No race weekend {season} R{round}.")
+            raise typer.Exit(code=1)
+        sess = repositories.get_session_by_name(conn, rw.id, session)
+        if sess is None:
+            typer.echo(f"No session named {session!r} for {season} R{round}.")
+            raise typer.Exit(code=1)
+        post_session_results.run(conn, session_id=sess.id)
+
+
 # --- orchestrator flows ---
 
 
@@ -217,9 +244,16 @@ def run_pre_season(season: int = typer.Option(...)) -> None:
     orchestrator.run_pre_season(season)
 
 
-@app.command("run-pre-race")
-def run_pre_race() -> None:
-    orchestrator.run_pre_race_for_next_weekend()
+@app.command("run-weather")
+def run_weather() -> None:
+    """Daily: refresh the forecast for the next weekend within 10 days (blank otherwise)."""
+    orchestrator.run_weather_refresh()
+
+
+@app.command("run-prelim")
+def run_prelim() -> None:
+    """Monday of race week: prelim strategy sim for that week's race (no-op otherwise)."""
+    orchestrator.run_prelim_sim()
 
 
 @app.command("run-post-race")
@@ -227,9 +261,18 @@ def run_post_race() -> None:
     orchestrator.run_post_race_for_last_weekend()
 
 
+@app.command("run-post-session")
+def run_post_session() -> None:
+    """~45 min after each session: save session results, and run the postquali sim once
+    Qualifying is done (idempotent catch-up)."""
+    orchestrator.run_post_session()
+
+
 @app.command("run-postquali-sim")
 def run_postquali_sim() -> None:
-    """Postquali sim for any weekend whose quali finished ≥2h30 ago (idempotent catch-up)."""
+    """Postquali sim for any weekend whose quali finished ≥2h30 ago (idempotent catch-up).
+
+    Manual escape hatch — the scheduled poll uses run-post-session, which does this too."""
     orchestrator.run_postquali_sim()
 
 

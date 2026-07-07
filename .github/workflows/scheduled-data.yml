@@ -3,28 +3,31 @@ name: Scheduled data jobs
 # Free fallback path for the scheduler. Mirrors the AWS EventBridge cron table from the plan.
 # Each job calls the same `formation-data` CLI that the production ECS task runs.
 #
-# DATABASE_URL must be set as a repository secret pointing at the live database.
+# GATED: the job below runs on `workflow_dispatch` only, so the schedules are wired but do
+# NOT fire against a live database yet. Once a prod DB + `DATABASE_URL` repo secret exist,
+# remove the `if:` guard on the `run` job to turn the schedules on.
 
 on:
   schedule:
-    # post-race: Monday 06:00 UTC. No-ops if no race ran the prior weekend.
+    # Weather: daily 06:00 UTC. No-ops until a race is within 10 days, then refreshes the
+    # forecast every day as it firms up.
+    - cron: "0 6 * * *"
+    # Monday 06:00 UTC: post-race (results + standings + fastest lap for last weekend) then
+    # prelim sim (only fires on the Monday of a race week).
     - cron: "0 6 * * MON"
-    # pre-race refresh: Thursday + Saturday 06:00 UTC. No-ops if no race within 7 days.
-    - cron: "0 6 * * THU" #TODO: consider earlier
-    - cron: "0 6 * * SAT"
-    # postquali sim: Sat afternoon/evening + Sun early UTC. Idempotent catch-up — each fire
-    # runs run-postquali-sim, which only acts on weekends whose Qualifying finished ≥2h30 ago
-    # and has no postquali yet. Multiple times cover quali across all race timezones.
-    - cron: "0 15,18,21 * * SAT"
-    - cron: "0 0,3 * * SUN"
-    # pre-season: 15 January 06:00 UTC.
+    # Post-session poll: hourly across race-weekend days (+ early Monday for late-tz races).
+    # Each fire runs run-post-session, which idempotently saves any session that ended ≥45
+    # min ago and runs the postquali sim once Qualifying is done. No-ops cheaply otherwise.
+    - cron: "0 * * * FRI,SAT,SUN"
+    - cron: "0 0-5 * * MON"
+    # Pre-season: 15 January 06:00 UTC.
     - cron: "0 6 15 1 *"
   workflow_dispatch:
     inputs:
       command:
-        description: "Command to run (e.g. 'run-pre-race', 'run-pre-season --season 2026')"
+        description: "Command to run (e.g. 'run-weather', 'run-pre-season --season 2026')"
         required: true
-        default: "run-pre-race"
+        default: "run-post-session"
 
 jobs:
   run:
@@ -43,18 +46,18 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          # GitHub puts the matched cron into github.event.schedule. Pick the command from there;
-          # for workflow_dispatch use the input verbatim.
+          # GitHub puts the matched cron into github.event.schedule. Pick the command from
+          # there; for workflow_dispatch use the input verbatim.
           case "${{ github.event.schedule }}" in
+            "0 6 * * *")
+              uv run --package formation-data formation-data run-weather
+              ;;
             "0 6 * * MON")
               uv run --package formation-data formation-data run-post-race
-              uv run --package formation-data formation-data run-pre-race
+              uv run --package formation-data formation-data run-prelim
               ;;
-            "0 6 * * THU"|"0 6 * * SAT")
-              uv run --package formation-data formation-data run-pre-race
-              ;;
-            "0 15,18,21 * * SAT"|"0 0,3 * * SUN")
-              uv run --package formation-data formation-data run-postquali-sim
+            "0 * * * FRI,SAT,SUN"|"0 0-5 * * MON")
+              uv run --package formation-data formation-data run-post-session
               ;;
             "0 6 15 1 *")
               # Adjust the season once a year, or trigger manually via workflow_dispatch.
