@@ -95,7 +95,8 @@ never re-simulate, re-select or re-fit, so they cannot change any prediction):
   (negative = faster), `undercut_s_per_lap` (fresh-vs-worn medium), `pit_loss_s`, `degradation`
   (severity + rank among all circuits), `safety_car_prob` / `vsc_prob` / `expected_sc_vsc_laps`,
   `overtaking_difficulty_0to100`, `expected_on_track_passes`, `stop_count_distribution` +
-  `most_likely_stops`, `chaos_index_0to100` (field-wide finish-spread), `pole_to_win_prob`.
+  `most_likely_stops`, `chaos_index_0to100` (field-wide finish-spread), `pole_to_win_prob`,
+  `quali_importance` (0-100 grid↔finish rank correlation; postquali only, `null` for prelim).
 - **Per driver** — plausibility-weighted `p_win` / `p_podium` / `p_points`, `expected_finish`,
   `projected_finish` and `grid_to_finish_delta` (the grid "mover"), `dnf_prob` (reliability), and
   `tyre_management_vs_field` (+ = kinder on tyres than the field).

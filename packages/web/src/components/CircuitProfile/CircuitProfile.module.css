@@ -1,4 +1,11 @@
+/* Flex column so the body fills the panel down to its bottom edge. */
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
 .body {
+  flex: 1;
   display: grid;
   grid-template-columns: 1.25fr 1fr;
 }
@@ -19,10 +26,18 @@
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /* Two metric rows sit at their natural height; the lap-record row absorbs the
+     rest so it fills to the panel bottom and its hover reaches the edge. */
+  grid-template-rows: auto auto 1fr;
 }
 
 .cellBorder {
   border-bottom: 1px solid var(--border-soft);
+  transition: background-color 0.12s ease;
+}
+
+.cellBorder:hover {
+  background: var(--glass-bg-raised);
 }
 
 .cellLeft {
@@ -36,6 +51,11 @@
 .lapRecord {
   grid-column: 1 / -1;
   padding: 15px 18px;
+  transition: background-color 0.12s ease;
+}
+
+.lapRecord:hover {
+  background: var(--glass-bg-raised);
 }
 
 .lapRecordLabel {

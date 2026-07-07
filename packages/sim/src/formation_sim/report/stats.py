@@ -104,6 +104,34 @@ def _undercut_power(lap_model, prior, circuit: str, n_laps: int, min_stint: int)
     return _r(max(gain, 0.0), 2)
 
 
+def _quali_importance(wctx, driver_agg: dict) -> int | None:
+    """0-100 index of how strongly qualifying position drives the finishing order: the
+    Spearman rank correlation between the grid order and the simulated finish order (drivers
+    ranked by expected finish), clamped to [0, 1] and scaled to 0-100. 100 = finish order
+    reproduces the grid exactly (quali decisive); 0 = finish order is unrelated to (or
+    inverts) the grid (quali irrelevant).
+
+    Only defined post-qualifying, where ``grid`` is the real starting order — for prelim the
+    grid is *derived from* predicted pace, so the correlation would be circular. ``None`` for
+    prelim, or when fewer than three drivers have an expected finish."""
+    if getattr(wctx, "mode", None) != "postquali":
+        return None
+    pairs = [(wctx.grid[d], a["expected_finish"])
+             for d, a in driver_agg.items()
+             if a and a.get("expected_finish") is not None]
+    if len(pairs) < 3:
+        return None
+    grid = np.array([g for g, _ in pairs], dtype=float)
+    exp = np.array([e for _, e in pairs], dtype=float)
+    # Spearman rho = Pearson correlation of the rank vectors.
+    grid_rank = grid.argsort().argsort().astype(float)
+    exp_rank = exp.argsort().argsort().astype(float)
+    if grid_rank.std() == 0 or exp_rank.std() == 0:
+        return None
+    rho = float(np.corrcoef(grid_rank, exp_rank)[0, 1])
+    return int(round(100 * float(np.clip(rho, 0.0, 1.0))))
+
+
 def _deg_rank(profiles, circuit: str) -> dict | None:
     """Where this circuit's degradation severity ranks among all known circuits
     (rank 1 = highest deg)."""
@@ -152,4 +180,5 @@ def race_stats(wctx, driver_agg: dict, profiles, cfg: dict) -> dict:
         "most_likely_stops": int(max(stops, key=stops.get)),
         "chaos_index_0to100": chaos,
         "pole_to_win_prob": (_r(pole_agg["_p_win"], 4) if pole_agg else None),
+        "quali_importance": _quali_importance(wctx, driver_agg),
     }

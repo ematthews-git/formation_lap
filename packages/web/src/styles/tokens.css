@@ -63,6 +63,8 @@
 
   /* ---- Frosted glass (panels layered over the hero photo) ---- */
   --glass-bg: rgba(30, 29, 28, 0.3);
+  /* Hover lift for frosted tiles — a lighter frost, still translucent. */
+  --glass-bg-raised: rgba(74, 71, 66, 0.2);
   --glass-border: rgba(232, 229, 224, 0.14);
   --glass-blur: blur(28px) saturate(1.25);
 

@@ -1,5 +1,6 @@
 import type { Circuit, RaceWeekend } from '../../api/types'
 import { formatRaceDate, prettifyCircuit } from '../../lib/format'
+import { resolveHero } from '../../lib/hero'
 import { FALLBACK_TRACK_PATH } from '../../lib/trackPath'
 import { Countdown, LightsOut } from './Countdown'
 import styles from './Header.module.css'
@@ -12,8 +13,11 @@ interface HeaderProps {
 
 export function Header({ weekend, circuit, totalRounds }: HeaderProps) {
   const ghostPath = circuit?.track_outline ?? FALLBACK_TRACK_PATH
+  // Header text tone is hardcoded per hero photo (see lib/hero.ts): 'light'
+  // flips the black subheader text to white for dark/night photos.
+  const light = resolveHero(weekend.circuit_id)?.tone === 'light'
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header} ${light ? styles.light : ''}`}>
       <svg className={styles.ghostTrack} viewBox="0 0 400 248" width="460">
         <path d={ghostPath} fill="none" stroke="#fff" strokeWidth="2" />
       </svg>

@@ -1,3 +1,10 @@
+/* Flex column so the forecast (or empty state) fills the panel down to its
+   bottom edge — keeps the frosted hover reaching every tile's edge. */
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
 .fill {
   display: flex;
   flex: 1;
@@ -13,6 +20,11 @@
 .cell {
   padding: 14px 18px;
   border-bottom: 1px solid var(--border-soft);
+  transition: background-color 0.12s ease;
+}
+
+.cell:hover {
+  background: var(--glass-bg-raised);
 }
 
 .cellLeft {
@@ -43,7 +55,14 @@
 }
 
 .chart {
+  /* Grows to fill the panel's remaining height so its hover reaches the bottom. */
+  flex: 1;
   padding: 15px 18px 18px;
+  transition: background-color 0.12s ease;
+}
+
+.chart:hover {
+  background: var(--glass-bg-raised);
 }
 
 .chartLabel {

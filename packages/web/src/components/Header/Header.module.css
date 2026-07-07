@@ -62,7 +62,8 @@
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.18em;
-  /* Black rather than grey — legible against the bright hero photo. */
+  /* Dark by default (bright photos); flipped to light on dark photos via the
+     .light modifier, keyed per photo in lib/hero.ts. */
   color: #000;
 }
 
@@ -93,7 +94,8 @@
   font-family: var(--font-mono);
   font-size: 13px;
   letter-spacing: 0.04em;
-  /* Black rather than grey — legible against the bright hero photo. */
+  /* Dark by default (bright photos); flipped to light on dark photos via the
+     .light modifier, keyed per photo in lib/hero.ts. */
   color: #000;
   flex-wrap: wrap;
 }
@@ -104,4 +106,13 @@
 
 .metaSlash {
   color: #000;
+}
+
+/* Dark/night photos (tone: 'light' in lib/hero.ts): flip the black subheader
+   text to white. The red ROUND line and light title are unaffected. */
+.light .championship,
+.light .meta,
+.light .metaStrong,
+.light .metaSlash {
+  color: var(--text-bright);
 }

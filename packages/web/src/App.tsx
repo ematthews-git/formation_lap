@@ -123,7 +123,7 @@ export default function App() {
         />
 
         <main className={styles.main}>
-        <section className={styles.splitWide}>
+        <section className={`${styles.splitWide} ${styles.profileRow}`}>
           <CircuitProfile
             circuit={circuit.data}
             circuitLoading={circuit.isLoading}

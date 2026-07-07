@@ -3,6 +3,11 @@
   gap: 14px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--border-hair);
+  transition: background-color 0.12s ease;
+}
+
+.race:hover {
+  background: var(--panel-raised);
 }
 
 .race:last-child {

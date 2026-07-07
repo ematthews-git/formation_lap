@@ -28,6 +28,14 @@
   gap: var(--gap);
 }
 
+/* TRK_PROFILE + MET_FORECAST share a row. Pin it to the populated-forecast
+   height so the row (and both panels) stay put whether or not weather data has
+   landed; align-content stretches the single row to fill that min-height. */
+.profileRow {
+  min-height: 324px;
+  align-content: stretch;
+}
+
 .alignStart {
   align-items: start;
 }

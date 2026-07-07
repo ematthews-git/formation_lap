@@ -1,35 +1,17 @@
+import { resolveHero } from '../../lib/hero'
 import styles from './HeroBackdrop.module.css'
 
 /**
  * Hero photo shown bleeding from the top-left, behind the header and the
  * circuit/weather row. The frosted-glass panels blur it through backdrop-filter.
  *
- * The photo tracks the featured race weekend: each circuit maps to an image in
- * `packages/web/public/`, keyed by `circuit_id`.
- *
- * ── To add a photo for a circuit ──
- *   Drop `<name>.jpg` in `packages/web/public/` and add a
- *   `<circuit_id>: '/<name>.jpg'` entry to HERO_IMAGES below.
- *
- * ── Circuits without their own photo ──
- *   Fall back to HERO_FALLBACK. Set it to `null` to show no backdrop for them.
+ * The photo tracks the featured race weekend — see `lib/hero.ts` for the
+ * circuit_id → photo map (and per-photo header text tone).
  */
-const HERO_IMAGES: Record<string, string> = {
-  silverstone: '/silverstone.jpg',
-  spa: '/spa.jpg',
-  hungaroring: '/hungary.jpg',
-  monza: '/monza.jpg',
-  baku: '/baku.jpg',
-  singapore: '/singapore.jpg',
-  austin: '/austin.jpg',
-  abu_dhabi: '/abu-dhabi.jpg',
-}
-
-const HERO_FALLBACK: string | null = '/silverstone.jpg'
-
 export function HeroBackdrop({ circuitId }: { circuitId?: string }) {
-  const image = (circuitId && HERO_IMAGES[circuitId]) || HERO_FALLBACK
-  if (!image) return null
+  const hero = resolveHero(circuitId)
+  if (!hero) return null
+  const image = hero.src
 
   return (
     <div className={styles.backdrop} aria-hidden="true">

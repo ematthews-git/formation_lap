@@ -26,6 +26,11 @@
   padding-top: 11px;
   padding-bottom: 11px;
   border-bottom: 1px solid var(--border-hair);
+  transition: background-color 0.12s ease;
+}
+
+.row:hover {
+  background: var(--panel-raised);
 }
 
 .row:last-child {

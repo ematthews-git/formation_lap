@@ -79,16 +79,30 @@ export function StrategyEngine({
   // to last season's. With no previous-season rows, every gauge reads —.
   const usingFallback = !simStats && !!fallbackStats
   const engineLoading = simStatsLoading || (!simStats && fallbackStatsLoading)
-  const engineStats = (simStats ?? fallbackStats)?.stats?.race_stats as
+  const activeSim = simStats ?? fallbackStats
+  const engineStats = activeSim?.stats?.race_stats as
     | Record<string, number | null>
     | undefined
+  // Number of historical dry races behind the circuit profile, and the season
+  // window they were drawn from — surfaced in the header meta.
+  const nDryRaces = (
+    activeSim?.stats?.circuit_profile as Record<string, number | null> | undefined
+  )?.n_races_in_history
+  const training = (activeSim?.stats?.meta as Record<string, unknown> | undefined)
+    ?.training_window as { start_year?: number; end_year?: number } | undefined
+  const headerMeta =
+    nDryRaces != null
+      ? `${nDryRaces} DRY RACE${nDryRaces === 1 ? '' : 'S'} ON RECORD` +
+        (training?.start_year != null && training?.end_year != null
+          ? ` · ${training.start_year}-${training.end_year}`
+          : '')
+      : undefined
 
   const code = {
     hard: weekend.hard_compound,
     medium: weekend.medium_compound,
     soft: weekend.soft_compound,
   }
-  const allocation = `PIRELLI ${weekend.soft_compound}–${weekend.hard_compound}`
 
   return (
     <Panel strong>
@@ -96,7 +110,7 @@ export function StrategyEngine({
         accent
         label="STRATEGY_ENGINE"
         sub={prettifyCircuit(weekend.circuit_id).toUpperCase()}
-        meta={allocation}
+        meta={headerMeta}
       />
 
       <div className={styles.topRow}>
