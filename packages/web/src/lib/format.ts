@@ -17,6 +17,10 @@ export function teamColorVar(team: string): string {
   if (key.includes('mercedes')) return 'var(--team-mercedes)'
   if (key.includes('aston')) return 'var(--team-aston)'
   if (key.includes('williams')) return 'var(--team-williams)'
+  if (key.includes('cadillac')) return 'var(--team-cadillac)'
+  if (key.includes('alpine') || key.includes('renault')) return 'var(--team-alpine)'
+  if (key.includes('audi') || key.includes('sauber')) return 'var(--team-audi)'
+  // Haas intentionally falls through to --team-default (neutral grey).
   return 'var(--team-default)'
 }
 

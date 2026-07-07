@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,10 +17,13 @@ from formation_api.routers import (
 
 app = FastAPI(title="Formation Lap API", version="0.1.0")
 
-# Allow the local React dev server to call the API from the browser.
+# Browser origins allowed to call the API. Comma-separated ALLOWED_ORIGINS env
+# var in deployed environments (e.g. "https://app.example.com"); defaults to the
+# local Vite dev server so nothing changes for local development.
+_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[o.strip() for o in _origins.split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,0 +1,17 @@
+# Production API, run on the VM. The image is built and pushed to GHCR by
+# .github/workflows/deploy-api.yml; this file only runs it. Deploy/refresh with:
+#   docker compose -f docker-compose.prod.yml pull api
+#   docker compose -f docker-compose.prod.yml up -d api
+#
+# Caddy (installed natively on the VM) terminates TLS and reverse-proxies to the
+# published 127.0.0.1:8000 below.
+services:
+  api:
+    # Defaults to :latest; pin a git SHA to roll back, e.g.
+    #   API_TAG=<sha> docker compose -f docker-compose.prod.yml up -d
+    image: ghcr.io/ematthews-git/formation-api:${API_TAG:-latest}
+    container_name: formation_api
+    restart: unless-stopped
+    env_file: .env # DATABASE_URL, ALLOWED_ORIGINS
+    ports:
+      - "127.0.0.1:8000:8000" # localhost only — never exposed directly

@@ -68,19 +68,19 @@ _DRIVERS_2026 = [
     _driver("antonelli", "Kimi Antonelli", "Italian", "Mercedes"),
     # Red Bull Racing
     _driver("verstappen", "Max Verstappen", "Dutch", "Red Bull Racing"),
-    _driver("tsunoda", "Yuki Tsunoda", "Japanese", "Red Bull Racing"),  # VERIFY seat
+    _driver("hadjar", "Isack Hadjar", "French", "Red Bull Racing"),
     # Aston Martin
     _driver("alonso", "Fernando Alonso", "Spanish", "Aston Martin"),
     _driver("stroll", "Lance Stroll", "Canadian", "Aston Martin"),
     # Alpine
     _driver("gasly", "Pierre Gasly", "French", "Alpine"),
-    _driver("colapinto", "Franco Colapinto", "Argentine", "Alpine"),  # VERIFY seat
+    _driver("colapinto", "Franco Colapinto", "Argentine", "Alpine"),
     # Williams
     _driver("albon", "Alexander Albon", "Thai", "Williams"),
     _driver("sainz", "Carlos Sainz", "Spanish", "Williams"),
     # Racing Bulls
-    _driver("hadjar", "Isack Hadjar", "French", "Racing Bulls"),  # VERIFY pairing
-    _driver("lawson", "Liam Lawson", "New Zealander", "Racing Bulls"),  # VERIFY pairing
+    _driver("lindblad", "Arvid Lindblad", "British", "Racing Bulls"),
+    _driver("lawson", "Liam Lawson", "New Zealander", "Racing Bulls"),
     # Haas
     _driver("ocon", "Esteban Ocon", "French", "Haas"),
     _driver("bearman", "Oliver Bearman", "British", "Haas"),
