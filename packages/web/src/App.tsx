@@ -25,8 +25,7 @@ import { TopBar } from './components/TopBar/TopBar'
 import { Header } from './components/Header/Header'
 import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
-import { EngineDerivedParameters } from './components/EngineDerivedParameters/EngineDerivedParameters'
-import { TyreStrategy } from './components/TyreStrategy/TyreStrategy'
+import { StrategyEngine } from './components/StrategyEngine/StrategyEngine'
 import { DriverForm } from './components/DriverForm/DriverForm'
 import { ConstructorStandings } from './components/ConstructorStandings/ConstructorStandings'
 import { PastResults } from './components/PastResults/PastResults'
@@ -134,15 +133,7 @@ export default function App() {
           <WeatherStrip weather={weather.data} weatherLoading={weather.isLoading} />
         </section>
 
-        <EngineDerivedParameters
-          weekend={featured}
-          simStats={simStats.data}
-          simStatsLoading={simStats.isLoading}
-          fallbackStats={simStatsLastSeason.data}
-          fallbackStatsLoading={simStatsLastSeason.isLoading}
-        />
-
-        <TyreStrategy
+        <StrategyEngine
           weekend={featured}
           stats={stats.data}
           statsLoading={stats.isLoading}
@@ -152,6 +143,8 @@ export default function App() {
           simStrategiesLoading={simStrategies.isLoading}
           simStats={simStats.data}
           simStatsLoading={simStats.isLoading}
+          fallbackStats={simStatsLastSeason.data}
+          fallbackStatsLoading={simStatsLastSeason.isLoading}
         />
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>

@@ -162,6 +162,100 @@
   background: var(--gold);
 }
 
+/* ---- engine-derived parameters ---- */
+.engineParams {
+  padding: 16px 20px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.engineHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.engineHeaderLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--text-fainter);
+}
+
+.engineNote {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-fainter);
+}
+
+.engineGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border-soft);
+  border: 1px solid var(--border-soft);
+}
+
+.gauge {
+  background: var(--panel-raised);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gaugeLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  color: var(--text-fainter);
+}
+
+.gaugeValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.gaugeValue {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 42px;
+  line-height: 0.82;
+  color: var(--text-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.gaugeValueEmpty {
+  color: var(--text-ghost);
+}
+
+.gaugeScale {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-faint);
+}
+
+.gaugeBar {
+  height: 4px;
+  width: 100%;
+  background: var(--border-hair);
+}
+
+.gaugeBarFill {
+  height: 4px;
+  /* colour is set inline — a green→red scale keyed off the value */
+}
+
+@media (max-width: 720px) {
+  .engineGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* ---- source toggle ---- */
 .sourceRow {
   display: flex;

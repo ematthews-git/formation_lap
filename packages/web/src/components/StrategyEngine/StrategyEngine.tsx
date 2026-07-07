@@ -10,7 +10,7 @@ import { PanelHeader } from '../common/PanelHeader'
 import { EmptyState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
 import { StintTimeline } from './StintTimeline'
-import styles from './TyreStrategy.module.css'
+import styles from './StrategyEngine.module.css'
 
 interface Props {
   weekend: RaceWeekend
@@ -22,6 +22,9 @@ interface Props {
   simStrategiesLoading: boolean
   simStats: SimRaceStats | null | undefined
   simStatsLoading: boolean
+  /** Last season's sim stats — the fallback for the engine parameters. */
+  fallbackStats: SimRaceStats | null | undefined
+  fallbackStatsLoading: boolean
 }
 
 const COMPOUNDS = [
@@ -30,9 +33,18 @@ const COMPOUNDS = [
   { key: 'soft', name: 'Soft', desc: 'PEAK GRIP', color: 'var(--soft)' },
 ] as const
 
+// The four engine-derived parameters, each a 0–100 rating. `key` reads the value
+// out of the sim's race_stats blob; params with no engine field yet stay blank (—).
+const ENGINE_PARAMS = [
+  { label: 'CHAOS RATING', key: 'chaos_index_0to100' },
+  { label: 'OVERTAKING DIFFICULTY', key: 'overtaking_difficulty_0to100' },
+  { label: 'QUALIFYING IMPORTANCE', key: null },
+  { label: 'TYRE DEGRADATION', key: null },
+] as const
+
 type Source = 'sim' | 'historical'
 
-export function TyreStrategy({
+export function StrategyEngine({
   weekend,
   stats,
   statsLoading,
@@ -42,6 +54,8 @@ export function TyreStrategy({
   simStrategiesLoading,
   simStats,
   simStatsLoading,
+  fallbackStats,
+  fallbackStatsLoading,
 }: Props) {
   const [source, setSource] = useState<Source>('sim')
   const showSim = source === 'sim'
@@ -54,12 +68,20 @@ export function TyreStrategy({
     ? simStrategiesLoading
     : historicalStrategiesLoading
   const phase = simStrategies?.[0]?.phase ?? simStats?.phase ?? null
-  // Undercut + pit loss now come from the sim's race-context numbers, not circuit stats.
+  // Undercut + pit loss come from this season's sim race-context numbers.
   const raceStats = simStats?.stats?.race_stats as
     | Record<string, number | null>
     | undefined
   const undercut = raceStats?.undercut_s_per_lap
   const pitLoss = raceStats?.pit_loss_s
+
+  // Engine parameters prefer this season's sim; if it hasn't run yet, fall back
+  // to last season's. With no previous-season rows, every gauge reads —.
+  const usingFallback = !simStats && !!fallbackStats
+  const engineLoading = simStatsLoading || (!simStats && fallbackStatsLoading)
+  const engineStats = (simStats ?? fallbackStats)?.stats?.race_stats as
+    | Record<string, number | null>
+    | undefined
 
   const code = {
     hard: weekend.hard_compound,
@@ -72,7 +94,7 @@ export function TyreStrategy({
     <Panel strong>
       <PanelHeader
         accent
-        label="TYRE_STRATEGY"
+        label="STRATEGY_ENGINE"
         sub={prettifyCircuit(weekend.circuit_id).toUpperCase()}
         meta={allocation}
       />
@@ -108,7 +130,7 @@ export function TyreStrategy({
                   {undercut != null ? undercut.toFixed(2) : '—'}
                 </span>
                 <span className={styles.bigUnit}>s/lap</span>
-                <span className={styles.bigCaption}>FRESH-TYRE GAIN</span>
+                <span className={styles.bigCaption}>UNDERCUT GAIN</span>
               </div>
               <div className={styles.miniStats}>
                 <Mini
@@ -141,6 +163,29 @@ export function TyreStrategy({
             <EmptyState hint="circuit-stats recompute job not yet run" />
           )}
         </div>
+      </div>
+
+      {/* engine-derived parameters — 0–100 ratings from the sim */}
+      <div className={styles.engineParams}>
+        <div className={styles.engineHeader}>
+          <span className={styles.engineHeaderLabel}>ENGINE-DERIVED PARAMETERS</span>
+          {usingFallback && (
+            <span className={styles.engineNote}>LAST SEASON · {weekend.season - 1}</span>
+          )}
+        </div>
+        {engineLoading ? (
+          <LoadingState label="LOADING PARAMETERS" />
+        ) : (
+          <div className={styles.engineGrid}>
+            {ENGINE_PARAMS.map((p) => (
+              <Gauge
+                key={p.label}
+                label={p.label}
+                value={p.key && engineStats ? (engineStats[p.key] ?? null) : null}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* source toggle: simulated projection (default) vs historical mining */}
@@ -198,4 +243,32 @@ function Mini({ label, value }: { label: string; value: string }) {
       <div className={styles.miniValue}>{value}</div>
     </div>
   )
+}
+
+function Gauge({ label, value }: { label: string; value: number | null }) {
+  const has = value != null
+  const pct = has ? Math.max(0, Math.min(100, value)) : 0
+  return (
+    <div className={styles.gauge}>
+      <div className={styles.gaugeLabel}>{label}</div>
+      <div className={styles.gaugeValueRow}>
+        <span className={`${styles.gaugeValue} ${has ? '' : styles.gaugeValueEmpty}`}>
+          {has ? Math.round(value) : '—'}
+        </span>
+        {has && <span className={styles.gaugeScale}>/100</span>}
+      </div>
+      <div className={styles.gaugeBar}>
+        <div
+          className={styles.gaugeBarFill}
+          style={{ width: `${pct}%`, background: scaleColor(pct) }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** Traffic-light scale for a 0–100 rating: green (low) → amber → red (high). */
+function scaleColor(value: number): string {
+  const hue = 120 * (1 - Math.max(0, Math.min(100, value)) / 100)
+  return `hsl(${Math.round(hue)}, 50%, 48%)`
 }
