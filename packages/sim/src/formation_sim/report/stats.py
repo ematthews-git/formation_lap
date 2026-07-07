@@ -45,13 +45,25 @@ def _tyre_management(driver: str, lap_model, circuit: str) -> float:
 
 
 def aggregate_driver(driver: str, sel, grid: int, dnf_model, lap_model,
-                     circuit: str) -> dict | None:
+                     circuit: str, n_pos: int) -> dict | None:
     """Plausibility-weighted driver-level summary over the shown strategies. ``None`` when
     the driver has no candidates. Keys prefixed ``_`` are internal (not serialised)."""
     if not sel:
         return None
     w = _weights(sel)
     outs = [s.outcome for s in sel]
+
+    # Plausibility-weighted finishing-position distribution, CONDITIONAL on finishing
+    # (retirements excluded), renormalised to a proper pmf. Feeds the pairwise-concordance
+    # quali-importance index, so reliability/DNF variance isn't read as quali (un)importance —
+    # only on-track order changes among cars that finish are.
+    finish_dist = np.zeros(n_pos)
+    for wi, o in zip(w, outs):
+        d = o.distribution(n_pos, classified=True)
+        finish_dist += wi * np.array([d[p] for p in range(1, n_pos + 1)])
+    total = finish_dist.sum()
+    if total > 0:
+        finish_dist /= total
 
     p_win = float(sum(wi * o.p_win for wi, o in zip(w, outs)))
     p_podium = float(sum(wi * o.p_podium for wi, o in zip(w, outs)))
@@ -77,6 +89,7 @@ def aggregate_driver(driver: str, sel, grid: int, dnf_model, lap_model,
         "tyre_management_vs_field": _r(_tyre_management(driver, lap_model, circuit), 3),
         "_finish_std": finish_std,
         "_p_win": p_win,
+        "_finish_dist": finish_dist,
     }
 
 
@@ -105,31 +118,45 @@ def _undercut_power(lap_model, prior, circuit: str, n_laps: int, min_stint: int)
 
 
 def _quali_importance(wctx, driver_agg: dict) -> int | None:
-    """0-100 index of how strongly qualifying position drives the finishing order: the
-    Spearman rank correlation between the grid order and the simulated finish order (drivers
-    ranked by expected finish), clamped to [0, 1] and scaled to 0-100. 100 = finish order
-    reproduces the grid exactly (quali decisive); 0 = finish order is unrelated to (or
-    inverts) the grid (quali irrelevant).
+    """0-100 index of how strongly qualifying position drives the finishing order — a
+    distribution-aware (soft Kendall's tau) rank agreement between the grid and the
+    simulated finishing order.
+
+    For every grid-ordered pair (i started ahead of j) we take the probability the grid
+    order is *kept* minus the probability it is *flipped*, using each driver's simulated
+    finishing distribution *given they finish* (retirements excluded, so reliability doesn't
+    masquerade as quali importance): ``P(fin_i < fin_j) - P(fin_i > fin_j)``. Averaging over
+    all pairs and clamping to [0, 1] gives the index. 100 = the better-qualifier reliably
+    finishes ahead (quali decisive); 0 = a coin-flip or worse (quali irrelevant). Unlike a
+    point estimate over expected finishes, this reads the *spread*: a race where finishing
+    distributions overlap heavily (lots of on-track shuffling) drives every pair toward 0.5
+    and the index down.
 
     Only defined post-qualifying, where ``grid`` is the real starting order — for prelim the
-    grid is *derived from* predicted pace, so the correlation would be circular. ``None`` for
-    prelim, or when fewer than three drivers have an expected finish."""
+    grid is *derived from* predicted pace, so the agreement would be circular. ``None`` for
+    prelim, or when fewer than three drivers have a finish distribution."""
     if getattr(wctx, "mode", None) != "postquali":
         return None
-    pairs = [(wctx.grid[d], a["expected_finish"])
-             for d, a in driver_agg.items()
-             if a and a.get("expected_finish") is not None]
-    if len(pairs) < 3:
+    entries = [(wctx.grid[d], a["_finish_dist"])
+               for d, a in driver_agg.items()
+               if a and a.get("_finish_dist") is not None]
+    if len(entries) < 3:
         return None
-    grid = np.array([g for g, _ in pairs], dtype=float)
-    exp = np.array([e for _, e in pairs], dtype=float)
-    # Spearman rho = Pearson correlation of the rank vectors.
-    grid_rank = grid.argsort().argsort().astype(float)
-    exp_rank = exp.argsort().argsort().astype(float)
-    if grid_rank.std() == 0 or exp_rank.std() == 0:
+    entries.sort(key=lambda t: t[0])            # ascending grid: index 0 = pole
+    pmfs = [p for _, p in entries]
+    cdfs = [np.cumsum(p) for p in pmfs]         # cdf[a] = P(finish <= position a)
+    tau_sum, n_pairs = 0.0, 0
+    for i in range(len(pmfs)):
+        pi = pmfs[i]
+        for j in range(i + 1, len(pmfs)):       # i qualified ahead of j
+            cj = cdfs[j]
+            p_kept = float(np.sum(pi * (1.0 - cj)))                 # i finishes ahead of j
+            p_flip = float(np.sum(pi * np.concatenate(([0.0], cj[:-1]))))  # j ahead of i
+            tau_sum += p_kept - p_flip           # ties contribute 0
+            n_pairs += 1
+    if n_pairs == 0:
         return None
-    rho = float(np.corrcoef(grid_rank, exp_rank)[0, 1])
-    return int(round(100 * float(np.clip(rho, 0.0, 1.0))))
+    return int(round(100 * float(np.clip(tau_sum / n_pairs, 0.0, 1.0))))
 
 
 def _deg_rank(profiles, circuit: str) -> dict | None:

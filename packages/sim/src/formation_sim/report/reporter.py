@@ -59,7 +59,7 @@ def build_report(wctx: WeekendContext, per_driver: dict[str, list[SelectedStrate
     # Derived fan-facing stats — a pure read over the already-computed outcomes / params
     # (see report/stats.py); does not affect any prediction.
     driver_agg = {d: aggregate_driver(d, per_driver.get(d, []), wctx.grid[d],
-                                      wctx.params.dnf, wctx.params.lap, wctx.circuit)
+                                      wctx.params.dnf, wctx.params.lap, wctx.circuit, n_pos)
                   for d in wctx.drivers()}
 
     drivers = {}

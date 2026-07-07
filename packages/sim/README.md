@@ -96,7 +96,9 @@ never re-simulate, re-select or re-fit, so they cannot change any prediction):
   (severity + rank among all circuits), `safety_car_prob` / `vsc_prob` / `expected_sc_vsc_laps`,
   `overtaking_difficulty_0to100`, `expected_on_track_passes`, `stop_count_distribution` +
   `most_likely_stops`, `chaos_index_0to100` (field-wide finish-spread), `pole_to_win_prob`,
-  `quali_importance` (0-100 grid↔finish rank correlation; postquali only, `null` for prelim).
+  `quali_importance` (0-100 distribution-aware grid↔finish rank agreement — soft Kendall's
+  tau over the simulated finishing distributions *given cars finish*, so on-track shuffling —
+  not retirements — lowers it; postquali only, `null` for prelim).
 - **Per driver** — plausibility-weighted `p_win` / `p_podium` / `p_points`, `expected_finish`,
   `projected_finish` and `grid_to_finish_delta` (the grid "mover"), `dnf_prob` (reliability), and
   `tyre_management_vs_field` (+ = kinder on tyres than the field).

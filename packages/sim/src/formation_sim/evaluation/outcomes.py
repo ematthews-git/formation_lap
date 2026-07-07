@@ -55,7 +55,15 @@ class Outcome:
     def finish_ci(self, lo=5, hi=95) -> tuple[float, float]:
         return float(np.percentile(self.finishes, lo)), float(np.percentile(self.finishes, hi))
 
-    def distribution(self, n_positions: int) -> dict[int, float]:
-        vals, counts = np.unique(self.finishes.astype(int), return_counts=True)
-        d = {int(v): float(c) / len(self.finishes) for v, c in zip(vals, counts)}
+    def distribution(self, n_positions: int, classified: bool = False) -> dict[int, float]:
+        """Finishing-position distribution over 1..n_positions. With ``classified=True``,
+        retirement sims are dropped and the mass is renormalised over the sims that
+        finished (i.e. the distribution *given the driver finished*)."""
+        fin = self.finishes
+        if classified:
+            fin = fin[~np.isnan(self.race_times)]
+        if not len(fin):
+            return {p: 0.0 for p in range(1, n_positions + 1)}
+        vals, counts = np.unique(fin.astype(int), return_counts=True)
+        d = {int(v): float(c) / len(fin) for v, c in zip(vals, counts)}
         return {p: d.get(p, 0.0) for p in range(1, n_positions + 1)}
