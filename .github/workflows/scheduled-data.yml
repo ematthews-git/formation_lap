@@ -3,9 +3,9 @@ name: Scheduled data jobs
 # Free fallback path for the scheduler. Mirrors the AWS EventBridge cron table from the plan.
 # Each job calls the same `formation-data` CLI that the production ECS task runs.
 #
-# GATED: the job below runs on `workflow_dispatch` only, so the schedules are wired but do
-# NOT fire against a live database yet. Once a prod DB + `DATABASE_URL` repo secret exist,
-# remove the `if:` guard on the `run` job to turn the schedules on.
+# LIVE: the schedules below fire against the hosted Supabase database via the `DATABASE_URL`
+# repo secret. Every job calls the same idempotent `formation-data` CLI, so re-runs outside
+# their window are cheap no-ops. To pause the schedules, re-add `if: false` to the `run` job.
 
 on:
   schedule:
@@ -31,7 +31,6 @@ on:
 
 jobs:
   run:
-    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
