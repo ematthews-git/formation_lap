@@ -1,6 +1,5 @@
 import type { Standing } from '../../api/types'
-import { Panel } from '../common/Panel'
-import { PanelHeader } from '../common/PanelHeader'
+import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { constructorKey, teamColorVar } from '../../lib/format'
 import styles from './ConstructorStandings.module.css'
@@ -39,13 +38,10 @@ export function ConstructorStandings({
   }
 
   return (
-    <Panel>
-      <PanelHeader
-        label="CONSTRUCTORS"
-        meta={
-          afterRound != null ? `CHAMPIONSHIP · AFTER R${afterRound}` : 'GRID'
-        }
-      />
+    <CollapsiblePanel
+      label="CONSTRUCTORS"
+      meta={afterRound != null ? `CHAMPIONSHIP · AFTER R${afterRound}` : 'GRID'}
+    >
       <div className={styles.headRow}>
         <span>#</span>
         <span>TEAM</span>
@@ -80,6 +76,6 @@ export function ConstructorStandings({
       ) : (
         <EmptyState label="NO STANDINGS" />
       )}
-    </Panel>
+    </CollapsiblePanel>
   )
 }

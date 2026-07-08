@@ -1,6 +1,5 @@
 import type { Driver, RaceResult, Standing } from '../../api/types'
-import { Panel } from '../common/Panel'
-import { PanelHeader } from '../common/PanelHeader'
+import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { teamColorVar } from '../../lib/format'
 import { Sparkline } from './Sparkline'
@@ -83,12 +82,11 @@ export function DriverForm({
   const afterRound = standings?.find((s) => s.type === 'driver')?.after_round
 
   return (
-    <Panel>
-      <PanelHeader
-        label="DRIVER_FORM"
-        sub="TOP_10"
-        meta={afterRound != null ? `CHAMPIONSHIP · AFTER R${afterRound}` : 'GRID'}
-      />
+    <CollapsiblePanel
+      label="DRIVER_FORM"
+      sub="TOP_10"
+      meta={afterRound != null ? `CHAMPIONSHIP · AFTER R${afterRound}` : 'GRID'}
+    >
       <div className={styles.headRow}>
         <span>#</span>
         <span>DRIVER</span>
@@ -125,6 +123,6 @@ export function DriverForm({
       ) : (
         <EmptyState label="NO DRIVERS" />
       )}
-    </Panel>
+    </CollapsiblePanel>
   )
 }

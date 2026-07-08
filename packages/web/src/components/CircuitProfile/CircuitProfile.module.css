@@ -86,3 +86,12 @@
   font-size: 11px;
   color: var(--text-faint);
 }
+
+@media (max-width: 750px) {
+  /* Driver sits under the time rather than squeezed to its right. */
+  .lapRecordValue {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

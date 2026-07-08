@@ -33,9 +33,10 @@ export function Header({ weekend, circuit, totalRounds }: HeaderProps) {
           {weekend.is_sprint && <span className={styles.sprint}>SPRINT</span>}
         </div>
 
-        {/* title + countdown share a baseline */}
-        <div className={styles.titleLine}>
-          <h1 className={styles.title}>{weekend.event_name}</h1>
+        {/* title + countdown: share a baseline on desktop (grid areas), but the
+            countdown reflows to just under the round line on mobile. */}
+        <h1 className={styles.title}>{weekend.event_name}</h1>
+        <div className={styles.clockSlot}>
           <Countdown raceDate={weekend.race_date} />
         </div>
 

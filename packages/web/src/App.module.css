@@ -64,4 +64,26 @@
   .splitWide {
     grid-template-columns: 1fr;
   }
+
+  /* Once the profile row stacks, the desktop min-height just adds dead space. */
+  .profileRow {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 750px) {
+  .page {
+    padding-bottom: 32px;
+  }
+
+  /* Panels run near-edge-to-edge on phones — a few px of breathing room, and a
+     tighter gap between stacked cards. */
+  .main {
+    --gap: 12px;
+    padding: 14px 10px 0;
+  }
+
+  .footer {
+    font-size: 9px;
+  }
 }

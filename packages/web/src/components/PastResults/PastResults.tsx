@@ -1,6 +1,5 @@
 import type { RaceResult } from '../../api/types'
-import { Panel } from '../common/Panel'
-import { PanelHeader } from '../common/PanelHeader'
+import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, LoadingState } from '../common/Status'
 import { prettifyCircuit, teamColorVar } from '../../lib/format'
 import styles from './PastResults.module.css'
@@ -39,12 +38,11 @@ export function PastResults({ circuitId, podiums, loading }: Props) {
   const races = podiums ? groupRaces(podiums) : []
 
   return (
-    <Panel>
-      <PanelHeader
-        label="PAST_RESULTS"
-        sub={prettifyCircuit(circuitId).toUpperCase()}
-        meta={races.length > 0 ? `LAST ${races.length}` : undefined}
-      />
+    <CollapsiblePanel
+      label="PAST_RESULTS"
+      sub={prettifyCircuit(circuitId).toUpperCase()}
+      meta={races.length > 0 ? `LAST ${races.length}` : undefined}
+    >
       {loading && !podiums ? (
         <LoadingState label="LOADING RESULTS" />
       ) : races.length > 0 ? (
@@ -83,6 +81,6 @@ export function PastResults({ circuitId, podiums, loading }: Props) {
           hint="new venue or no race history at this circuit"
         />
       )}
-    </Panel>
+    </CollapsiblePanel>
   )
 }

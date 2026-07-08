@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '../../api/types'
-import { Panel } from '../common/Panel'
-import { PanelHeader } from '../common/PanelHeader'
+import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
 import { circuitTimezone, formatClock, formatDayDate } from '../../lib/circuitTime'
@@ -50,12 +49,11 @@ export function WeekendSchedule({ circuitId, sessions, loading }: Props) {
   }, [])
 
   return (
-    <Panel>
-      <PanelHeader
-        label="WEEKEND_SCHEDULE"
-        sub={circuitId ? prettifyCircuit(circuitId).toUpperCase() : undefined}
-        meta="CIRCUIT / LOCAL"
-      />
+    <CollapsiblePanel
+      label="WEEKEND_SCHEDULE"
+      sub={circuitId ? prettifyCircuit(circuitId).toUpperCase() : undefined}
+      meta="CIRCUIT / LOCAL"
+    >
       <div className={styles.headRow}>
         <span>SESSION</span>
         <span>DATE</span>
@@ -102,6 +100,6 @@ export function WeekendSchedule({ circuitId, sessions, loading }: Props) {
       ) : (
         <EmptyState label="NO SCHEDULE" />
       )}
-    </Panel>
+    </CollapsiblePanel>
   )
 }

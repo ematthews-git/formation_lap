@@ -304,3 +304,37 @@
   padding: 18px 20px 22px;
   border-top: 1px solid var(--border);
 }
+
+@media (max-width: 750px) {
+  /* The three-up top row is what runs off the right edge on a phone — stack it,
+     and swap the column dividers for row dividers. min-width:0 lets the big
+     figures shrink instead of forcing the panel wider than the screen. */
+  .topRow {
+    grid-template-columns: 1fr;
+  }
+
+  .compounds,
+  .undercut,
+  .safetyCar {
+    min-width: 0;
+  }
+
+  .compounds,
+  .undercut {
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .bigValueRow {
+    flex-wrap: wrap;
+  }
+
+  .bigValue,
+  .scValue {
+    font-size: 52px;
+  }
+
+  .sourceRow {
+    flex-wrap: wrap;
+  }
+}

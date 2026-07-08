@@ -133,3 +133,13 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+@media (max-width: 750px) {
+  /* Keep the four columns readable and let the panel scroll horizontally
+     (CollapsiblePanel wraps the body in a scroll container) instead of
+     crushing the session column to nothing. */
+  .headRow,
+  .row {
+    min-width: 540px;
+  }
+}

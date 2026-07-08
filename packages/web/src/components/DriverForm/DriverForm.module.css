@@ -96,3 +96,21 @@
   color: var(--text-num);
   font-variant-numeric: tabular-nums;
 }
+
+@media (max-width: 750px) {
+  /* Six columns can't fit a phone — keep them at a readable width and let the
+     panel scroll horizontally (CollapsiblePanel wraps the body in a scroll
+     container). */
+  .headRow,
+  .row {
+    min-width: 560px;
+  }
+
+  /* Safety net: truncate a long name rather than letting it spill into TEAM. */
+  .name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

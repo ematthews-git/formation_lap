@@ -21,6 +21,12 @@
   color: var(--accent-hot);
 }
 
+@media (max-width: 750px) {
+  .clock {
+    font-size: clamp(38px, 11vw, 56px);
+  }
+}
+
 .times {
   display: flex;
   flex-direction: column;

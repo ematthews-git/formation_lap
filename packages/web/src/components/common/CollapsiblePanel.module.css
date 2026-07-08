@@ -1,0 +1,43 @@
+/*
+ * The collapse animation: a grid whose single row track interpolates between
+ * 0fr (closed) and 1fr (open). Unlike a max-height hack this eases smoothly to
+ * the content's real height with no measuring and no magic numbers. Only ever
+ * rendered on mobile (the component swaps to a plain Panel above 600px).
+ */
+.region {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.open {
+  grid-template-rows: 1fr;
+}
+
+/* The grid child must be able to shrink below its content and clip during the
+   slide. It also carries a gentle opacity fade so content doesn't hard-cut in. */
+.regionInner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.open .regionInner {
+  opacity: 1;
+}
+
+/* Wide tables scroll horizontally within the panel rather than overflowing the
+   page; overscroll-contain keeps that scroll from triggering browser back-swipe. */
+.scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .region,
+  .regionInner {
+    transition: none;
+  }
+}

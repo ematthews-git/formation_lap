@@ -23,17 +23,26 @@
   max-width: var(--maxw);
   margin: 0 auto;
   padding: 26px 32px 24px;
+  /* Grid so the title + countdown share a baseline (same row) while the round
+     line and meta line span full width. Row spacing stays on the child margins
+     below; the mobile block re-orders these areas. */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'round round'
+    'title clock'
+    'meta  meta';
+  align-items: baseline;
+  column-gap: 40px;
 }
 
-.titleLine {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 40px;
-  flex-wrap: wrap;
+.clockSlot {
+  grid-area: clock;
+  justify-self: end;
 }
 
 .metaLine {
+  grid-area: meta;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -43,6 +52,7 @@
 }
 
 .roundLine {
+  grid-area: round;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -78,6 +88,7 @@
 }
 
 .title {
+  grid-area: title;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: clamp(48px, 7vw, 92px);
@@ -115,4 +126,32 @@
 .light .metaStrong,
 .light .metaSlash {
   color: var(--text-bright);
+}
+
+@media (max-width: 750px) {
+  /* Single column, and the countdown moves to just under the round line rather
+     than sitting on the title's baseline. */
+  .inner {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'round'
+      'clock'
+      'title'
+      'meta';
+    column-gap: 0;
+    padding: 18px 12px 18px;
+  }
+
+  .clockSlot {
+    justify-self: start;
+    margin: 6px 0 2px;
+  }
+
+  .title {
+    font-size: clamp(40px, 12vw, 60px);
+  }
+
+  .metaLine {
+    margin-top: 12px;
+  }
 }

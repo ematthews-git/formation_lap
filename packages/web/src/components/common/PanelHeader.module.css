@@ -13,6 +13,42 @@
   border-bottom-color: var(--border);
 }
 
+/* Collapsible variant: the whole header is a tappable toggle. Reset the native
+   button chrome but keep the header's own layout, background, and hairline. */
+.headerButton {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border-header);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.rightGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--text-faint);
+  transition: transform 0.28s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
 .left {
   display: flex;
   align-items: center;

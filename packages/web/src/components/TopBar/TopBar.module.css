@@ -122,3 +122,33 @@
   gap: 8px;
   color: var(--text-muted);
 }
+
+@media (max-width: 750px) {
+  .inner {
+    padding: 10px 12px;
+  }
+
+  /* Brand wraps: dot + name on line 1, the tag drops to its own line beneath,
+     and the lookahead selectors get a full row of their own below that. */
+  .brand {
+    flex-wrap: wrap;
+    column-gap: 11px;
+    row-gap: 7px;
+  }
+
+  .brandTag,
+  .lookahead {
+    flex-basis: 100%;
+    padding-left: 0;
+    border-left: none;
+  }
+
+  .lookahead {
+    gap: 9px 16px;
+  }
+
+  /* No room for the live/weather feeds on a phone — drop them entirely. */
+  .statusRight {
+    display: none;
+  }
+}
