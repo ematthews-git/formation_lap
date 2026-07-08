@@ -17,13 +17,19 @@ from formation_api.routers import (
 
 app = FastAPI(title="Formation Lap API", version="0.1.0")
 
-# Browser origins allowed to call the API. Comma-separated ALLOWED_ORIGINS env
-# var in deployed environments (e.g. "https://app.example.com"); defaults to the
-# local Vite dev server so nothing changes for local development.
+# Browser origins allowed to call the API.
+#   ALLOWED_ORIGINS       — comma-separated exact-match list (e.g.
+#                           "https://formationlap.dev,https://www.formationlap.dev").
+#                           Defaults to the local Vite dev server, so local dev is
+#                           unchanged.
+#   ALLOWED_ORIGIN_REGEX  — optional regex for dynamic origins; set it to
+#                           "https://.*\.vercel\.app" so Vercel preview deploys
+#                           (unique per-deploy URLs) can call the API too.
 _origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _origins.split(",") if o.strip()],
+    allow_origin_regex=os.environ.get("ALLOWED_ORIGIN_REGEX") or None,
     allow_methods=["*"],
     allow_headers=["*"],
 )
