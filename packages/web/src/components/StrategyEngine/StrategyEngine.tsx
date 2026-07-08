@@ -33,14 +33,31 @@ const COMPOUNDS = [
   { key: 'soft', name: 'Soft', desc: 'PEAK GRIP', color: 'var(--soft)' },
 ] as const
 
-// The four engine-derived parameters, each a 0–100 rating. `key` reads the value
-// out of the sim's race_stats blob; params with no engine field yet stay blank (—).
-const ENGINE_PARAMS = [
-  { label: 'CHAOS RATING', key: 'chaos_index_0to100' },
-  { label: 'OVERTAKING DIFFICULTY', key: 'overtaking_difficulty_0to100' },
-  { label: 'QUALIFYING IMPORTANCE', key: null },
-  { label: 'TYRE DEGRADATION', key: null },
-] as const
+const asNum = (v: unknown): number | null => (typeof v === 'number' ? v : null)
+
+// The four engine-derived parameters. `get` reads the value out of the sim's
+// race_stats blob; params with no engine field yet stay blank (—).
+const ENGINE_PARAMS: {
+  label: string
+  get: (s: Record<string, unknown>) => number | null
+}[] = [
+  { label: 'CHAOS RATING', get: (s) => asNum(s.chaos_index_0to100) },
+  { label: 'OVERTAKING DIFFICULTY', get: (s) => asNum(s.overtaking_difficulty_0to100) },
+  { label: 'QUALIFYING IMPORTANCE', get: () => null },
+  {
+    // Percentile of this circuit's deg severity among all known circuits, where
+    // rank 1 = highest deg → 100. Raw severity is a tiny s/lap slope, so we map it
+    // onto the 0–100 gauge via the sim's precomputed rank/of.
+    label: 'TYRE DEGRADATION',
+    get: (s) => {
+      const deg = s.degradation as Record<string, unknown> | undefined
+      const rank = asNum(deg?.rank)
+      const of = asNum(deg?.of)
+      if (rank == null || of == null || of <= 0) return null
+      return (100 * (of - rank + 1)) / of
+    },
+  },
+]
 
 type Source = 'sim' | 'historical'
 
@@ -81,7 +98,7 @@ export function StrategyEngine({
   const engineLoading = simStatsLoading || (!simStats && fallbackStatsLoading)
   const activeSim = simStats ?? fallbackStats
   const engineStats = activeSim?.stats?.race_stats as
-    | Record<string, number | null>
+    | Record<string, unknown>
     | undefined
   // Number of historical dry races behind the circuit profile, and the season
   // window they were drawn from — surfaced in the header meta.
@@ -195,7 +212,7 @@ export function StrategyEngine({
               <Gauge
                 key={p.label}
                 label={p.label}
-                value={p.key && engineStats ? (engineStats[p.key] ?? null) : null}
+                value={engineStats ? p.get(engineStats) : null}
               />
             ))}
           </div>

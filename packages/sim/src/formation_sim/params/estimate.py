@@ -27,6 +27,11 @@ class ParameterSet:
 
 
 def _cache_path(cfg: dict) -> Path:
+    # Prefer the dated, committed artifact from settings; fall back to the legacy
+    # unversioned name so older configs / ad-hoc rebuilds keep working.
+    configured = cfg["data"].get("paramset_path")
+    if configured:
+        return resolve_path(configured)
     return resolve_path(cfg["data"]["derived_dir"]) / "paramset.pkl"
 
 

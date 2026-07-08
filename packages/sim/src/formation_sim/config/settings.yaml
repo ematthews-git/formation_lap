@@ -4,6 +4,9 @@
 data:
   cache_dir: formation_sim/data/cache/fastf1   # FastF1 raw session cache
   derived_dir: formation_sim/data/derived      # cleaned parquet / derived tables
+  # Committed, dated fitted-parameter artifact (the only derived file tracked in git).
+  # Bump the date on each pre-season rebuild so the sim loads a season-appropriate fit.
+  paramset_path: formation_sim/data/derived/paramset08072026.pkl
   manifest_path: formation_sim/data/manifest.json
   circuit_profiles_path: formation_sim/data/circuit_profiles.json
 

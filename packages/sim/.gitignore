@@ -6,4 +6,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-src/formation_sim/data/derived
+# Derived tables are regenerable and not committed — except the dated fitted-parameter
+# artifact, which the sim loads at runtime (e.g. in CI where the FastF1 cache is absent).
+src/formation_sim/data/derived/*
+!src/formation_sim/data/derived/paramset08072026.pkl
