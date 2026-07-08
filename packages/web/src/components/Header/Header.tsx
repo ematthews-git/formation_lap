@@ -57,7 +57,11 @@ export function Header({ weekend, circuit, totalRounds }: HeaderProps) {
             <span>{formatRaceDate(weekend.race_date)}</span>
           </div>
 
-          <LightsOut raceDate={weekend.race_date} circuitId={weekend.circuit_id} />
+          <LightsOut
+            raceDate={weekend.race_date}
+            circuitId={weekend.circuit_id}
+            light={light}
+          />
         </div>
       </div>
     </header>

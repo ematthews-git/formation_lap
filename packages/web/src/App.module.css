@@ -2,7 +2,6 @@
   position: relative;
   overflow: hidden;
   min-height: 100vh;
-  padding-bottom: 56px;
 }
 
 /* Wraps the hero photo + header + main so the photo (absolute, top:0) starts
@@ -40,19 +39,6 @@
   align-items: start;
 }
 
-.footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--text-rule);
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .fullState {
   min-height: 100vh;
   display: flex;
@@ -72,18 +58,10 @@
 }
 
 @media (max-width: 750px) {
-  .page {
-    padding-bottom: 32px;
-  }
-
   /* Panels run near-edge-to-edge on phones — a few px of breathing room, and a
      tighter gap between stacked cards. */
   .main {
     --gap: 12px;
     padding: 14px 10px 0;
-  }
-
-  .footer {
-    font-size: 9px;
   }
 }

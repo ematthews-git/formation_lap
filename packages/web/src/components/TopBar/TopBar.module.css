@@ -128,15 +128,14 @@
     padding: 10px 12px;
   }
 
-  /* Brand wraps: dot + name on line 1, the tag drops to its own line beneath,
-     and the lookahead selectors get a full row of their own below that. */
+  /* Brand wraps: name + tag stay inline on line 1 (as on desktop), and the
+     lookahead selectors get a full row of their own beneath them. */
   .brand {
     flex-wrap: wrap;
     column-gap: 11px;
     row-gap: 7px;
   }
 
-  .brandTag,
   .lookahead {
     flex-basis: 100%;
     padding-left: 0;

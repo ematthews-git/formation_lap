@@ -31,6 +31,7 @@ import { DriverForm } from './components/DriverForm/DriverForm'
 import { ConstructorStandings } from './components/ConstructorStandings/ConstructorStandings'
 import { PastResults } from './components/PastResults/PastResults'
 import { WeekendSchedule } from './components/WeekendSchedule/WeekendSchedule'
+import { Footer } from './components/Footer/Footer'
 import { LoadingState, ErrorState } from './components/common/Status'
 import styles from './App.module.css'
 
@@ -104,8 +105,6 @@ export default function App() {
     ? Math.max(...weekends.data.map((w) => w.round_number))
     : featured.round_number
 
-  const updated = new Date().toUTCString().replace('GMT', 'UTC')
-
   return (
     <div className={styles.page}>
       <TopBar
@@ -176,13 +175,9 @@ export default function App() {
             error={constructorStandings.isError}
           />
         </section>
-
-        <footer className={styles.footer}>
-          <span>FORMATION LAP · LIVE API · STRATEGY MODELLED FOR ILLUSTRATION</span>
-          <span>BRIEFING RENDERED {updated}</span>
-        </footer>
         </main>
       </div>
+      <Footer />
       <Analytics />
     </div>
   )

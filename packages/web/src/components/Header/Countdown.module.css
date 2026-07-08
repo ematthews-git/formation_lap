@@ -25,6 +25,19 @@
   .clock {
     font-size: clamp(38px, 11vw, 56px);
   }
+
+  /* The full-bleed hero sits behind these times on mobile, so the theme greys
+     lose contrast. Match the other subheaders instead: black on bright photos,
+     white on dark/night photos (.light tone, threaded down from the Header). */
+  .timeLabel,
+  .timeValue {
+    color: #000;
+  }
+
+  .light .timeLabel,
+  .light .timeValue {
+    color: var(--text-bright);
+  }
 }
 
 .times {

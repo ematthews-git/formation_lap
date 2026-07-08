@@ -27,15 +27,19 @@ export function Countdown({ raceDate }: { raceDate: string | undefined }) {
 export function LightsOut({
   raceDate,
   circuitId,
+  light,
 }: {
   raceDate: string | undefined
   circuitId: string | undefined
+  /** Header tone (dark/night photo) — flips the mobile text to white, matching
+      the other subheaders when the full-bleed hero sits behind these times. */
+  light?: boolean
 }) {
   const target = raceTarget(raceDate)
   const circuitTz = circuitTimezone(circuitId)
 
   return (
-    <div className={styles.times}>
+    <div className={`${styles.times} ${light ? styles.light : ''}`}>
       <div className={styles.timeRow}>
         <span className={styles.timeLabel}>LIGHTS OUT · CIRCUIT</span>
         <span className={styles.timeValue}>{formatClock(target, circuitTz)}</span>

@@ -1,0 +1,122 @@
+/* Full-bleed band pinned to the foot of the page; content aligns to the page
+   column, mirroring the TopBar at the top. */
+.footer {
+  background: var(--panel-header);
+  border-top: 1px solid var(--border-header);
+  margin-top: 56px;
+}
+
+.inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 26px 32px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brandDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  animation: flpulse 1.8s ease-in-out infinite;
+}
+
+.brandName {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.brandTag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-ghost);
+  padding-left: 11px;
+  border-left: 1px solid #403d38;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  color: var(--text-faint);
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+
+.link:hover {
+  color: var(--text);
+}
+
+.disclaimer {
+  margin: 0;
+  max-width: 78ch;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--text-ghost);
+  border-top: 1px solid var(--border-hair);
+  padding-top: 16px;
+}
+
+.src {
+  color: var(--text-faint);
+}
+
+.legal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-rule);
+}
+
+.rendered {
+  color: var(--text-rule);
+}
+
+@media (max-width: 750px) {
+  .footer {
+    margin-top: 32px;
+  }
+
+  .inner {
+    padding: 20px 12px 24px;
+    gap: 14px;
+  }
+
+  .disclaimer {
+    font-size: 10.5px;
+  }
+
+  .legal {
+    font-size: 9px;
+  }
+}
