@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import {
   DEFAULT_SEASON,
   lookaheadWeekends,
@@ -182,6 +183,7 @@ export default function App() {
         </footer>
         </main>
       </div>
+      <Analytics />
     </div>
   )
 }
