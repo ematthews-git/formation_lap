@@ -25,9 +25,17 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: "Command to run (e.g. 'run-weather', 'run-pre-season --season 2026')"
+        description: "Command to run (e.g. 'run-weather', 'run-pre-season --season 2026'). Ignored if 'prelim_round' is set."
         required: true
         default: "run-post-session"
+      prelim_round:
+        description: "Optional: force run-prelim for this round number (skips the race-week gate). Requires prelim_season."
+        required: false
+        default: ""
+      prelim_season:
+        description: "Season for the forced prelim run (defaults to the current year)."
+        required: false
+        default: ""
 
 jobs:
   run:
@@ -63,6 +71,14 @@ jobs:
               uv run --package formation-data formation-data run-pre-season --season "$(date +%Y)"
               ;;
             *)
-              uv run --package formation-data formation-data ${{ github.event.inputs.command }}
+              # Forced prelim for a specific round takes precedence over the free-form command.
+              if [ -n "${{ github.event.inputs.prelim_round }}" ]; then
+                season="${{ github.event.inputs.prelim_season }}"
+                season="${season:-$(date +%Y)}"
+                uv run --package formation-data formation-data run-prelim \
+                  --season "$season" --round "${{ github.event.inputs.prelim_round }}"
+              else
+                uv run --package formation-data formation-data ${{ github.event.inputs.command }}
+              fi
               ;;
           esac

@@ -92,22 +92,43 @@ def run_weather_refresh(today: date | None = None) -> None:
         weather.run(conn, season=rw.season, round_number=rw.round_number)
 
 
-def run_prelim_sim(today: date | None = None) -> None:
+def run_prelim_sim(
+    today: date | None = None,
+    season: int | None = None,
+    round_number: int | None = None,
+) -> None:
     """Called on the Monday of race week. Generates the prelim (pre-quali, season-form)
     strategy sim for that week's race, then superseded by the postquali sim once quali
     runs.
 
     No-ops when no race falls inside ``PRELIM_WINDOW`` (7 days), so it only fires on race
     weeks. Idempotent — a re-run just refreshes the prelim projection.
+
+    Pass ``season`` and ``round_number`` together to force the prelim sim for a specific
+    weekend, skipping the window gate (manual escape hatch, e.g. via workflow_dispatch).
     """
+    if (season is None) != (round_number is None):
+        raise ValueError("season and round_number must be provided together")
+
     today = today or date.today()
     with connection_scope() as conn:
-        rw = repositories.next_race_weekend_within(conn, today, PRELIM_WINDOW)
-        if rw is None:
-            logger.info(
-                "run_prelim_sim: no race within %s days; skipping", PRELIM_WINDOW.days
-            )
-            return
+        if season is not None and round_number is not None:
+            rw = repositories.get_race_weekend(conn, season, round_number)
+            if rw is None:
+                logger.warning(
+                    "run_prelim_sim: no race weekend for %s R%s; skipping",
+                    season,
+                    round_number,
+                )
+                return
+        else:
+            rw = repositories.next_race_weekend_within(conn, today, PRELIM_WINDOW)
+            if rw is None:
+                logger.info(
+                    "run_prelim_sim: no race within %s days; skipping",
+                    PRELIM_WINDOW.days,
+                )
+                return
         logger.info(
             "run_prelim_sim: prelim sim for %s R%s (race %s)",
             rw.season,

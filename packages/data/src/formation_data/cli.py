@@ -264,9 +264,19 @@ def run_weather() -> None:
 
 
 @app.command("run-prelim")
-def run_prelim() -> None:
-    """Monday of race week: prelim strategy sim for that week's race (no-op otherwise)."""
-    orchestrator.run_prelim_sim()
+def run_prelim(
+    season: int | None = typer.Option(
+        None, help="Force prelim for this season (requires --round)."
+    ),
+    round_number: int | None = typer.Option(
+        None, "--round", help="Force prelim for this round (requires --season)."
+    ),
+) -> None:
+    """Monday of race week: prelim strategy sim for that week's race (no-op otherwise).
+
+    Pass --season and --round together to force the prelim sim for a specific weekend,
+    skipping the race-week gate."""
+    orchestrator.run_prelim_sim(season=season, round_number=round_number)
 
 
 @app.command("run-post-race")
