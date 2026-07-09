@@ -21,6 +21,7 @@ from formation_data.jobs.post_race import (
 from formation_data.jobs.post_session import session_results as post_session_results
 from formation_data.jobs.pre_race import sim_strategies, strategies, weather
 from formation_data.jobs.pre_season import (
+    circuit_race_stats,
     circuit_stats,
     drivers,
     lap_records as pre_season_lap_records,
@@ -42,6 +43,7 @@ weekends_app = typer.Typer(help="Season calendar.")
 sessions_app = typer.Typer(help="Weekend session timetable.")
 lap_records_app = typer.Typer(help="All-time race lap records.")
 circuit_stats_app = typer.Typer(help="Per-circuit per-season stats.")
+circuit_race_stats_app = typer.Typer(help="Empirical per-circuit race analytics.")
 weather_app = typer.Typer(help="Race weekend weather forecast.")
 strategies_app = typer.Typer(help="Historical (mined) strategy options.")
 sim_strategies_app = typer.Typer(help="Simulated strategy options.")
@@ -56,6 +58,7 @@ app.add_typer(weekends_app, name="weekends")
 app.add_typer(sessions_app, name="sessions")
 app.add_typer(lap_records_app, name="lap-records")
 app.add_typer(circuit_stats_app, name="circuit-stats")
+app.add_typer(circuit_race_stats_app, name="circuit-race-stats")
 app.add_typer(weather_app, name="weather")
 app.add_typer(strategies_app, name="strategies")
 app.add_typer(sim_strategies_app, name="sim-strategies")
@@ -135,6 +138,16 @@ def lap_records_refresh() -> None:
 def circuit_stats_recompute(season: int = typer.Option(...)) -> None:
     with connection_scope() as conn:
         circuit_stats.run(conn, season=season)
+
+
+@circuit_race_stats_app.command("recompute")
+def circuit_race_stats_recompute(
+    season: int = typer.Option(..., help="Upcoming season the rollup is keyed to."),
+    circuit: str | None = typer.Option(None, "--circuit", help="Single circuit_id; default all."),
+) -> None:
+    """Mine empirical race analytics from the trailing seasons (all races, wet included)."""
+    with connection_scope() as conn:
+        circuit_race_stats.run(conn, season=season, circuit_id=circuit)
 
 
 @weather_app.command("refresh")

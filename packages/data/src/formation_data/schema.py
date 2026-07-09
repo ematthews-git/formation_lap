@@ -227,6 +227,29 @@ sim_race_stats = Table(
 )
 
 
+# Empirical per-circuit race analytics, mined from EVERY race (wet included) in the trailing
+# few seasons — the observed-history counterpart to the sim's dry-only, model-derived context
+# numbers. Like sim_race_stats it's a single JSONB blob (incidents, grid/finish, tyres,
+# weather, timing … a large, still-evolving set) rather than a column per metric, so the feed
+# can grow without a migration. Keyed (circuit_id, season): one rollup per circuit per season
+# the job is run for, the season fixing the trailing window it was computed over.
+circuit_race_stats = Table(
+    "circuit_race_stats",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
+    Column("season", Integer, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column("stats", JSONB, nullable=False),
+    UniqueConstraint("circuit_id", "season"),
+)
+
+
 # Per-session finishing order / timesheet, one row per session. Session classifications
 # are heterogeneous — a practice timesheet (fastest lap + gap), a qualifying sheet
 # (Q1/Q2/Q3), and a race classification (points, status, time) share almost no columns —
@@ -292,6 +315,7 @@ __all__ = [
     "strategies",
     "strategy_stints",
     "sim_race_stats",
+    "circuit_race_stats",
     "session_results",
     "race_results",
     "standings",

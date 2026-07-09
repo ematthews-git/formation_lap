@@ -98,6 +98,7 @@ def session_laps(ses) -> pd.DataFrame:
         "is_sc": ts.str.contains("4", regex=False),
         "is_red": ts.str.contains("5", regex=False),
         "is_vsc": ts.str.contains("6", regex=False) | ts.str.contains("7", regex=False),
+        "is_yellow": ts.str.contains("2", regex=False),
         "is_green": ts.str.fullmatch(r"[13]+").fillna(False),
         "is_inlap": laps["PitInTime"].notna(),
         "is_outlap": laps["PitOutTime"].notna(),
@@ -142,7 +143,12 @@ def _classify(classified_position: object, status: object) -> tuple[bool, bool]:
 
 
 def session_results(ses) -> pd.DataFrame:
-    """Tidy race/qualifying results: grid, finish, DNF, points, best quali time."""
+    """Tidy race/qualifying results: grid, finish, DNF, points, best quali time.
+
+    ``race_time_s`` is the winner's total race time (same on every row, so any row yields
+    the race duration); ``gap_to_winner_s`` is 0 for the winner and each finisher's gap in
+    seconds, ``NaN`` for lapped runners whose FastF1 ``Time`` is a lap gap, not a duration.
+    """
     res = ses.results.copy()
     ev = ses.event
 
@@ -158,6 +164,18 @@ def session_results(ses) -> pd.DataFrame:
     finished = pd.Series([p[0] for p in pairs], index=res.index)
     dns = pd.Series([p[1] for p in pairs], index=res.index)
 
+    # FastF1's Time column: the winner's is the total race time, everyone else's is the gap
+    # to the winner (NaT for lapped runners). Split it into a broadcast race duration and a
+    # per-driver gap so downstream metrics don't have to re-learn that convention.
+    pos = res["Position"].astype("float")
+    time_s = _seconds(res["Time"]) if "Time" in res.columns else pd.Series(np.nan, index=res.index)
+    winner_time = np.nan
+    if (pos == 1).any():
+        wt = time_s[pos == 1]
+        if len(wt) and pd.notna(wt.iloc[0]):
+            winner_time = float(wt.iloc[0])
+    gap = time_s.mask(pos == 1, 0.0)
+
     out = pd.DataFrame({
         "year": int(ev["EventDate"].year),
         "round": int(ev["RoundNumber"]),
@@ -170,6 +188,8 @@ def session_results(ses) -> pd.DataFrame:
         "points": res["Points"].astype("float"),
         "laps_completed": res["Laps"].astype("float") if "Laps" in res.columns else np.nan,
         "best_quali_s": best_quali.astype("float").values,
+        "race_time_s": winner_time,
+        "gap_to_winner_s": gap.astype("float").values,
     })
     out["dns"] = dns.values
     out["classified"] = finished.values
@@ -179,14 +199,21 @@ def session_results(ses) -> pd.DataFrame:
 
 def weather_summary(ses) -> dict:
     """Small dry/wet-relevant weather summary for a session."""
+    empty = {
+        "rainfall_any": False,
+        "track_temp_min": np.nan, "track_temp_max": np.nan,
+        "air_temp_min": np.nan, "air_temp_max": np.nan,
+    }
     try:
         w = ses.weather_data
     except Exception:
-        return {"rainfall_any": False, "track_temp_min": np.nan, "track_temp_max": np.nan}
+        return empty
     return {
         "rainfall_any": bool(w["Rainfall"].any()) if "Rainfall" in w else False,
         "track_temp_min": float(w["TrackTemp"].min()) if "TrackTemp" in w else np.nan,
         "track_temp_max": float(w["TrackTemp"].max()) if "TrackTemp" in w else np.nan,
+        "air_temp_min": float(w["AirTemp"].min()) if "AirTemp" in w else np.nan,
+        "air_temp_max": float(w["AirTemp"].max()) if "AirTemp" in w else np.nan,
     }
 
 

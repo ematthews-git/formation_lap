@@ -36,19 +36,33 @@ const COMPOUNDS = [
 const asNum = (v: unknown): number | null => (typeof v === 'number' ? v : null)
 
 // The four engine-derived parameters. `get` reads the value out of the sim's
-// race_stats blob; params with no engine field yet stay blank (—).
+// race_stats blob; a param whose field is missing from the blob stays blank (—).
 const ENGINE_PARAMS: {
   label: string
   get: (s: Record<string, unknown>) => number | null
 }[] = [
   { label: 'CHAOS RATING', get: (s) => asNum(s.chaos_index_0to100) },
   { label: 'OVERTAKING DIFFICULTY', get: (s) => asNum(s.overtaking_difficulty_0to100) },
-  { label: 'QUALIFYING IMPORTANCE', get: () => null },
+  {
+    // Percentile of this circuit's strategic flexibility among all calendar circuits with
+    // a sim on record, where rank 1 = most flexible → 100. Flexibility blends how spread
+    // the stop-count distribution and the shown-strategy plausibilities are; the API ranks
+    // it across the season (see repositories.strategy_flexibility_rank) and hands us
+    // rank/of, which we map onto the 0–100 gauge exactly like tyre degradation.
+    label: 'STRATEGY FLEXIBILITY',
+    get: (s) => {
+      const flex = s.strategy_flexibility as Record<string, unknown> | undefined
+      const rank = asNum(flex?.rank)
+      const of = asNum(flex?.of)
+      if (rank == null || of == null || of <= 0) return null
+      return (100 * (of - rank + 1)) / of
+    },
+  },
   {
     // Percentile of this circuit's deg severity among all known circuits, where
     // rank 1 = highest deg → 100. Raw severity is a tiny s/lap slope, so we map it
     // onto the 0–100 gauge via the sim's precomputed rank/of.
-    label: 'TYRE DEGRADATION',
+    label: 'TYRE WEAR',
     get: (s) => {
       const deg = s.degradation as Record<string, unknown> | undefined
       const rank = asNum(deg?.rank)
@@ -149,9 +163,9 @@ export function StrategyEngine({
           </div>
         </div>
 
-        {/* undercut window — from the sim's race-context numbers */}
+        {/* fresh tyre advantage — from the sim's race-context numbers */}
         <div className={styles.undercut}>
-          <div className={styles.sectionLabel}>UNDERCUT WINDOW</div>
+          <div className={styles.sectionLabel}>FRESH TYRE ADVANTAGE</div>
           {simStatsLoading ? (
             <LoadingState />
           ) : raceStats ? (

@@ -84,13 +84,14 @@ LAP_COLUMNS = [
     "driver", "driver_number", "team",
     "lap_number", "total_laps", "laps_remaining", "lap_time_s",
     "stint", "compound", "tyre_life", "fresh_tyre", "position",
-    "is_green", "is_sc", "is_vsc", "is_inlap", "is_outlap", "is_clean",
+    "is_green", "is_sc", "is_vsc", "is_yellow", "is_inlap", "is_outlap", "is_clean",
 ]
 
 RESULT_COLUMNS = [
     "year", "round", "circuit", "driver", "team",
     "grid", "finish_position", "classified", "status",
     "dnf", "dns", "points", "laps_completed", "best_quali_s",
+    "race_time_s", "gap_to_winner_s",
 ]
 
 

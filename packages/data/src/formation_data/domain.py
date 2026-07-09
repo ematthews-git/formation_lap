@@ -173,6 +173,21 @@ class SimRaceStats(_Base):
     stats: dict
 
 
+class CircuitRaceStats(_Base):
+    """Empirical per-circuit race analytics over a trailing window (the JSONB `stats` blob).
+
+    API read shape. Computed from every race (wet included) in the last few seasons — the
+    observed-history counterpart to the sim's dry-only context numbers. Keyed (circuit_id,
+    season); `stats` groups the feed (incidents, grid/finish, tyres, weather, timing …).
+    """
+
+    id: int | None = None
+    circuit_id: str
+    season: int
+    updated_at: datetime | None = None
+    stats: dict
+
+
 class SessionResults(_Base):
     """One session's ordered per-driver classification (the JSONB `results` blob).
 
@@ -220,6 +235,7 @@ __all__ = [
     "StrategyStint",
     "StrategyWithStints",
     "SimRaceStats",
+    "CircuitRaceStats",
     "SessionResults",
     "RaceResult",
     "Standing",

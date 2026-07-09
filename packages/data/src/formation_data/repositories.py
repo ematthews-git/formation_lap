@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy import Connection, Table, and_, delete, exists, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 
-from formation_data import domain, schema
+from formation_data import domain, flexibility, schema
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +176,27 @@ def upsert_sim_race_stats(
             "phase": stmt.excluded.phase,
             "stats": stmt.excluded.stats,
             "generated_at": func.now(),
+        },
+    )
+    conn.execute(stmt)
+
+
+def upsert_circuit_race_stats(
+    conn: Connection, circuit_id: str, season: int, stats: dict
+) -> None:
+    """Upsert the empirical race-analytics blob for a circuit (one row per circuit-season).
+
+    Re-running for the same (circuit, season) replaces the blob — the whole feed is recomputed
+    from the trailing window each run, so there's nothing to merge.
+    """
+    stmt = insert(schema.circuit_race_stats).values(
+        circuit_id=circuit_id, season=season, stats=stats
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["circuit_id", "season"],
+        set_={
+            "stats": stmt.excluded.stats,
+            "updated_at": func.now(),
         },
     )
     conn.execute(stmt)
@@ -661,12 +682,29 @@ def get_circuit_stats(
     return domain.CircuitStats.model_validate(row._mapping) if row else None
 
 
+def get_circuit_race_stats(
+    conn: Connection, circuit_id: str, season: int
+) -> domain.CircuitRaceStats | None:
+    """The empirical race-analytics blob for a circuit in a given season, or None."""
+    row = conn.execute(
+        select(schema.circuit_race_stats).where(
+            schema.circuit_race_stats.c.circuit_id == circuit_id,
+            schema.circuit_race_stats.c.season == season,
+        )
+    ).first()
+    return domain.CircuitRaceStats.model_validate(row._mapping) if row else None
+
+
 def get_sim_race_stats(
     conn: Connection, season: int, round_number: int
 ) -> domain.SimRaceStats | None:
     """The race-context stats blob from the latest sim run for a weekend, or None.
 
     One row per weekend; `phase` says whether it came from the prelim or postquali run.
+    The blob's `race_stats` is enriched at read time with `strategy_flexibility` — this
+    weekend's flexibility rank across the season's simulated circuits (see
+    `strategy_flexibility_rank`) — since that number is relative to the rest of the
+    calendar and so can't be baked in when a single weekend is simulated.
     """
     rw = get_race_weekend(conn, season, round_number)
     if rw is None:
@@ -676,4 +714,63 @@ def get_sim_race_stats(
             schema.sim_race_stats.c.race_weekend_id == rw.id
         )
     ).first()
-    return domain.SimRaceStats.model_validate(row._mapping) if row else None
+    if row is None:
+        return None
+    stats = domain.SimRaceStats.model_validate(row._mapping)
+    flex = strategy_flexibility_rank(conn, season, round_number)
+    race_stats = stats.stats.get("race_stats") if isinstance(stats.stats, dict) else None
+    if flex is not None and isinstance(race_stats, dict):
+        race_stats["strategy_flexibility"] = flex
+    return stats
+
+
+def strategy_flexibility_rank(
+    conn: Connection, season: int, round_number: int
+) -> dict | None:
+    """Where this weekend's strategic flexibility ranks among the season's simulated
+    weekends (rank 1 = most flexible), as `{"score", "rank", "of"}`; None when the weekend
+    has no sim on record or the field can't be scored.
+
+    Flexibility blends how spread the stop-count distribution (from each weekend's
+    `sim_race_stats` blob) and the shown-strategy plausibilities (from its `source="sim"`
+    strategies) are — see `formation_data.flexibility`. Ranked at read time over whatever
+    circuits are currently simulated, so the value tracks the live calendar the same way
+    the degradation rank tracks all known circuit profiles.
+    """
+    rw = schema.race_weekends
+    srs = schema.sim_race_stats
+    stat_rows = conn.execute(
+        select(rw.c.id, rw.c.round_number, srs.c.stats)
+        .join(srs, srs.c.race_weekend_id == rw.c.id)
+        .where(rw.c.season == season)
+    ).all()
+    if not stat_rows:
+        return None
+
+    st = schema.strategies
+    plaus_by_weekend: dict[int, list[float]] = {}
+    for wid, plausibility in conn.execute(
+        select(st.c.race_weekend_id, st.c.plausibility).where(
+            st.c.race_weekend_id.in_([r.id for r in stat_rows]),
+            st.c.source == "sim",
+            st.c.plausibility.is_not(None),
+        )
+    ).all():
+        plaus_by_weekend.setdefault(wid, []).append(float(plausibility))
+
+    scores: dict[int, float] = {}
+    target_id: int | None = None
+    for r in stat_rows:
+        if r.round_number == round_number:
+            target_id = r.id
+        race_stats = (r.stats or {}).get("race_stats") or {}
+        score = flexibility.flexibility_score(
+            race_stats.get("stop_count_distribution"),
+            plaus_by_weekend.get(r.id, []),
+        )
+        if score is not None:
+            scores[r.id] = score
+
+    if target_id is None or target_id not in scores:
+        return None
+    return flexibility.rank_of(scores[target_id], scores.values())
