@@ -701,10 +701,11 @@ def get_sim_race_stats(
     """The race-context stats blob from the latest sim run for a weekend, or None.
 
     One row per weekend; `phase` says whether it came from the prelim or postquali run.
-    The blob's `race_stats` is enriched at read time with `strategy_flexibility` — this
-    weekend's flexibility rank across the season's simulated circuits (see
-    `strategy_flexibility_rank`) — since that number is relative to the rest of the
-    calendar and so can't be baked in when a single weekend is simulated.
+    The blob's `race_stats` is enriched at read time with `strategy_flexibility` and
+    `chaos` — this weekend's flexibility and chaos ranks across the season's simulated
+    circuits (see `strategy_flexibility_rank` / `chaos_rank`) — since those numbers are
+    relative to the rest of the calendar and so can't be baked in when a single weekend
+    is simulated.
     """
     rw = get_race_weekend(conn, season, round_number)
     if rw is None:
@@ -718,9 +719,13 @@ def get_sim_race_stats(
         return None
     stats = domain.SimRaceStats.model_validate(row._mapping)
     flex = strategy_flexibility_rank(conn, season, round_number)
+    chaos = chaos_rank(conn, season, round_number)
     race_stats = stats.stats.get("race_stats") if isinstance(stats.stats, dict) else None
-    if flex is not None and isinstance(race_stats, dict):
-        race_stats["strategy_flexibility"] = flex
+    if isinstance(race_stats, dict):
+        if flex is not None:
+            race_stats["strategy_flexibility"] = flex
+        if chaos is not None:
+            race_stats["chaos"] = chaos
     return stats
 
 
@@ -774,3 +779,39 @@ def strategy_flexibility_rank(
     if target_id is None or target_id not in scores:
         return None
     return flexibility.rank_of(scores[target_id], scores.values())
+
+
+def chaos_rank(conn: Connection, season: int, round_number: int) -> dict | None:
+    """Where this weekend's chaos index ranks among the season's simulated weekends
+    (rank 1 = most chaotic), as `{"score", "rank", "of"}`; None when the weekend has no
+    sim on record or no chaos index was scored.
+
+    The raw `chaos_index_0to100` is baked into each weekend's `sim_race_stats` blob, but
+    it's an absolute figure — this ranks it across whatever circuits are currently
+    simulated, mirroring `strategy_flexibility_rank` so chaos tracks the live calendar
+    the same way flexibility does.
+    """
+    rw = schema.race_weekends
+    srs = schema.sim_race_stats
+    stat_rows = conn.execute(
+        select(rw.c.round_number, srs.c.stats)
+        .join(srs, srs.c.race_weekend_id == rw.c.id)
+        .where(rw.c.season == season)
+    ).all()
+    if not stat_rows:
+        return None
+
+    scores: dict[int, float] = {}
+    target_score: float | None = None
+    for r in stat_rows:
+        race_stats = (r.stats or {}).get("race_stats") or {}
+        chaos = race_stats.get("chaos_index_0to100")
+        if chaos is None:
+            continue
+        scores[r.round_number] = float(chaos)
+        if r.round_number == round_number:
+            target_score = float(chaos)
+
+    if target_score is None:
+        return None
+    return flexibility.rank_of(target_score, scores.values())

@@ -169,6 +169,17 @@ def _deg_rank(profiles, circuit: str) -> dict | None:
     return {"rank": rank, "of": len(sev)}
 
 
+def _overtake_rank(profiles, circuit: str) -> dict | None:
+    """Where this circuit's overtaking difficulty ranks among all known circuits
+    (rank 1 = hardest to overtake). Mirrors `_deg_rank` — overtaking difficulty is a
+    static profile property, so it's ranked against the full calendar at sim time."""
+    if not profiles or circuit not in profiles:
+        return None
+    diff = {c: p.overtaking_difficulty for c, p in profiles.items()}
+    rank = 1 + sum(1 for v in diff.values() if v > diff[circuit])
+    return {"rank": rank, "of": len(diff)}
+
+
 def race_stats(wctx, driver_agg: dict, profiles, cfg: dict) -> dict:
     p = wctx.profile
     lm = wctx.params.lap
@@ -201,7 +212,10 @@ def race_stats(wctx, driver_agg: dict, profiles, cfg: dict) -> dict:
         "safety_car_prob": _r(p.sc_prob, 2),
         "vsc_prob": _r(p.vsc_prob, 2),
         "expected_sc_vsc_laps": _r(p.sc_expected_laps, 1),
-        "overtaking_difficulty_0to100": int(round(100 * p.overtaking_difficulty)),
+        "overtaking_difficulty": {
+            "difficulty_0to100": int(round(100 * p.overtaking_difficulty)),
+            **(_overtake_rank(profiles, circuit) or {}),
+        },
         "expected_on_track_passes": _r(p.passes_per_race, 1),
         "stop_count_distribution": {str(n): _r(v / tot, 3) for n, v in stops.items()},
         "most_likely_stops": int(max(stops, key=stops.get)),

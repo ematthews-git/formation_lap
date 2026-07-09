@@ -35,42 +35,39 @@ const COMPOUNDS = [
 
 const asNum = (v: unknown): number | null => (typeof v === 'number' ? v : null)
 
-// The four engine-derived parameters. `get` reads the value out of the sim's
+// Map a calendar `rank`/`of` pair (rank 1 = the highest-ranked circuit) onto the 0–100
+// gauge, where rank 1 → 100. `field` is the nested race_stats object holding the pair
+// (e.g. degradation, strategy_flexibility). Returns null when the pair is missing.
+const rankToGauge = (field: unknown): number | null => {
+  const obj = field as Record<string, unknown> | undefined
+  const rank = asNum(obj?.rank)
+  const of = asNum(obj?.of)
+  if (rank == null || of == null || of <= 0) return null
+  return (100 * (of - rank + 1)) / of
+}
+
+// The four engine-derived parameters, each a percentile of this circuit among the
+// calendar (rank 1 → 100) rather than an absolute figure — the API precomputes the
+// rank/of pair and we map it onto the 0–100 gauge. `get` reads it out of the sim's
 // race_stats blob; a param whose field is missing from the blob stays blank (—).
 const ENGINE_PARAMS: {
   label: string
   get: (s: Record<string, unknown>) => number | null
 }[] = [
-  { label: 'CHAOS RATING', get: (s) => asNum(s.chaos_index_0to100) },
-  { label: 'OVERTAKING DIFFICULTY', get: (s) => asNum(s.overtaking_difficulty_0to100) },
-  {
-    // Percentile of this circuit's strategic flexibility among all calendar circuits with
-    // a sim on record, where rank 1 = most flexible → 100. Flexibility blends how spread
-    // the stop-count distribution and the shown-strategy plausibilities are; the API ranks
-    // it across the season (see repositories.strategy_flexibility_rank) and hands us
-    // rank/of, which we map onto the 0–100 gauge exactly like tyre degradation.
-    label: 'STRATEGY FLEXIBILITY',
-    get: (s) => {
-      const flex = s.strategy_flexibility as Record<string, unknown> | undefined
-      const rank = asNum(flex?.rank)
-      const of = asNum(flex?.of)
-      if (rank == null || of == null || of <= 0) return null
-      return (100 * (of - rank + 1)) / of
-    },
-  },
-  {
-    // Percentile of this circuit's deg severity among all known circuits, where
-    // rank 1 = highest deg → 100. Raw severity is a tiny s/lap slope, so we map it
-    // onto the 0–100 gauge via the sim's precomputed rank/of.
-    label: 'TYRE WEAR',
-    get: (s) => {
-      const deg = s.degradation as Record<string, unknown> | undefined
-      const rank = asNum(deg?.rank)
-      const of = asNum(deg?.of)
-      if (rank == null || of == null || of <= 0) return null
-      return (100 * (of - rank + 1)) / of
-    },
-  },
+  // Chaos: rank 1 = most chaotic. Ranked across the season's simulated weekends at read
+  // time (see repositories.chaos_rank), the same way flexibility is.
+  { label: 'CHAOS RATING', get: (s) => rankToGauge(s.chaos) },
+  // Overtaking difficulty: rank 1 = hardest to overtake. A static circuit-profile
+  // property, so the sim ranks it against all known circuits (see stats._overtake_rank),
+  // exactly like tyre degradation.
+  { label: 'OVERTAKING DIFFICULTY', get: (s) => rankToGauge(s.overtaking_difficulty) },
+  // Strategic flexibility: rank 1 = most flexible. Blends how spread the stop-count
+  // distribution and shown-strategy plausibilities are; ranked across the season
+  // (see repositories.strategy_flexibility_rank).
+  { label: 'STRATEGY FLEXIBILITY', get: (s) => rankToGauge(s.strategy_flexibility) },
+  // Tyre wear: rank 1 = highest deg. Raw severity is a tiny s/lap slope, ranked against
+  // all known circuits at sim time (see stats._deg_rank).
+  { label: 'TYRE WEAR', get: (s) => rankToGauge(s.degradation) },
 ]
 
 type Source = 'sim' | 'historical'
