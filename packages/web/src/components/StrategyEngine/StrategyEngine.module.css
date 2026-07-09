@@ -11,16 +11,34 @@
   margin-bottom: 12px;
 }
 
+.sectionSubLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-ghost);
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+
 /* ---- compounds ---- */
 .compounds {
   padding: 18px 20px;
   border-right: 1px solid var(--border-soft);
 }
 
+.compoundsBody {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+}
+
 .compoundList {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 12px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .compound {
@@ -56,6 +74,23 @@
   font-size: 10px;
   color: var(--text-faint);
   margin-top: 3px;
+}
+
+/* Historical usage share for this compound, inline after the descriptor. */
+.compoundFreqInline {
+  color: var(--text-fainter);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Max stint / age @ pit / stint deg, stacked beside the compound list. Equal
+   flex-basis with .compoundList so the divider sits near the tile's centre. */
+.tyreStats {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1 1 0;
+  padding-left: 18px;
+  border-left: 1px solid var(--border-soft);
 }
 
 /* ---- undercut ---- */
@@ -98,7 +133,8 @@
 
 .miniStats {
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 16px 24px;
   margin-top: 14px;
   padding-top: 13px;
   border-top: 1px solid var(--border-soft);
@@ -119,7 +155,7 @@
   margin-top: 2px;
 }
 
-/* ---- safety car ---- */
+/* ---- incident probabilities ---- */
 .safetyCar {
   padding: 18px 20px;
   display: flex;
@@ -127,39 +163,97 @@
   gap: 6px;
 }
 
-.scValueRow {
+/* Split, matching the compounds tile: bars on the left, extra averages on the
+   right, divided by a vertical rule. */
+.incidentBody {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 6px 0 4px;
+  align-items: stretch;
+  gap: 18px;
 }
 
-.scValue {
+.incidentList {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.incidentStats {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1 1 0;
+  padding-left: 18px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.incidentRow {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.incidentLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-fainter);
+}
+
+.incidentValueRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.incidentValue {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 76px;
+  font-size: 22px;
   line-height: 0.82;
   color: var(--gold);
   font-variant-numeric: tabular-nums;
 }
 
-.scUnit {
+.incidentValueDanger {
+  color: var(--accent);
+}
+
+.incidentUnit {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 30px;
+  font-size: 12px;
   color: var(--gold-dim);
 }
 
-.scBar {
-  height: 5px;
-  background: #2a2724;
-  width: 100%;
-  margin: 8px 0 4px;
+.incidentUnitDanger {
+  color: var(--accent);
 }
 
-.scBarFill {
-  height: 5px;
+.incidentSub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-left: 5px;
+  align-self: baseline;
+}
+
+.incidentBar {
+  height: 3px;
+  background: #2a2724;
+  width: 100%;
+}
+
+.incidentBarFill {
+  height: 3px;
   background: var(--gold);
+}
+
+.incidentBarFillDanger {
+  background: var(--accent);
 }
 
 /* ---- engine-derived parameters ---- */
@@ -325,12 +419,33 @@
     border-bottom: 1px solid var(--border-soft);
   }
 
+  .compoundsBody {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .tyreStats,
+  .incidentStats {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 16px;
+    padding-left: 0;
+    padding-top: 14px;
+    border-left: none;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .incidentBody {
+    flex-direction: column;
+    gap: 14px;
+  }
+
   .bigValueRow {
     flex-wrap: wrap;
   }
 
-  .bigValue,
-  .scValue {
+  .bigValue {
     font-size: 52px;
   }
 

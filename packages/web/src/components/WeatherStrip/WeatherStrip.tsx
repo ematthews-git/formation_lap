@@ -30,7 +30,7 @@ export function WeatherStrip({ weather, weatherLoading }: Props) {
         <div className={styles.fill}>
           <EmptyState
             label="FORECAST PENDING"
-            hint="run: formation-data weather refresh --season … --round …"
+            hint="Forecast is available when Grand Prix is 10 days away"
           />
         </div>
       )}

@@ -5,7 +5,7 @@ import {
   lookaheadWeekends,
   pickFeaturedWeekend,
   useCircuit,
-  useCircuitStats,
+  useCircuitRaceStats,
   useDrivers,
   useCircuitPodiums,
   useLapRecord,
@@ -59,7 +59,7 @@ export default function App() {
 
   const circuit = useCircuit(featured?.circuit_id)
   const lapRecord = useLapRecord(featured?.circuit_id)
-  const stats = useCircuitStats(featured?.circuit_id, SEASON)
+  const circuitRaceStats = useCircuitRaceStats(featured?.circuit_id, SEASON)
   const strategies = useStrategies(SEASON, featured?.round_number)
   const simStrategies = useSimStrategies(SEASON, featured?.round_number)
   const simStats = useSimStats(SEASON, featured?.round_number)
@@ -135,8 +135,8 @@ export default function App() {
 
         <StrategyEngine
           weekend={featured}
-          stats={stats.data}
-          statsLoading={stats.isLoading}
+          circuitRaceStats={circuitRaceStats.data}
+          circuitRaceStatsLoading={circuitRaceStats.isLoading}
           historicalStrategies={strategies.data}
           historicalStrategiesLoading={strategies.isLoading}
           simStrategies={simStrategies.data}

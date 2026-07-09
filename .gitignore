@@ -16,7 +16,7 @@ bin/
 .jupyter/
 .ipynb_checkpoints/
 
-strategy_methodology.ipynb
+analysis
 
 .cache
 

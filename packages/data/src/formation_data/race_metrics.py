@@ -60,18 +60,24 @@ def _classify_race(laps: pd.DataFrame, rainfall: bool) -> str:
     return "dry"
 
 
+def _neutralised_pace(laps: pd.DataFrame, flag: str, min_laps: int = 3) -> float | None:
+    """Median circulating lap time under a caution (``flag`` = is_sc / is_vsc), excluding
+    in/out laps — the pace a car pitting under that caution is measured against. None if the
+    caution had too few full laps to establish a baseline."""
+    times = laps.loc[laps[flag] & ~laps["is_inlap"] & ~laps["is_outlap"], "lap_time_s"].dropna()
+    return float(times.median()) if len(times) >= min_laps else None
+
+
 def _pit_losses(laps: pd.DataFrame) -> dict[str, list[float]]:
-    """Per-stop time loss (in-lap delta + out-lap delta vs the driver's green pace), bucketed
-    by whether the stop was made under SC or VSC. Green-flag stops are left to the sim's
-    per-weekend pit-loss estimate; here we only surface the neutralised-stop cost (approximate
-    — the green baseline overstates it slightly, so treat as a rough guide)."""
+    """Per-stop time loss for stops made under SC / VSC, measured against that caution's
+    NEUTRALISED circulating pace: ``(in-lap − pace) + (out-lap − pace)``. Pitting under a
+    caution is cheap precisely because the whole field is slowed, so baselining against the
+    caution pace (not green pace) is what makes this come out below the sim's green pit loss.
+    Green-flag stops are left to the sim's per-weekend estimate."""
     out: dict[str, list[float]] = {"sc": [], "vsc": []}
+    pace = {"sc": _neutralised_pace(laps, "is_sc"), "vsc": _neutralised_pace(laps, "is_vsc")}
     for _, g in laps.groupby("driver"):
         g = g.sort_values("lap_number")
-        green = g["is_green"] & ~g["is_inlap"] & ~g["is_outlap"]
-        gm = g.loc[green, "lap_time_s"].median()
-        if not np.isfinite(gm):
-            continue
         for _, il in g[g["is_inlap"]].iterrows():
             nxt = g[(g["lap_number"] == il["lap_number"] + 1) & g["is_outlap"]]
             if not len(nxt):
@@ -80,44 +86,73 @@ def _pit_losses(laps: pd.DataFrame) -> dict[str, list[float]]:
             it, ot = il["lap_time_s"], ol["lap_time_s"]
             if not (pd.notna(it) and pd.notna(ot)):
                 continue
-            loss = (it - gm) + (ot - gm)
-            if not 0.0 < loss < _MAX_PIT_LOSS_S:
-                continue
             if bool(il["is_sc"]) or bool(ol["is_sc"]):
-                out["sc"].append(float(loss))
+                bucket = "sc"
             elif bool(il["is_vsc"]) or bool(ol["is_vsc"]):
-                out["vsc"].append(float(loss))
+                bucket = "vsc"
+            else:
+                continue
+            base = pace[bucket]
+            if base is None:
+                continue
+            loss = (it - base) + (ot - base)
+            if 0.0 < loss < _MAX_PIT_LOSS_S:
+                out[bucket].append(float(loss))
     return out
 
 
-def _passes(laps: pd.DataFrame) -> float:
-    """On-track overtakes: total positions gained on green racing laps (excl. in/out laps)."""
-    rac = laps[laps["is_green"] & ~laps["is_inlap"] & ~laps["is_outlap"]]
-    if not len(rac):
+def _on_track_passes(laps: pd.DataFrame) -> float:
+    """On-track overtakes: over each pair of consecutive green racing laps, the number of car
+    pairs — both circulating (neither on an in/out lap) — that swap order. Counting only mutual
+    green-lap order reversals excludes the pit-cycle churn a naive lap-to-lap position-gain sum
+    counts as passes (a car promoted because a rival pitted was not overtaken on track)."""
+    racing = laps[
+        laps["is_green"] & ~laps["is_inlap"] & ~laps["is_outlap"] & laps["position"].notna()
+    ]
+    if not len(racing):
         return 0.0
-    rac = rac.sort_values(["driver", "lap_number"])
-    prev = rac.groupby("driver")["position"].shift(1)
-    return float((prev - rac["position"]).clip(lower=0).sum())
+    piv = racing.pivot_table(
+        index="lap_number", columns="driver", values="position", aggfunc="first"
+    ).sort_index()
+    lap_nums = piv.index.to_numpy()
+    passes = 0
+    for i in range(len(lap_nums) - 1):
+        if lap_nums[i + 1] != lap_nums[i] + 1:
+            continue  # only truly consecutive laps (a gap means a car was pitting / lapped out)
+        a = piv.iloc[i].to_numpy(dtype=float)
+        b = piv.iloc[i + 1].to_numpy(dtype=float)
+        valid = np.isfinite(a) & np.isfinite(b)
+        pa, pb = a[valid], b[valid]
+        # For each car x, count rivals y it was behind (pa[x] > pa[y]) and is now ahead of
+        # (pb[x] < pb[y]) — each is one completed on-track pass. Self-compare is never a hit.
+        for x in range(len(pa)):
+            passes += int(np.sum((pa[x] > pa) & (pb[x] < pb)))
+    return float(passes)
 
 
-def _position_changes_after_lap1(laps: pd.DataFrame) -> float:
-    """Count of (driver, lap) events after lap 1 where a car's position differs from its
-    previous lap — the amount of on-track shuffling once the start is done."""
-    after = laps[laps["lap_number"] > 1].sort_values(["driver", "lap_number"])
-    if not len(after):
-        return 0.0
-    prev = after.groupby("driver")["position"].shift(1)
-    changed = prev.notna() & after["position"].notna() & (after["position"] != prev)
-    return float(changed.sum())
-
-
-def _lap1_gains(laps: pd.DataFrame, results: pd.DataFrame) -> float:
-    """Total places gained off the line: Σ max(grid − position at the end of lap 1, 0)."""
+def _lap1_position_changes(laps: pd.DataFrame, results: pd.DataFrame) -> float:
+    """Number of cars whose position at the end of lap 1 differs from their grid slot — the
+    size of the start-line shuffle."""
     lap1 = laps.loc[laps["lap_number"] == 1, ["driver", "position"]]
     if not len(lap1):
         return 0.0
     m = lap1.merge(results[["driver", "grid"]], on="driver", how="inner")
-    return float((m["grid"] - m["position"]).clip(lower=0).sum())
+    changed = m["grid"].notna() & m["position"].notna() & (m["grid"] != m["position"])
+    return float(changed.sum())
+
+
+def _post_lap1_position_changes(laps: pd.DataFrame, results: pd.DataFrame) -> float:
+    """Number of classified cars whose finishing position differs from their position at the
+    end of lap 1 — how much the order reshuffles across the race once the start has settled."""
+    lap1 = laps.loc[laps["lap_number"] == 1, ["driver", "position"]].rename(
+        columns={"position": "p1"}
+    )
+    if not len(lap1):
+        return 0.0
+    fin = results.loc[_b(results["classified"]), ["driver", "finish_position"]]
+    m = lap1.merge(fin, on="driver", how="inner")
+    changed = m["p1"].notna() & m["finish_position"].notna() & (m["p1"] != m["finish_position"])
+    return float(changed.sum())
 
 
 def _stint_slopes(laps: pd.DataFrame) -> list[float]:
@@ -198,9 +233,9 @@ def race_features(laps: pd.DataFrame, results: pd.DataFrame, weather: dict) -> d
         "n_lap1_dnf": n_lap1_dnf,
         "sc_pit_losses": pit["sc"],
         "vsc_pit_losses": pit["vsc"],
-        "overtakes": _passes(laps),
-        "pos_changes_after_lap1": _position_changes_after_lap1(laps),
-        "pos_changes_lap1": _lap1_gains(laps, results),
+        "overtakes": _on_track_passes(laps),
+        "pos_changes_after_lap1": _post_lap1_position_changes(laps, results),
+        "pos_changes_lap1": _lap1_position_changes(laps, results),
         "winner_grid": winner_grid,
         "podium_outside_top10": podium_out10,
         "points_outside_top10": points_out10,

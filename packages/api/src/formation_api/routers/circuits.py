@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException
 
 from formation_data import repositories
 from formation_data.db import connection_scope
-from formation_data.domain import Circuit, CircuitStats, LapRecord, RaceResult
+from formation_data.domain import (
+    Circuit,
+    CircuitRaceStats,
+    CircuitStats,
+    LapRecord,
+    RaceResult,
+)
 
 router = APIRouter(prefix="/circuits", tags=["circuits"])
 
@@ -22,6 +28,11 @@ def _get_one(circuit_id: str) -> Circuit | None:
 def _get_stats(circuit_id: str, season: int) -> CircuitStats | None:
     with connection_scope() as conn:
         return repositories.get_circuit_stats(conn, circuit_id, season)
+
+
+def _get_race_stats(circuit_id: str, season: int) -> CircuitRaceStats | None:
+    with connection_scope() as conn:
+        return repositories.get_circuit_race_stats(conn, circuit_id, season)
 
 
 def _get_lap_record(circuit_id: str) -> LapRecord | None:
@@ -53,6 +64,16 @@ async def get_circuit_stats(circuit_id: str, season: int) -> CircuitStats:
     if stats is None:
         raise HTTPException(
             status_code=404, detail="No stats for that circuit and season"
+        )
+    return stats
+
+
+@router.get("/{circuit_id}/race-stats", response_model=CircuitRaceStats)
+async def get_circuit_race_stats(circuit_id: str, season: int) -> CircuitRaceStats:
+    stats = await asyncio.to_thread(_get_race_stats, circuit_id, season)
+    if stats is None:
+        raise HTTPException(
+            status_code=404, detail="No race stats for that circuit and season"
         )
     return stats
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type {
-  CircuitStats,
+  CircuitRaceStats,
   RaceWeekend,
   SimRaceStats,
   StrategyWithStints,
@@ -9,13 +9,14 @@ import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { EmptyState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
+import { useCountUp } from '../../lib/useCountUp'
 import { StintTimeline } from './StintTimeline'
 import styles from './StrategyEngine.module.css'
 
 interface Props {
   weekend: RaceWeekend
-  stats: CircuitStats | null | undefined
-  statsLoading: boolean
+  circuitRaceStats: CircuitRaceStats | null | undefined
+  circuitRaceStatsLoading: boolean
   historicalStrategies: StrategyWithStints[] | undefined
   historicalStrategiesLoading: boolean
   simStrategies: StrategyWithStints[] | undefined
@@ -74,8 +75,8 @@ type Source = 'sim' | 'historical'
 
 export function StrategyEngine({
   weekend,
-  stats,
-  statsLoading,
+  circuitRaceStats,
+  circuitRaceStatsLoading,
   historicalStrategies,
   historicalStrategiesLoading,
   simStrategies,
@@ -132,6 +133,35 @@ export function StrategyEngine({
     soft: weekend.soft_compound,
   }
 
+  // Empirical race analytics for this circuit-season (null until the pre-season
+  // job has run). Feeds the tyre, pit-loss and incident-probability figures.
+  const incidents = circuitRaceStats?.stats?.incidents
+  const pit = circuitRaceStats?.stats?.pit
+  const tyres = circuitRaceStats?.stats?.tyres
+  const compoundFreq = tyres?.compound_usage_frequency
+
+  // Count-up targets for the top-row tiles — called unconditionally (hooks
+  // can't live inside the conditional JSX below) so the numbers animate in
+  // from 0 whenever a weekend's data first resolves.
+  const animatedUndercut = useCountUp(undercut)
+  const animatedPitLoss = useCountUp(pitLoss)
+  const animatedScPitLoss = useCountUp(pit?.sc_pit_loss_s)
+  const animatedVscPitLoss = useCountUp(pit?.vsc_pit_loss_s)
+  const animatedMaxStint = useCountUp(tyres?.max_stint_length)
+  const animatedAgeAtPit = useCountUp(tyres?.avg_tyre_age_at_pit)
+  const animatedStintDeg = useCountUp(tyres?.avg_stint_degradation_s_per_lap)
+  const animatedFreqHard = useCountUp(compoundFreq?.['HARD'])
+  const animatedFreqMedium = useCountUp(compoundFreq?.['MEDIUM'])
+  const animatedFreqSoft = useCountUp(compoundFreq?.['SOFT'])
+  const animatedYellowLaps = useCountUp(incidents?.avg_yellow_flag_laps)
+  const animatedRetirements = useCountUp(incidents?.avg_retirements)
+  const animatedLap1Dnfs = useCountUp(incidents?.avg_lap1_dnfs)
+  const animatedFreq: Record<string, number | null> = {
+    hard: animatedFreqHard,
+    medium: animatedFreqMedium,
+    soft: animatedFreqSoft,
+  }
+
   return (
     <Panel strong>
       <PanelHeader
@@ -142,21 +172,63 @@ export function StrategyEngine({
       />
 
       <div className={styles.topRow}>
-        {/* compounds — live from the weekend allocation */}
+        {/* compounds — allocation from the weekend, usage/degradation from race stats */}
         <div className={styles.compounds}>
           <div className={styles.sectionLabel}>AVAILABLE COMPOUNDS</div>
-          <div className={styles.compoundList}>
-            {COMPOUNDS.map((c) => (
-              <div key={c.key} className={styles.compound}>
-                <div className={styles.compoundChip} style={{ borderColor: c.color, color: c.color }}>
-                  {code[c.key]}
-                </div>
-                <div>
-                  <div className={styles.compoundName}>{c.name}</div>
-                  <div className={styles.compoundDesc}>{c.desc}</div>
-                </div>
+          {tyres && <div className={styles.sectionSubLabel}>· LAST 5 USAGE</div>}
+          <div className={styles.compoundsBody}>
+            <div className={styles.compoundList}>
+              {COMPOUNDS.map((c) => {
+                const freq = animatedFreq[c.key]
+                return (
+                  <div key={c.key} className={styles.compound}>
+                    <div className={styles.compoundChip} style={{ borderColor: c.color, color: c.color }}>
+                      {code[c.key]}
+                    </div>
+                    <div>
+                      <div className={styles.compoundName}>{c.name}</div>
+                      <div className={styles.compoundDesc}>
+                        {c.desc}
+                        {freq != null && (
+                          <span className={styles.compoundFreqInline}>
+                            {' '}
+                            · {Math.round(freq * 100)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {tyres && (
+              <div className={styles.tyreStats}>
+                <Mini
+                  label="MAX STINT LENGTH"
+                  value={
+                    animatedMaxStint != null
+                      ? `${Math.round(animatedMaxStint)} laps`
+                      : '—'
+                  }
+                />
+                <Mini
+                  label="AVG TYRE AGE AT PIT"
+                  value={
+                    animatedAgeAtPit != null
+                      ? `${animatedAgeAtPit.toFixed(1)} laps`
+                      : '—'
+                  }
+                />
+                <Mini
+                  label="AVG STINT DEGRADATION"
+                  value={
+                    animatedStintDeg != null
+                      ? `${animatedStintDeg.toFixed(2)}s`
+                      : '—'
+                  }
+                />
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -169,7 +241,7 @@ export function StrategyEngine({
             <>
               <div className={styles.bigValueRow}>
                 <span className={styles.bigValue}>
-                  {undercut != null ? undercut.toFixed(2) : '—'}
+                  {animatedUndercut != null ? animatedUndercut.toFixed(2) : '—'}
                 </span>
                 <span className={styles.bigUnit}>s/lap</span>
                 <span className={styles.bigCaption}>UNDERCUT GAIN</span>
@@ -177,32 +249,82 @@ export function StrategyEngine({
               <div className={styles.miniStats}>
                 <Mini
                   label="PIT LOSS"
-                  value={pitLoss != null ? `${pitLoss.toFixed(1)}s` : '—'}
+                  value={animatedPitLoss != null ? `${animatedPitLoss.toFixed(1)}s` : '—'}
+                />
+                <Mini
+                  label="SC PIT LOSS"
+                  value={
+                    animatedScPitLoss != null
+                      ? `${animatedScPitLoss.toFixed(1)}s`
+                      : '—'
+                  }
+                />
+                <Mini
+                  label="VSC PIT LOSS"
+                  value={
+                    animatedVscPitLoss != null
+                      ? `${animatedVscPitLoss.toFixed(1)}s`
+                      : '—'
+                  }
                 />
               </div>
             </>
           ) : (
-            <EmptyState hint="sim not yet run for this weekend" />
+            <EmptyState hint="sim not yet available for this weekend" />
           )}
         </div>
 
-        {/* safety car probability — from circuit stats */}
+        {/* incident probabilities — empirical, from circuit race stats */}
         <div className={styles.safetyCar}>
-          <div className={styles.sectionLabel}>SAFETY CAR PROBABILITY</div>
-          {statsLoading ? (
+          <div className={styles.sectionLabel}>INCIDENT PROBABILITY · LAST 5</div>
+          {circuitRaceStatsLoading ? (
             <LoadingState />
-          ) : stats ? (
-            <div>
-              <div className={styles.scValueRow}>
-                <span className={styles.scValue}>{stats.sc_probability}</span>
-                <span className={styles.scUnit}>%</span>
+          ) : incidents ? (
+            <div className={styles.incidentBody}>
+              <div className={styles.incidentList}>
+                <IncidentRow
+                  label="SAFETY CAR"
+                  prob={incidents.sc_probability}
+                  deployments={incidents.avg_sc_deployments}
+                />
+                <IncidentRow
+                  label="VIRTUAL SC"
+                  prob={incidents.vsc_probability}
+                  deployments={incidents.avg_vsc_deployments}
+                />
+                <IncidentRow
+                  label="RED FLAG"
+                  prob={incidents.red_flag_probability}
+                  tone="danger"
+                />
               </div>
-              <div className={styles.scBar}>
-                <div className={styles.scBarFill} style={{ width: `${stats.sc_probability}%` }} />
+              <div className={styles.incidentStats}>
+                <Mini
+                  label="AVG YELLOW FLAG"
+                  value={
+                    animatedYellowLaps != null
+                      ? `${animatedYellowLaps.toFixed(1)} laps`
+                      : '—'
+                  }
+                />
+                <Mini
+                  label="AVG RETIREMENTS"
+                  value={
+                    animatedRetirements != null
+                      ? animatedRetirements.toFixed(1)
+                      : '—'
+                  }
+                />
+                <Mini
+                  label="AVG LAP 1 DNFS"
+                  value={
+                    animatedLap1Dnfs != null ? animatedLap1Dnfs.toFixed(1) : '—'
+                  }
+                />
               </div>
             </div>
           ) : (
-            <EmptyState hint="circuit-stats recompute job not yet run" />
+            <EmptyState hint="race-stats not yet available" />
           )}
         </div>
       </div>
@@ -266,11 +388,7 @@ export function StrategyEngine({
         ) : (
           <EmptyState
             label="NO STRATEGY DATA"
-            hint={
-              showSim
-                ? `run: formation-data sim-strategies generate --season ${weekend.season} --round ${weekend.round_number} --mode postquali`
-                : `run: formation-data strategies generate --season ${weekend.season} --round ${weekend.round_number}`
-            }
+            hint="Available on monday of race weekend"
           />
         )}
       </div>
@@ -287,22 +405,72 @@ function Mini({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** One incident-probability row: a shrunk percentage with an optional average
+ * deployment count, and a gauge bar. `prob`/`deployments` are nullable. */
+function IncidentRow({
+  label,
+  prob,
+  deployments,
+  tone = 'gold',
+}: {
+  label: string
+  prob: number | null | undefined
+  deployments?: number | null
+  /** Visual tone for the value/bar — 'danger' marks red-flag-severity incidents. */
+  tone?: 'gold' | 'danger'
+}) {
+  const targetPct = prob != null ? Math.max(0, Math.min(100, prob * 100)) : null
+  const pct = useCountUp(targetPct)
+  const animatedDeployments = useCountUp(deployments)
+  const has = pct != null
+  const danger = tone === 'danger'
+  return (
+    <div className={styles.incidentRow}>
+      <div className={styles.incidentLabel}>{label}</div>
+      <div className={styles.incidentValueRow}>
+        <span
+          className={`${styles.incidentValue} ${danger ? styles.incidentValueDanger : ''}`}
+        >
+          {has ? Math.round(pct) : '—'}
+        </span>
+        {has && (
+          <span
+            className={`${styles.incidentUnit} ${danger ? styles.incidentUnitDanger : ''}`}
+          >
+            %
+          </span>
+        )}
+        {animatedDeployments != null && (
+          <span className={styles.incidentSub}>{animatedDeployments.toFixed(1)} avg</span>
+        )}
+      </div>
+      <div className={styles.incidentBar}>
+        <div
+          className={`${styles.incidentBarFill} ${danger ? styles.incidentBarFillDanger : ''}`}
+          style={{ width: `${pct ?? 0}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 function Gauge({ label, value }: { label: string; value: number | null }) {
-  const has = value != null
-  const pct = has ? Math.max(0, Math.min(100, value)) : 0
+  const targetPct = value != null ? Math.max(0, Math.min(100, value)) : null
+  const pct = useCountUp(targetPct)
+  const has = pct != null
   return (
     <div className={styles.gauge}>
       <div className={styles.gaugeLabel}>{label}</div>
       <div className={styles.gaugeValueRow}>
         <span className={`${styles.gaugeValue} ${has ? '' : styles.gaugeValueEmpty}`}>
-          {has ? Math.round(value) : '—'}
+          {has ? Math.round(pct) : '—'}
         </span>
         {has && <span className={styles.gaugeScale}>/100</span>}
       </div>
       <div className={styles.gaugeBar}>
         <div
           className={styles.gaugeBarFill}
-          style={{ width: `${pct}%`, background: scaleColor(pct) }}
+          style={{ width: `${pct ?? 0}%`, background: scaleColor(pct ?? 0) }}
         />
       </div>
     </div>

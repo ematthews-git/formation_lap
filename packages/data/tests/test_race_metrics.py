@@ -132,22 +132,61 @@ def test_dnf_and_lap1_dnf():
 # --- overtaking / position ---
 
 
-def test_overtakes_counts_green_position_gains():
-    # VER holds P1; HAM climbs 3 -> 2 -> 1 (two gains).
+def test_overtakes_counts_on_track_order_swaps():
+    # Three cars, all on green racing laps. C passes B (lap1->2), then C passes A (lap2->3):
+    #   lap1  A=1 B=2 C=3
+    #   lap2  A=1 B=3 C=2   (C got by B)
+    #   lap3  A=2 B=3 C=1   (C got by A)
     laps = make_laps([
-        {"driver": "VER", "lap": 1, "position": 1}, {"driver": "VER", "lap": 2, "position": 2},
-        {"driver": "VER", "lap": 3, "position": 2},
-        {"driver": "HAM", "lap": 1, "position": 3}, {"driver": "HAM", "lap": 2, "position": 2},
-        {"driver": "HAM", "lap": 3, "position": 1},
+        {"driver": "A", "lap": 1, "position": 1}, {"driver": "A", "lap": 2, "position": 1},
+        {"driver": "A", "lap": 3, "position": 2},
+        {"driver": "B", "lap": 1, "position": 2}, {"driver": "B", "lap": 2, "position": 3},
+        {"driver": "B", "lap": 3, "position": 3},
+        {"driver": "C", "lap": 1, "position": 3}, {"driver": "C", "lap": 2, "position": 2},
+        {"driver": "C", "lap": 3, "position": 1},
     ])
-    feat = rm.race_features(laps, make_results([{"driver": "HAM", "finish": 1}]), DRY)
+    feat = rm.race_features(laps, make_results([{"driver": "C", "finish": 1}]), DRY)
     assert feat["overtakes"] == 2.0
 
 
-def test_lap1_gains_from_grid_to_end_of_lap1():
-    laps = make_laps([{"driver": "HAM", "lap": 1, "position": 2}])
-    results = make_results([{"driver": "HAM", "grid": 5, "finish": 1}])  # gained 3 off the line
-    assert rm.race_features(laps, results, DRY)["pos_changes_lap1"] == 3.0
+def test_overtakes_ignore_position_gain_from_a_rival_pitting():
+    # B holds P1 on green; A jumps P2->P1 only because B is on its in-lap that lap (a pit
+    # promotion, not an on-track pass) -> zero on-track passes.
+    laps = make_laps([
+        {"driver": "A", "lap": 1, "position": 2}, {"driver": "A", "lap": 2, "position": 1},
+        {"driver": "B", "lap": 1, "position": 1},
+        {"driver": "B", "lap": 2, "position": 2, "is_inlap": True, "is_green": False},
+    ])
+    feat = rm.race_features(laps, make_results([{"driver": "A", "finish": 1}]), DRY)
+    assert feat["overtakes"] == 0.0
+
+
+def test_lap1_position_changes_counts_moved_cars():
+    # Two cars off their grid slot at the end of lap 1, one held station -> 2 changed.
+    laps = make_laps([
+        {"driver": "A", "lap": 1, "position": 1},
+        {"driver": "B", "lap": 1, "position": 3},
+        {"driver": "C", "lap": 1, "position": 2},
+    ])
+    results = make_results([
+        {"driver": "A", "grid": 2, "finish": 1},  # 2 -> 1, moved
+        {"driver": "B", "grid": 3, "finish": 3},  # 3 -> 3, held
+        {"driver": "C", "grid": 1, "finish": 2},  # 1 -> 2, moved
+    ])
+    assert rm.race_features(laps, results, DRY)["pos_changes_lap1"] == 2.0
+
+
+def test_post_lap1_position_changes_vs_finish():
+    # End-of-lap-1 order A1 B2; A finishes P2, B finishes P1 -> both changed after the start.
+    laps = make_laps([
+        {"driver": "A", "lap": 1, "position": 1},
+        {"driver": "B", "lap": 1, "position": 2},
+    ])
+    results = make_results([
+        {"driver": "A", "grid": 1, "finish": 2},
+        {"driver": "B", "grid": 2, "finish": 1},
+    ])
+    assert rm.race_features(laps, results, DRY)["pos_changes_after_lap1"] == 2.0
 
 
 # --- grid / finish ---
@@ -211,15 +250,18 @@ def test_stint_degradation_slope_positive():
 # --- pit loss under SC/VSC ---
 
 
-def test_sc_pit_loss_bucketed():
+def test_sc_pit_loss_uses_neutralised_baseline():
+    # Green pace 90; SC circulating pace 120 (3+ laps to set the baseline). A stop under SC
+    # (in-lap 130, out-lap 125) costs relative to the SC pace, not green: (130-120)+(125-120)=15.
     laps = make_laps(
-        [{"driver": "VER", "lap": lap, "time": 90.0} for lap in range(1, 6)]  # green pace ~90
-        + [{"driver": "VER", "lap": 6, "time": 110.0, "is_inlap": True, "is_sc": True, "is_green": False}]
-        + [{"driver": "VER", "lap": 7, "time": 100.0, "is_outlap": True, "is_sc": True, "is_green": False}]
+        [{"driver": "OTH", "lap": lap, "time": 120.0, "is_sc": True, "is_green": False}
+         for lap in range(3, 6)]  # 3 SC circulating laps -> baseline 120
+        + [{"driver": "VER", "lap": lap, "time": 90.0} for lap in range(1, 3)]  # green pace
+        + [{"driver": "VER", "lap": 3, "time": 130.0, "is_inlap": True, "is_sc": True, "is_green": False},
+           {"driver": "VER", "lap": 4, "time": 125.0, "is_outlap": True, "is_sc": True, "is_green": False}]
     )
     feat = rm.race_features(laps, make_results([{"driver": "VER", "finish": 1}]), DRY)
-    # loss = (110-90) + (100-90) = 30, bucketed under SC
-    assert feat["sc_pit_losses"] == [pytest.approx(30.0)]
+    assert feat["sc_pit_losses"] == [pytest.approx(15.0)]  # well below a green pit loss
     assert feat["vsc_pit_losses"] == []
 
 

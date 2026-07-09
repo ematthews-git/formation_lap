@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from './client'
 import type {
   Circuit,
+  CircuitRaceStats,
   CircuitStats,
   Driver,
   LapRecord,
@@ -65,6 +66,22 @@ export function useCircuitStats(
     queryFn: () =>
       api.getOptional<CircuitStats>(
         `/circuits/${circuitId}/stats?season=${season}`,
+      ),
+  })
+}
+
+/** Empirical race-analytics blob for a circuit-season (null until the pre-season job runs). */
+export function useCircuitRaceStats(
+  circuitId: string | undefined,
+  season: number,
+) {
+  return useQuery({
+    queryKey: ['circuit-race-stats', circuitId, season],
+    enabled: !!circuitId,
+    // 404 (no stats yet) → null, an expected empty state.
+    queryFn: () =>
+      api.getOptional<CircuitRaceStats>(
+        `/circuits/${circuitId}/race-stats?season=${season}`,
       ),
   })
 }

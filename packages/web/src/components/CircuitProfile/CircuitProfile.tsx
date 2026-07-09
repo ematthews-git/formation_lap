@@ -96,7 +96,7 @@ export function CircuitProfile({
                     </span>
                   </div>
                 ) : (
-                  <EmptyState hint="Lap-records job not yet run" />
+                  <EmptyState hint="Lap-record not found" />
                 )}
               </div>
             </>

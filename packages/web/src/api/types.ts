@@ -88,6 +88,27 @@ export interface CircuitStats {
   updated_at: string | null
 }
 
+/** Empirical per-circuit race analytics over a trailing window (the JSONB `stats` blob).
+ * Only the groups the frontend currently reads are typed; other groups (grid, overtaking,
+ * weather, timing) are left loose. All numeric fields are nullable. */
+export interface CircuitRaceStats {
+  id: number | null
+  circuit_id: string
+  season: number
+  updated_at: string | null
+  stats: {
+    incidents?: Record<string, number | null>
+    pit?: Record<string, number | null>
+    tyres?: {
+      compound_usage_frequency?: Record<string, number>
+      max_stint_length?: number | null
+      avg_tyre_age_at_pit?: number | null
+      avg_stint_degradation_s_per_lap?: number | null
+    }
+    [group: string]: unknown
+  }
+}
+
 export interface LapRecord {
   id: number | null
   circuit_id: string

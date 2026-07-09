@@ -6,8 +6,8 @@
  *   'light' → white text  (use for dark/night photos)
  *
  * ── To add a photo for a circuit ──
- *   Drop `<name>.jpg` in `packages/web/public/`, add a
- *   `<circuit_id>: { src: '/<name>.jpg', tone: 'dark' | 'light' }` entry below,
+ *   Drop `<name>.webp` in `packages/web/public/`, add a
+ *   `<circuit_id>: { src: '/<name>.webp', tone: 'dark' | 'light' }` entry below,
  *   and flip `tone` to whichever reads better against that photo.
  *
  * ── Circuits without their own photo ──
@@ -21,14 +21,14 @@ export interface Hero {
 }
 
 const HERO_IMAGES: Record<string, Hero> = {
-  silverstone: { src: '/silverstone.jpg', tone: 'dark' },
-  spa: { src: '/spa.jpg', tone: 'light' },
-  hungaroring: { src: '/hungary.jpg', tone: 'light' },
-  monza: { src: '/monza.jpg', tone: 'light' },
-  baku: { src: '/baku.jpg', tone: 'dark' },
-  singapore: { src: '/singapore.jpg', tone: 'dark' },
-  austin: { src: '/austin.jpg', tone: 'dark' },
-  abu_dhabi: { src: '/abu-dhabi.jpg', tone: 'dark' },
+  silverstone: { src: '/silverstone.webp', tone: 'dark' },
+  spa: { src: '/spa.webp', tone: 'light' },
+  hungaroring: { src: '/hungary.webp', tone: 'light' },
+  monza: { src: '/monza.webp', tone: 'light' },
+  baku: { src: '/baku.webp', tone: 'dark' },
+  singapore: { src: '/singapore.webp', tone: 'dark' },
+  austin: { src: '/austin.webp', tone: 'dark' },
+  abu_dhabi: { src: '/abu-dhabi.webp', tone: 'dark' },
 }
 
 const HERO_FALLBACK: Hero | null = HERO_IMAGES.silverstone
