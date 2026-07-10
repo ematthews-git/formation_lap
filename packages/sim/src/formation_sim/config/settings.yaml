@@ -25,6 +25,8 @@ target:
   # In FastF1's 2026 calendar Silverstone (British GP) is ROUND 9 (2026-07-05, a
   # sprint weekend) and is the upcoming race with no sessions yet -> preliminary mode.
   # (The brief called it "round 14"; that slot is Madrid. Data-driven numbering wins.)
+
+  # UPDATE FOR TRAINING - in any other situation the sim does not read these numbers.
   upcoming_round: 9
   last_completed_round: 8   # rounds 1-8 of 2026 are complete and usable for training
 
