@@ -140,6 +140,38 @@ def run_prelim_sim(
         )
 
 
+def run_prelim_sim_for_remaining_calendar(season: int, today: date | None = None) -> None:
+    """Manual bulk backfill: prelim sim for every round still to come in `season`.
+
+    Unlike `run_prelim_sim` (gated to the current race week's 7-day window), this walks
+    the whole remaining calendar in one pass — e.g. to seed every future weekend's
+    projection right after the season is loaded, or to refresh them all after a model
+    change. Triggered by hand via workflow_dispatch, not on a recurring cron: each round
+    re-fits season form from scratch, so sweeping the full calendar is real FastF1 +
+    compute cost, not something to pay on every scheduled tick.
+    """
+    today = today or date.today()
+    with connection_scope() as conn:
+        remaining = repositories.remaining_race_weekends(conn, season, today)
+        if not remaining:
+            logger.info(
+                "run_prelim_sim_for_remaining_calendar season=%s today=%s: no remaining rounds",
+                season,
+                today,
+            )
+            return
+        for rw in remaining:
+            logger.info(
+                "run_prelim_sim_for_remaining_calendar: prelim sim for %s R%s (race %s)",
+                rw.season,
+                rw.round_number,
+                rw.race_date,
+            )
+            sim_strategies.run(
+                conn, season=rw.season, round_number=rw.round_number, mode="prelim"
+            )
+
+
 def run_post_race_for_last_weekend(today: date | None = None) -> None:
     """Called on a cron. No-ops if every past race already has results loaded.
 
@@ -258,6 +290,7 @@ __all__ = [
     "run_pre_season",
     "run_weather_refresh",
     "run_prelim_sim",
+    "run_prelim_sim_for_remaining_calendar",
     "run_post_race_for_last_weekend",
     "run_postquali_sim",
     "run_post_session",

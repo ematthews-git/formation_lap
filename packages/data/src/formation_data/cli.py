@@ -279,6 +279,16 @@ def run_prelim(
     orchestrator.run_prelim_sim(season=season, round_number=round_number)
 
 
+@app.command("run-prelim-remaining")
+def run_prelim_remaining(season: int = typer.Option(...)) -> None:
+    """Manual bulk backfill: prelim sim for every round still to come this season.
+
+    Unlike `run-prelim` (gated to the current race week), this sweeps the whole
+    remaining calendar in one pass. Meant for workflow_dispatch, not a recurring
+    schedule — each round re-fits season form from scratch."""
+    orchestrator.run_prelim_sim_for_remaining_calendar(season=season)
+
+
 @app.command("run-post-race")
 def run_post_race() -> None:
     orchestrator.run_post_race_for_last_weekend()

@@ -11,6 +11,10 @@ frames, so it's unit-testable with fabricated DataFrames. Conventions:
   * rates/probabilities are fractions in ``[0, 1]``; counts and seconds are absolute.
   * "deployments" are rising edges of the per-lap SC/VSC flags (one continuous period = one).
   * tyre metrics are computed on DRY races only, so they stay meaningful.
+  * pit losses are per-stop deltas vs a lap-matched field median (see :func:`_pit_losses`),
+    so sc / vsc / green numbers are directly comparable.
+  * stint degradation is fuel-corrected (see :func:`_stint_slopes`); the raw within-stint
+    lap-time trend nets out fuel burn and would read near zero.
 """
 
 from __future__ import annotations
@@ -21,8 +25,12 @@ import pandas as pd
 SLICKS = ("SOFT", "MEDIUM", "HARD")
 POINTS_CUTOFF = 10  # a top-10 finish scores points
 TOP10_GRID = 10  # "outside the top 10" on the grid
-_MAX_PIT_LOSS_S = 80.0  # guard: in/out-lap deltas above this are garbage (SC laps run slow)
+_MAX_PIT_LOSS_S = 80.0  # guard: per-stop losses above this are garbage (penalty served, damage)
+_MIN_PIT_LOSS_S = -30.0  # guard: SC bunching can make a stop near-free, but not this free
+_MIN_BASELINE_CARS = 5  # circulating cars needed for a lap's field-median baseline
 _MIN_STINT_LAPS = 4  # laps needed to fit a stint degradation slope
+START_FUEL_KG = 100.0  # approximate race-start fuel load
+LAPTIME_S_PER_KG = 0.03  # approximate lap-time cost per kg of fuel (~0.3 s per 10 kg)
 
 
 def _r(x, n=3):
@@ -60,22 +68,21 @@ def _classify_race(laps: pd.DataFrame, rainfall: bool) -> str:
     return "dry"
 
 
-def _neutralised_pace(laps: pd.DataFrame, flag: str, min_laps: int = 3) -> float | None:
-    """Median circulating lap time under a caution (``flag`` = is_sc / is_vsc), excluding
-    in/out laps — the pace a car pitting under that caution is measured against. None if the
-    caution had too few full laps to establish a baseline."""
-    times = laps.loc[laps[flag] & ~laps["is_inlap"] & ~laps["is_outlap"], "lap_time_s"].dropna()
-    return float(times.median()) if len(times) >= min_laps else None
-
-
 def _pit_losses(laps: pd.DataFrame) -> dict[str, list[float]]:
-    """Per-stop time loss for stops made under SC / VSC, measured against that caution's
-    NEUTRALISED circulating pace: ``(in-lap − pace) + (out-lap − pace)``. Pitting under a
-    caution is cheap precisely because the whole field is slowed, so baselining against the
-    caution pace (not green pace) is what makes this come out below the sim's green pit loss.
-    Green-flag stops are left to the sim's per-weekend estimate."""
-    out: dict[str, list[float]] = {"sc": [], "vsc": []}
-    pace = {"sc": _neutralised_pace(laps, "is_sc"), "vsc": _neutralised_pace(laps, "is_vsc")}
+    """Per-stop time loss vs the field, bucketed by track state (sc / vsc / green).
+
+    Each stop is measured against a LAP-MATCHED baseline: for the in-lap and out-lap,
+    the delta to the median lap time of cars circulating (neither in nor out) on that
+    same lap number. Because the baseline tracks whatever the field was doing on those
+    exact laps — green pace, SC queue, VSC crawl, or a mid-lap transition — the losses
+    are directly comparable across buckets, and caution stops naturally come out below
+    green ones (the field covers less ground while the pitting car sits at pit speed).
+
+    Stops touching a red flag are skipped (a red-flag pit visit is free, not a stop);
+    a lap with fewer than ``_MIN_BASELINE_CARS`` circulating cars has no baseline."""
+    out: dict[str, list[float]] = {"sc": [], "vsc": [], "green": []}
+    circulating = laps[~laps["is_inlap"] & ~laps["is_outlap"]]
+    base = circulating.groupby("lap_number")["lap_time_s"].agg(["median", "count"])
     for _, g in laps.groupby("driver"):
         g = g.sort_values("lap_number")
         for _, il in g[g["is_inlap"]].iterrows():
@@ -86,17 +93,24 @@ def _pit_losses(laps: pd.DataFrame) -> dict[str, list[float]]:
             it, ot = il["lap_time_s"], ol["lap_time_s"]
             if not (pd.notna(it) and pd.notna(ot)):
                 continue
+            if bool(il["is_red"]) or bool(ol["is_red"]):
+                continue
+            bi = base["median"].get(il["lap_number"], np.nan)
+            bo = base["median"].get(ol["lap_number"], np.nan)
+            ni = base["count"].get(il["lap_number"], 0)
+            no = base["count"].get(ol["lap_number"], 0)
+            if not (np.isfinite(bi) and np.isfinite(bo)):
+                continue
+            if ni < _MIN_BASELINE_CARS or no < _MIN_BASELINE_CARS:
+                continue
             if bool(il["is_sc"]) or bool(ol["is_sc"]):
                 bucket = "sc"
             elif bool(il["is_vsc"]) or bool(ol["is_vsc"]):
                 bucket = "vsc"
             else:
-                continue
-            base = pace[bucket]
-            if base is None:
-                continue
-            loss = (it - base) + (ot - base)
-            if 0.0 < loss < _MAX_PIT_LOSS_S:
+                bucket = "green"
+            loss = (it - bi) + (ot - bo)
+            if _MIN_PIT_LOSS_S < loss < _MAX_PIT_LOSS_S:
                 out[bucket].append(float(loss))
     return out
 
@@ -156,12 +170,20 @@ def _post_lap1_position_changes(laps: pd.DataFrame, results: pd.DataFrame) -> fl
 
 
 def _stint_slopes(laps: pd.DataFrame) -> list[float]:
-    """Per-stint OLS slope of lap time vs tyre age (s/lap) on clean green laps — the observed
-    within-stint trend, net of fuel burn (which pulls it down)."""
+    """Per-stint fuel-corrected degradation slope (s/lap) on clean green laps.
+
+    The raw OLS slope of lap time vs tyre age nets out fuel burn — the car gets lighter
+    every lap, which masks almost all of the tyre falloff (raw slopes hover near zero).
+    Adding back the approximate per-lap fuel gain (``START_FUEL_KG / race laps *
+    LAPTIME_S_PER_KG``) recovers the equal-fuel degradation rate."""
     clean = laps[
         laps["is_green"] & ~laps["is_inlap"] & ~laps["is_outlap"]
         & _b(laps["is_accurate"]) & ~_b(laps["deleted"])
     ]
+    total_laps = float(np.nanmax(laps["lap_number"].to_numpy(dtype=float))) if len(laps) else 0.0
+    if not np.isfinite(total_laps) or total_laps < 1:
+        return []
+    fuel_s_per_lap = START_FUEL_KG / total_laps * LAPTIME_S_PER_KG
     slopes: list[float] = []
     for _, g in clean.groupby(["driver", "stint"]):
         x = g["tyre_life"].to_numpy(dtype=float)
@@ -169,7 +191,7 @@ def _stint_slopes(laps: pd.DataFrame) -> list[float]:
         ok = np.isfinite(x) & np.isfinite(y)
         if ok.sum() < _MIN_STINT_LAPS or np.ptp(x[ok]) < 1:
             continue
-        slopes.append(float(np.polyfit(x[ok], y[ok], 1)[0]))
+        slopes.append(float(np.polyfit(x[ok], y[ok], 1)[0]) + fuel_s_per_lap)
     return slopes
 
 
@@ -233,6 +255,7 @@ def race_features(laps: pd.DataFrame, results: pd.DataFrame, weather: dict) -> d
         "n_lap1_dnf": n_lap1_dnf,
         "sc_pit_losses": pit["sc"],
         "vsc_pit_losses": pit["vsc"],
+        "green_pit_losses": pit["green"],
         "overtakes": _on_track_passes(laps),
         "pos_changes_after_lap1": _post_lap1_position_changes(laps, results),
         "pos_changes_lap1": _lap1_position_changes(laps, results),
@@ -330,6 +353,7 @@ def aggregate(features: list[dict], *, seasons: list[int]) -> dict:
     stint_maxes = [f["stint_max"] for f in dry if f["stint_max"] is not None]
     sc_losses = [x for f in features for x in f["sc_pit_losses"]]
     vsc_losses = [x for f in features for x in f["vsc_pit_losses"]]
+    green_losses = [x for f in features for x in f["green_pit_losses"]]
 
     return {
         "meta": {
@@ -350,6 +374,7 @@ def aggregate(features: list[dict], *, seasons: list[int]) -> dict:
         "pit": {
             "sc_pit_loss_s": _r(np.median(sc_losses) if sc_losses else None, 1),
             "vsc_pit_loss_s": _r(np.median(vsc_losses) if vsc_losses else None, 1),
+            "green_pit_loss_s": _r(np.median(green_losses) if green_losses else None, 1),
         },
         "overtaking": {
             "avg_overtakes_per_race": _r(_mean(f["overtakes"] for f in features), 1),
@@ -371,7 +396,9 @@ def aggregate(features: list[dict], *, seasons: list[int]) -> dict:
             "compound_usage_frequency": _normalise(compound_laps),
             "max_stint_length": max(stint_maxes) if stint_maxes else None,
             "avg_tyre_age_at_pit": _r(_mean(pit_ages), 1),
-            "avg_stint_degradation_s_per_lap": _r(_mean(stint_slopes), 3),
+            "avg_stint_degradation_s_per_lap": _r(
+                np.median(stint_slopes) if stint_slopes else None, 3
+            ),
         },
         "weather": {
             "dry_race_share": _r(_rate(f["class"] == "dry" for f in features)),

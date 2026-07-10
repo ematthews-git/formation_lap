@@ -237,32 +237,105 @@ def test_tyre_metrics_empty_on_wet_race():
     assert feat["pit_ages"] == [] and feat["stint_slopes"] == []
 
 
-def test_stint_degradation_slope_positive():
+def test_stint_degradation_slope_is_fuel_corrected():
+    # Raw within-stint trend is +0.2 s/lap; the reported slope adds back the per-lap fuel
+    # gain (START_FUEL_KG / race laps * LAPTIME_S_PER_KG) that the raw trend nets out.
     laps = make_laps([
         {"driver": "VER", "lap": lap, "stint": 1, "compound": "MEDIUM",
          "tyre_life": lap, "time": 90.0 + 0.2 * lap}
         for lap in range(1, 8)
     ])
+    fuel = rm.START_FUEL_KG / 7 * rm.LAPTIME_S_PER_KG
     feat = rm.race_features(laps, make_results([{"driver": "VER", "finish": 1}]), DRY)
-    assert feat["stint_slopes"] and feat["stint_slopes"][0] == pytest.approx(0.2, abs=1e-6)
+    assert feat["stint_slopes"] and feat["stint_slopes"][0] == pytest.approx(0.2 + fuel, abs=1e-6)
 
 
-# --- pit loss under SC/VSC ---
+# --- pit loss (lap-matched field baseline) ---
+
+FIELD = [f"O{i}" for i in range(1, 6)]  # 5 circulating cars = the minimum baseline field
 
 
-def test_sc_pit_loss_uses_neutralised_baseline():
-    # Green pace 90; SC circulating pace 120 (3+ laps to set the baseline). A stop under SC
-    # (in-lap 130, out-lap 125) costs relative to the SC pace, not green: (130-120)+(125-120)=15.
+def _field_laps(times_by_lap: dict[int, float], **flags_by_lap) -> list[dict]:
+    """Rows for the 5-car baseline field: every car runs ``times_by_lap[lap]`` on each lap.
+    ``flags_by_lap`` maps a flag name to the set of laps where it's raised."""
+    rows = []
+    for d in FIELD:
+        for lap, t in times_by_lap.items():
+            row = {"driver": d, "lap": lap, "time": t}
+            for flag, laps_on in flags_by_lap.items():
+                if lap in laps_on:
+                    row[flag] = True
+                    row["is_green"] = False
+            rows.append(row)
+    return rows
+
+
+def test_sc_pit_loss_vs_lap_matched_field():
+    # Field runs 90 on green laps 1-2, then 120/118 under SC on laps 3-4. A stop under SC
+    # (in-lap 130 on lap 3, out-lap 125 on lap 4) costs vs the field ON THOSE LAPS:
+    # (130-120) + (125-118) = 17 — well below a green stop's cost.
     laps = make_laps(
-        [{"driver": "OTH", "lap": lap, "time": 120.0, "is_sc": True, "is_green": False}
-         for lap in range(3, 6)]  # 3 SC circulating laps -> baseline 120
-        + [{"driver": "VER", "lap": lap, "time": 90.0} for lap in range(1, 3)]  # green pace
-        + [{"driver": "VER", "lap": 3, "time": 130.0, "is_inlap": True, "is_sc": True, "is_green": False},
+        _field_laps({1: 90.0, 2: 90.0, 3: 120.0, 4: 118.0}, is_sc={3, 4})
+        + [{"driver": "VER", "lap": 1, "time": 90.0}, {"driver": "VER", "lap": 2, "time": 90.0},
+           {"driver": "VER", "lap": 3, "time": 130.0, "is_inlap": True, "is_sc": True, "is_green": False},
            {"driver": "VER", "lap": 4, "time": 125.0, "is_outlap": True, "is_sc": True, "is_green": False}]
     )
     feat = rm.race_features(laps, make_results([{"driver": "VER", "finish": 1}]), DRY)
-    assert feat["sc_pit_losses"] == [pytest.approx(15.0)]  # well below a green pit loss
-    assert feat["vsc_pit_losses"] == []
+    assert feat["sc_pit_losses"] == [pytest.approx(17.0)]
+    assert feat["vsc_pit_losses"] == [] and feat["green_pit_losses"] == []
+
+
+def test_green_pit_loss_bucket():
+    # Field steady at 90; a green stop with in-lap 100 and out-lap 102 loses (10 + 12) = 22.
+    laps = make_laps(
+        _field_laps({1: 90.0, 2: 90.0, 3: 90.0})
+        + [{"driver": "VER", "lap": 1, "time": 90.0},
+           {"driver": "VER", "lap": 2, "time": 100.0, "is_inlap": True},
+           {"driver": "VER", "lap": 3, "time": 102.0, "is_outlap": True}]
+    )
+    feat = rm.race_features(laps, make_results([{"driver": "VER", "finish": 1}]), DRY)
+    assert feat["green_pit_losses"] == [pytest.approx(22.0)]
+    assert feat["sc_pit_losses"] == [] and feat["vsc_pit_losses"] == []
+
+
+def test_pit_loss_straddling_caution_uses_per_lap_baselines():
+    # VSC ends between the in-lap (field at 110) and the out-lap (field back to 90). Each
+    # lap's delta is taken against ITS OWN field median: (115-110) + (105-90) = 20, and the
+    # stop is bucketed VSC because it touched the caution.
+    laps = make_laps(
+        _field_laps({1: 90.0, 2: 110.0, 3: 90.0}, is_vsc={2})
+        + [{"driver": "VER", "lap": 1, "time": 90.0},
+           {"driver": "VER", "lap": 2, "time": 115.0, "is_inlap": True, "is_vsc": True, "is_green": False},
+           {"driver": "VER", "lap": 3, "time": 105.0, "is_outlap": True}]
+    )
+    feat = rm.race_features(laps, make_results([{"driver": "VER", "finish": 1}]), DRY)
+    assert feat["vsc_pit_losses"] == [pytest.approx(20.0)]
+    assert feat["green_pit_losses"] == []
+
+
+def test_red_flag_stop_excluded():
+    # A pit visit that touches a red flag is a free stop, not a measurable pit loss.
+    laps = make_laps(
+        _field_laps({1: 90.0, 2: 150.0, 3: 90.0}, is_red={2})
+        + [{"driver": "VER", "lap": 1, "time": 90.0},
+           {"driver": "VER", "lap": 2, "time": 160.0, "is_inlap": True, "is_red": True, "is_green": False},
+           {"driver": "VER", "lap": 3, "time": 100.0, "is_outlap": True}]
+    )
+    feat = rm.race_features(laps, make_results([{"driver": "VER", "finish": 1}]), DRY)
+    assert feat["sc_pit_losses"] == [] and feat["vsc_pit_losses"] == []
+    assert feat["green_pit_losses"] == []
+
+
+def test_pit_loss_needs_baseline_cars():
+    # Only 3 circulating cars on the stop laps -> below _MIN_BASELINE_CARS, no sample.
+    laps = make_laps(
+        [{"driver": d, "lap": lap, "time": 90.0} for d in ("O1", "O2", "O3") for lap in (1, 2, 3)]
+        + [{"driver": "VER", "lap": 1, "time": 90.0},
+           {"driver": "VER", "lap": 2, "time": 100.0, "is_inlap": True},
+           {"driver": "VER", "lap": 3, "time": 102.0, "is_outlap": True}]
+    )
+    feat = rm.race_features(laps, make_results([{"driver": "VER", "finish": 1}]), DRY)
+    assert feat["green_pit_losses"] == []
 
 
 # --- timing ---
@@ -296,7 +369,8 @@ def _feat(**over):
         "class": "dry", "is_dry": True,
         "sc_any": False, "vsc_any": False, "red_any": False, "rain_any": False,
         "sc_deployments": 0, "vsc_deployments": 0, "yellow_laps": 0,
-        "n_dnf": 0, "n_lap1_dnf": 0, "sc_pit_losses": [], "vsc_pit_losses": [],
+        "n_dnf": 0, "n_lap1_dnf": 0,
+        "sc_pit_losses": [], "vsc_pit_losses": [], "green_pit_losses": [],
         "overtakes": 0.0, "pos_changes_after_lap1": 0.0, "pos_changes_lap1": 0.0,
         "winner_grid": 1.0, "podium_outside_top10": False, "points_outside_top10": False,
         "grid_finish_pairs": [], "air_temp": None, "track_temp": None,
@@ -334,6 +408,23 @@ def test_aggregate_grid_map_and_correlation():
     blob = rm.aggregate(feats, seasons=[2024])
     assert blob["grid"]["quali_finish_correlation"] == pytest.approx(1.0)
     assert blob["grid"]["avg_finish_by_grid"] == {"1": 1.0, "2": 2.0, "3": 3.0}
+
+
+def test_aggregate_pit_loss_medians():
+    feats = [
+        _feat(sc_pit_losses=[10.0, 20.0], green_pit_losses=[20.0, 22.0]),
+        _feat(green_pit_losses=[24.0]),
+    ]
+    blob = rm.aggregate(feats, seasons=[2024])
+    assert blob["pit"]["sc_pit_loss_s"] == 15.0
+    assert blob["pit"]["vsc_pit_loss_s"] is None
+    assert blob["pit"]["green_pit_loss_s"] == 22.0
+
+
+def test_aggregate_stint_degradation_is_pooled_median():
+    feats = [_feat(stint_slopes=[0.02, 0.05]), _feat(stint_slopes=[0.08])]
+    blob = rm.aggregate(feats, seasons=[2024])
+    assert blob["tyres"]["avg_stint_degradation_s_per_lap"] == 0.05
 
 
 def test_aggregate_compound_usage_normalised():

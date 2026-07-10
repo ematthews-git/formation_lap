@@ -25,15 +25,20 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: "Command to run (e.g. 'run-weather', 'run-pre-season --season 2026'). Ignored if 'prelim_round' is set."
+        description: "Command to run (e.g. 'run-weather', 'run-pre-season --season 2026'). Ignored if 'prelim_round' is set or 'prelim_remaining' is checked."
         required: true
         default: "run-post-session"
       prelim_round:
-        description: "Optional: force run-prelim for this round number (skips the race-week gate). Requires prelim_season."
+        description: "Optional: force run-prelim for this round number (skips the race-week gate). Requires prelim_season. Takes precedence over 'prelim_remaining'."
         required: false
         default: ""
+      prelim_remaining:
+        description: "Bulk-backfill run-prelim-remaining for every round left in prelim_season (skipped if 'prelim_round' is set)."
+        required: false
+        type: boolean
+        default: false
       prelim_season:
-        description: "Season for the forced prelim run (defaults to the current year)."
+        description: "Season for the forced prelim run or the bulk backfill (defaults to the current year)."
         required: false
         default: ""
 
@@ -71,12 +76,16 @@ jobs:
               uv run --package formation-data formation-data run-pre-season --season "$(date +%Y)"
               ;;
             *)
-              # Forced prelim for a specific round takes precedence over the free-form command.
+              # Forced prelim for a specific round takes precedence over the bulk backfill,
+              # which takes precedence over the free-form command.
+              season="${{ github.event.inputs.prelim_season }}"
+              season="${season:-$(date +%Y)}"
               if [ -n "${{ github.event.inputs.prelim_round }}" ]; then
-                season="${{ github.event.inputs.prelim_season }}"
-                season="${season:-$(date +%Y)}"
                 uv run --package formation-data formation-data run-prelim \
                   --season "$season" --round "${{ github.event.inputs.prelim_round }}"
+              elif [ "${{ github.event.inputs.prelim_remaining }}" = "true" ]; then
+                uv run --package formation-data formation-data run-prelim-remaining \
+                  --season "$season"
               else
                 uv run --package formation-data formation-data ${{ github.event.inputs.command }}
               fi

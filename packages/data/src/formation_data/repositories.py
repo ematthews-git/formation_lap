@@ -259,6 +259,22 @@ def list_race_weekends(conn: Connection, season: int) -> list[domain.RaceWeekend
     return [domain.RaceWeekend.model_validate(row._mapping) for row in rows]
 
 
+def remaining_race_weekends(
+    conn: Connection, season: int, today: date
+) -> list[domain.RaceWeekend]:
+    """Race weekends in `season` whose race hasn't happened yet (race_date >= today),
+    in round order. Drives the bulk prelim backfill (`run-prelim-remaining`)."""
+    rows = conn.execute(
+        select(schema.race_weekends)
+        .where(
+            schema.race_weekends.c.season == season,
+            schema.race_weekends.c.race_date >= today,
+        )
+        .order_by(schema.race_weekends.c.round_number)
+    ).all()
+    return [domain.RaceWeekend.model_validate(row._mapping) for row in rows]
+
+
 def get_race_weekend(
     conn: Connection, season: int, round_number: int
 ) -> domain.RaceWeekend | None:
