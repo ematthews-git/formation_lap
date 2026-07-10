@@ -74,7 +74,10 @@ def simulate_race(mode: str, year: int, rnd: int, n_sims: int | None = None,
     seed = seed if seed is not None else int(cfg["simulation"]["seed"])
 
     ps = estimate.fit_all(cfg)
-    profiles = circuit.build_circuit_profiles(ps.lap, cfg)
+    # Load the committed circuit-profile artifact rather than rebuilding it from ~110
+    # historical sessions on every run (which needs a warm FastF1 cache and blows the
+    # 500-req/h budget in CI). Falls back to a rebuild only if the artifact is absent.
+    profiles = circuit.get_circuit_profiles(ps.lap, cfg)
 
     if mode == "postquali":
         wctx = build_postquali_context(year, rnd, ps, profiles, cfg)

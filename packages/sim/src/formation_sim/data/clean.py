@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from formation_sim.data import collector, schema, session_filter
+from formation_sim.data import artifacts, collector, schema, session_filter
 from formation_sim.data.schema import DRY_COMPOUNDS
 from formation_sim.settings import load_settings, resolve_path
 
@@ -56,11 +56,14 @@ def get_clean_race(year: int, rnd: int, cfg: dict | None = None,
     """Return the cleaned lap frame for one race, caching to disk. None if absent."""
     cfg = cfg or load_settings()
     path = _derived_path(cfg, year, rnd)
-    if use_cache and path.exists():
-        df = pd.read_pickle(path)
-        # Older caches predate circuit-name normalisation (Monaco vs Monte Carlo).
-        df["circuit"] = df["circuit"].map(schema.normalize_circuit)
-        return df
+    if use_cache:
+        # Read from the active store (local disk by default; a DB-backed store when one is
+        # injected, e.g. in CI). Falls through to a live FastF1 fetch on a miss.
+        df = artifacts.get_store().read("laps", year, rnd, cfg)
+        if df is not None:
+            # Older caches predate circuit-name normalisation (Monaco vs Monte Carlo).
+            df["circuit"] = df["circuit"].map(schema.normalize_circuit)
+            return df
     ses = collector.load_session(year, rnd, "R", weather=False, messages=False)
     if ses is None:
         return None

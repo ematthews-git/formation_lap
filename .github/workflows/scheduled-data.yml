@@ -66,10 +66,10 @@ jobs:
               ;;
             "0 6 * * MON")
               uv run --package formation-data formation-data run-post-race
-              uv run --package formation-data formation-data run-prelim
+              uv run --package formation-data formation-data run-prelim --source db
               ;;
             "0 * * * FRI,SAT,SUN"|"0 0-5 * * MON")
-              uv run --package formation-data formation-data run-post-session
+              uv run --package formation-data formation-data run-post-session --source db
               ;;
             "0 6 15 1 *")
               # Adjust the season once a year, or trigger manually via workflow_dispatch.
@@ -82,10 +82,10 @@ jobs:
               season="${season:-$(date +%Y)}"
               if [ -n "${{ github.event.inputs.prelim_round }}" ]; then
                 uv run --package formation-data formation-data run-prelim \
-                  --season "$season" --round "${{ github.event.inputs.prelim_round }}"
+                  --season "$season" --round "${{ github.event.inputs.prelim_round }}" --source db
               elif [ "${{ github.event.inputs.prelim_remaining }}" = "true" ]; then
                 uv run --package formation-data formation-data run-prelim-remaining \
-                  --season "$season"
+                  --season "$season" --source db
               else
                 uv run --package formation-data formation-data ${{ github.event.inputs.command }}
               fi

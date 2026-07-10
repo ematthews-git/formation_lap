@@ -42,13 +42,19 @@ def run(
     round_number: int,
     mode: str,
     n_sims: int | None = None,
+    source: str = "disk",
 ) -> None:
     """Simulate and persist strategy options for (season, round_number) in `mode`.
 
     `n_sims` overrides the simulator's configured Monte-Carlo count (None = its default).
+    `source` selects where the sim reads its cleaned per-race laps: "disk" (local pkl / live
+    FastF1, the default) or "db" (the `derived_artifacts` table via `DbArtifactStore`), the
+    latter used in CI so the strategy prior + season form don't re-fetch ~110 FastF1 sessions.
     """
     if mode not in MODES:
         raise ValueError(f"unknown sim mode {mode!r} (expected one of {MODES})")
+    if source not in ("disk", "db"):
+        raise ValueError(f"unknown source {source!r} (expected 'disk' or 'db')")
 
     rw = repositories.get_race_weekend(conn, season, round_number)
     if rw is None:
@@ -73,8 +79,17 @@ def run(
     # Imported lazily: the sim pulls in its own heavy deps and target-race FastF1 data,
     # neither of which the non-sim jobs sharing this process should pay for.
     from formation_sim.api import simulate_race
+    from formation_sim.data import artifacts
 
-    result = simulate_race(mode, season, round_number, n_sims=n_sims)
+    if source == "db":
+        # Read cleaned laps from Postgres (this open transaction) for the duration of the run,
+        # so the sim never touches the FastF1 network for history / season form.
+        from formation_data.artifact_store import DbArtifactStore
+
+        with artifacts.using_store(DbArtifactStore(conn)):
+            result = simulate_race(mode, season, round_number, n_sims=n_sims)
+    else:
+        result = simulate_race(mode, season, round_number, n_sims=n_sims)
     shown = result["shown"]
     if not shown:
         logger.warning(

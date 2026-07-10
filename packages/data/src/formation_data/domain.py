@@ -221,6 +221,22 @@ class Standing(_Base):
     points: float
 
 
+class DerivedArtifact(_Base):
+    """One per-race derived table serialized to bytes (Parquet), keyed (kind, year, round).
+
+    Lets the sim read cleaned laps from the DB instead of local pkl / live FastF1 in CI.
+    `data` is the DataFrame serialized in `data_format`.
+    """
+
+    id: int | None = None
+    kind: str
+    year: int
+    round_number: int
+    data: bytes
+    data_format: str = "parquet"
+    updated_at: datetime | None = None
+
+
 __all__ = [
     "Circuit",
     "LapRecord",
@@ -239,4 +255,5 @@ __all__ = [
     "SessionResults",
     "RaceResult",
     "Standing",
+    "DerivedArtifact",
 ]

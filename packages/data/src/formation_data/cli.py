@@ -50,6 +50,7 @@ sim_strategies_app = typer.Typer(help="Simulated strategy options.")
 results_app = typer.Typer(help="Race finishing order.")
 standings_app = typer.Typer(help="Driver + constructor standings.")
 session_results_app = typer.Typer(help="Per-session classification / timesheet.")
+derived_app = typer.Typer(help="Derived-artifact store (sim laps in the DB).")
 db_app = typer.Typer(help="Database schema management.")
 
 app.add_typer(circuits_app, name="circuits")
@@ -65,6 +66,7 @@ app.add_typer(sim_strategies_app, name="sim-strategies")
 app.add_typer(results_app, name="results")
 app.add_typer(standings_app, name="standings")
 app.add_typer(session_results_app, name="session-results")
+app.add_typer(derived_app, name="derived")
 app.add_typer(db_app, name="db")
 
 
@@ -174,10 +176,15 @@ def sim_strategies_generate(
     round: int = typer.Option(..., "--round"),
     mode: str = typer.Option("postquali", help="Sim mode: 'prelim' or 'postquali'."),
     sims: int = typer.Option(None, "--sims", help="Monte-Carlo count override (default: sim config)."),
+    source: str = typer.Option(
+        "disk", help="Cleaned-laps source: 'disk' (local pkl / FastF1) or 'db' (derived_artifacts)."
+    ),
 ) -> None:
     """Run the strategy simulator and persist the race-level shown-5 + race-context stats."""
     with connection_scope() as conn:
-        sim_strategies.run(conn, season=season, round_number=round, mode=mode, n_sims=sims)
+        sim_strategies.run(
+            conn, season=season, round_number=round, mode=mode, n_sims=sims, source=source
+        )
 
 
 @results_app.command("refresh")
@@ -263,6 +270,11 @@ def run_weather() -> None:
     orchestrator.run_weather_refresh()
 
 
+_SOURCE_OPT = typer.Option(
+    "disk", help="Cleaned-laps source: 'disk' (local pkl / FastF1) or 'db' (derived_artifacts)."
+)
+
+
 @app.command("run-prelim")
 def run_prelim(
     season: int | None = typer.Option(
@@ -271,22 +283,25 @@ def run_prelim(
     round_number: int | None = typer.Option(
         None, "--round", help="Force prelim for this round (requires --season)."
     ),
+    source: str = _SOURCE_OPT,
 ) -> None:
     """Monday of race week: prelim strategy sim for that week's race (no-op otherwise).
 
     Pass --season and --round together to force the prelim sim for a specific weekend,
     skipping the race-week gate."""
-    orchestrator.run_prelim_sim(season=season, round_number=round_number)
+    orchestrator.run_prelim_sim(season=season, round_number=round_number, source=source)
 
 
 @app.command("run-prelim-remaining")
-def run_prelim_remaining(season: int = typer.Option(...)) -> None:
+def run_prelim_remaining(
+    season: int = typer.Option(...), source: str = _SOURCE_OPT
+) -> None:
     """Manual bulk backfill: prelim sim for every round still to come this season.
 
     Unlike `run-prelim` (gated to the current race week), this sweeps the whole
     remaining calendar in one pass. Meant for workflow_dispatch, not a recurring
     schedule — each round re-fits season form from scratch."""
-    orchestrator.run_prelim_sim_for_remaining_calendar(season=season)
+    orchestrator.run_prelim_sim_for_remaining_calendar(season=season, source=source)
 
 
 @app.command("run-post-race")
@@ -295,18 +310,45 @@ def run_post_race() -> None:
 
 
 @app.command("run-post-session")
-def run_post_session() -> None:
+def run_post_session(source: str = _SOURCE_OPT) -> None:
     """~45 min after each session: save session results, and run the postquali sim once
     Qualifying is done (idempotent catch-up)."""
-    orchestrator.run_post_session()
+    orchestrator.run_post_session(source=source)
 
 
 @app.command("run-postquali-sim")
-def run_postquali_sim() -> None:
+def run_postquali_sim(source: str = _SOURCE_OPT) -> None:
     """Postquali sim for any weekend whose quali finished ≥2h30 ago (idempotent catch-up).
 
     Manual escape hatch — the scheduled poll uses run-post-session, which does this too."""
-    orchestrator.run_postquali_sim()
+    orchestrator.run_postquali_sim(source=source)
+
+
+# --- derived-artifact store ---
+
+
+@derived_app.command("dump-laps")
+def derived_dump_laps(
+    season: int = typer.Option(None, help="Dump only this season (requires --round)."),
+    round: int = typer.Option(None, "--round", help="Dump only this round (requires --season)."),
+) -> None:
+    """Serialize cleaned per-race laps into the derived_artifacts table.
+
+    No args: dump every local laps_*.pkl (one-time history backfill from a warm cache).
+    With --season and --round: dump one race, fetching + cleaning it from FastF1 if it isn't
+    cached (post-race refresh so the current season stays available to the sim in CI)."""
+    from formation_data import artifact_store
+
+    if (season is None) != (round is None):
+        typer.echo("Provide both --season and --round, or neither.")
+        raise typer.Exit(code=1)
+    with connection_scope() as conn:
+        if season is not None:
+            stored = artifact_store.dump_race_laps(conn, season, round)
+            typer.echo(f"dump-laps {season} R{round}: {'stored' if stored else 'no data'}")
+        else:
+            n = artifact_store.dump_all_local_laps(conn)
+            typer.echo(f"dump-laps: stored {n} local laps files into derived_artifacts")
 
 
 # --- schema ---

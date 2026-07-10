@@ -202,6 +202,51 @@ def upsert_circuit_race_stats(
     conn.execute(stmt)
 
 
+def upsert_derived_artifact(
+    conn: Connection,
+    *,
+    kind: str,
+    year: int,
+    round_number: int,
+    data: bytes,
+    data_format: str = "parquet",
+) -> None:
+    """Upsert one serialized per-race derived table (one row per kind+year+round).
+
+    Re-dumping a race replaces its blob — the frame is regenerated wholesale, nothing to merge.
+    """
+    stmt = insert(schema.derived_artifacts).values(
+        kind=kind,
+        year=year,
+        round_number=round_number,
+        data=data,
+        data_format=data_format,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["kind", "year", "round_number"],
+        set_={
+            "data": stmt.excluded.data,
+            "data_format": stmt.excluded.data_format,
+            "updated_at": func.now(),
+        },
+    )
+    conn.execute(stmt)
+
+
+def get_derived_artifact(
+    conn: Connection, *, kind: str, year: int, round_number: int
+) -> domain.DerivedArtifact | None:
+    """The serialized derived table for (kind, year, round), or None if not stored."""
+    row = conn.execute(
+        select(schema.derived_artifacts).where(
+            schema.derived_artifacts.c.kind == kind,
+            schema.derived_artifacts.c.year == year,
+            schema.derived_artifacts.c.round_number == round_number,
+        )
+    ).first()
+    return domain.DerivedArtifact.model_validate(row._mapping) if row else None
+
+
 def upsert_session_results(
     conn: Connection, session_id: int, results: list[dict]
 ) -> None:

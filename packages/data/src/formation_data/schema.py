@@ -14,6 +14,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     MetaData,
     String,
     Table,
@@ -303,6 +304,30 @@ standings = Table(
 )
 
 
+# Per-race derived tables the simulator reads, serialized to bytes so CI can read them from
+# the DB instead of re-fetching ~110 FastF1 sessions (which blows the hourly rate limit). Each
+# row is one DataFrame as Parquet (version-portable, unlike pickle). `kind` = "laps" (cleaned
+# lap frame consumed by the strategy prior + season form) now; "results"/"lap1" reserved for
+# paramset rebuilds. Keyed (kind, year, round_number): one blob per derived file per race.
+derived_artifacts = Table(
+    "derived_artifacts",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("kind", String(15), nullable=False),
+    Column("year", Integer, nullable=False),
+    Column("round_number", Integer, nullable=False),
+    Column("data", LargeBinary, nullable=False),
+    Column("data_format", String(15), nullable=False, server_default="parquet"),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    UniqueConstraint("kind", "year", "round_number"),
+)
+
+
 __all__ = [
     "metadata",
     "circuits",
@@ -319,4 +344,5 @@ __all__ = [
     "session_results",
     "race_results",
     "standings",
+    "derived_artifacts",
 ]

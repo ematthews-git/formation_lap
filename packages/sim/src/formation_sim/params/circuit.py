@@ -138,6 +138,21 @@ def load_circuit_profiles(cfg: dict | None = None) -> dict[str, CircuitProfile]:
     return {c: CircuitProfile(**d) for c, d in raw.items()}
 
 
+def get_circuit_profiles(lap_model: LapModel, cfg: dict | None = None) -> dict[str, CircuitProfile]:
+    """Load the committed circuit-profile artifact if present, else build and save it.
+
+    Mirrors ``estimate.fit_all``'s cache behaviour: production / CI reads the committed
+    ``circuit_profiles.json`` (no historical session loads, so no FastF1 fetches), while a
+    fresh checkout without the artifact falls back to a full rebuild (needs the cache).
+    The committed profiles are built alongside the committed paramset, so their deg/fuel
+    coefficients already match ``lap_model``; ``lap_model`` is only used by the fallback.
+    """
+    cfg = cfg or load_settings()
+    if resolve_path(cfg["data"]["circuit_profiles_path"]).exists():
+        return load_circuit_profiles(cfg)
+    return build_circuit_profiles(lap_model, cfg)
+
+
 def get_profile(circuit: str, profiles: dict[str, CircuitProfile],
                 lap_model: LapModel | None = None) -> CircuitProfile:
     """Return the circuit's profile, or a field-median fallback profile."""

@@ -96,6 +96,7 @@ def run_prelim_sim(
     today: date | None = None,
     season: int | None = None,
     round_number: int | None = None,
+    source: str = "disk",
 ) -> None:
     """Called on the Monday of race week. Generates the prelim (pre-quali, season-form)
     strategy sim for that week's race, then superseded by the postquali sim once quali
@@ -136,11 +137,13 @@ def run_prelim_sim(
             rw.race_date,
         )
         sim_strategies.run(
-            conn, season=rw.season, round_number=rw.round_number, mode="prelim"
+            conn, season=rw.season, round_number=rw.round_number, mode="prelim", source=source
         )
 
 
-def run_prelim_sim_for_remaining_calendar(season: int, today: date | None = None) -> None:
+def run_prelim_sim_for_remaining_calendar(
+    season: int, today: date | None = None, source: str = "disk"
+) -> None:
     """Manual bulk backfill: prelim sim for every round still to come in `season`.
 
     Unlike `run_prelim_sim` (gated to the current race week's 7-day window), this walks
@@ -168,7 +171,11 @@ def run_prelim_sim_for_remaining_calendar(season: int, today: date | None = None
                 rw.race_date,
             )
             sim_strategies.run(
-                conn, season=rw.season, round_number=rw.round_number, mode="prelim"
+                conn,
+                season=rw.season,
+                round_number=rw.round_number,
+                mode="prelim",
+                source=source,
             )
 
 
@@ -187,6 +194,7 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
     published, so an as-yet-unscored weekend is simply retried on the next run.
     """
     today = today or date.today()
+    processed: list[tuple[int, int]] = []  # (season, official_round) to refresh laps for
     with connection_scope() as conn:
         pending = repositories.race_weekends_missing_results(conn, before=today)
         if not pending:
@@ -234,9 +242,26 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
                 season=rw.season,
                 round_number=official_round,
             )
+            processed.append((rw.season, official_round))
+
+    # Keep the sim's current-season laps fresh in derived_artifacts so prelim/postquali runs in
+    # CI (which read laps from the DB) can see just-completed races. Done in its own transaction,
+    # after the results/standings above have committed, so a laps-fetch/upsert hiccup can never
+    # roll those back. Best-effort: a failure just means the round is retried next run.
+    for season, rnd in processed:
+        try:
+            with connection_scope() as conn:
+                from formation_data import artifact_store
+
+                if artifact_store.dump_race_laps(conn, season, rnd):
+                    logger.info("run_post_race: stored laps for %s R%s", season, rnd)
+        except Exception:
+            logger.exception(
+                "run_post_race: laps dump failed for %s R%s (non-fatal)", season, rnd
+            )
 
 
-def run_postquali_sim(now: datetime | None = None) -> None:
+def run_postquali_sim(now: datetime | None = None, source: str = "disk") -> None:
     """Generate postquali sims for weekends whose Qualifying finished ≥2h30 ago and
     that don't have one yet (and whose race hasn't started).
 
@@ -252,11 +277,15 @@ def run_postquali_sim(now: datetime | None = None) -> None:
             return
         for rw in due:
             sim_strategies.run(
-                conn, season=rw.season, round_number=rw.round_number, mode="postquali"
+                conn,
+                season=rw.season,
+                round_number=rw.round_number,
+                mode="postquali",
+                source=source,
             )
 
 
-def run_post_session(now: datetime | None = None) -> None:
+def run_post_session(now: datetime | None = None, source: str = "disk") -> None:
     """Called on a frequent race-weekend poll. Two independently-gated steps:
 
     1. Save the classification for any session that ended ≥45 min ago and isn't stored yet
@@ -282,7 +311,11 @@ def run_post_session(now: datetime | None = None) -> None:
             logger.info("run_post_session now=%s: no postquali sims due", now)
         for rw in due_postquali:
             sim_strategies.run(
-                conn, season=rw.season, round_number=rw.round_number, mode="postquali"
+                conn,
+                season=rw.season,
+                round_number=rw.round_number,
+                mode="postquali",
+                source=source,
             )
 
 
