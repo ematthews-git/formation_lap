@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import {
   DEFAULT_SEASON,
   lookaheadWeekends,
@@ -179,6 +180,7 @@ export default function App() {
       </div>
       <Footer />
       <Analytics />
+      <SpeedInsights />
     </div>
   )
 }
