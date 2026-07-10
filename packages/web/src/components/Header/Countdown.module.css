@@ -1,12 +1,10 @@
 /* Sized to match the header title (.title) so the clock sits on its baseline.
-   The fixed `width` is what stops the jitter (the box never resizes as digits
-   tick) AND is the horizontal-position knob: because the clock is anchored to
-   the right, DECREASING the width pushes it toward the right edge, INCREASING
-   it pulls it left. Tune in ch (roughly one digit each). */
+   No fixed width: each digit below is pinned to its own 1ch slot, so the
+   rendered content width is constant across ticks and the box can just
+   shrink-wrap its content. Header.module.css's `1fr auto` grid + .clockSlot's
+   `justify-self: end` right-mount it flush against .inner's right edge. */
 .clock {
   flex: none;
-  width: 8.25ch;
-  text-align: left;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: clamp(48px, 7vw, 92px);
@@ -19,6 +17,16 @@
 
 .seconds {
   color: var(--accent-hot);
+}
+
+/* Saira Condensed's digit glyphs are proportional (no tabular-figures
+   support), so pin each character to a fixed-width slot to stop per-tick
+   jitter — `tabular-nums` above is a no-op for this font but kept as a
+   correct hint for any font that does support it. */
+.digit {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
 }
 
 @media (max-width: 750px) {

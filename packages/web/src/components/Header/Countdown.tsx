@@ -11,14 +11,27 @@ function raceTarget(raceDate: string | undefined) {
   return raceDate ? `${raceDate}T13:00:00Z` : undefined
 }
 
+/** Saira Condensed has no tabular-figures support and its digit glyphs vary
+    widely in width, so `tabular-nums` alone can't stop per-tick jitter — pin
+    each character to a fixed-width slot instead. */
+function Digits({ value }: { value: string }) {
+  return (
+    <>
+      {[...value].map((ch, i) => (
+        <span key={i} className={styles.digit}>{ch}</span>
+      ))}
+    </>
+  )
+}
+
 /** Big ticking lights-out countdown — DD:HH:MM.SS, sized to match the title. */
 export function Countdown({ raceDate }: { raceDate: string | undefined }) {
   const { d, h, m, s } = useCountdown(raceTarget(raceDate))
 
   return (
     <div className={styles.clock}>
-      {d}:{h}:{m}
-      <span className={styles.seconds}>.{s}</span>
+      <Digits value={d} />:<Digits value={h} />:<Digits value={m} />
+      <span className={styles.seconds}>.<Digits value={s} /></span>
     </div>
   )
 }
