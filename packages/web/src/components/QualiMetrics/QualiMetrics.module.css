@@ -1,0 +1,137 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.fill {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-height: 200px;
+}
+
+.body {
+  flex: 1;
+  display: grid;
+  /* scatter | metrics */
+  grid-template-columns: 1fr 1.15fr;
+}
+
+.chart {
+  padding: 18px 20px;
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.scatterSvg {
+  max-width: 320px;
+  overflow: visible;
+}
+
+.axis {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.identity {
+  stroke: var(--border-soft);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.calendarDot {
+  fill: var(--text-ghost);
+  opacity: 0.55;
+}
+
+.circuitDot {
+  fill: var(--accent);
+}
+
+.tickStart,
+.tickEnd,
+.axisTitleX,
+.axisTitleY {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  fill: var(--text-ghost);
+}
+
+.tickStart {
+  text-anchor: start;
+}
+
+.tickEnd {
+  text-anchor: end;
+}
+
+.axisTitleX,
+.axisTitleY {
+  text-anchor: middle;
+  fill: var(--text-fainter);
+  letter-spacing: 0.16em;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-fainter);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dotCircuit {
+  background: var(--accent);
+}
+
+.dotCalendar {
+  background: var(--text-ghost);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+}
+
+.cellBorder {
+  border-bottom: 1px solid var(--border-soft);
+  transition: background-color 0.12s ease;
+}
+
+.cellBorder:hover {
+  background: var(--glass-bg-raised);
+}
+
+.cellLeft {
+  border-left: 1px solid var(--border-soft);
+}
+
+@media (max-width: 750px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .chart {
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+}

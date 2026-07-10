@@ -1,4 +1,4 @@
-import type { Circuit, LapRecord } from '../../api/types'
+import type { Circuit, CircuitRaceStats, LapRecord } from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { StatCell } from '../common/StatCell'
@@ -18,6 +18,7 @@ interface Props {
   circuitLoading: boolean
   lapRecord: LapRecord | null | undefined
   lapRecordLoading: boolean
+  raceStats: CircuitRaceStats | null | undefined
 }
 
 export function CircuitProfile({
@@ -25,11 +26,23 @@ export function CircuitProfile({
   circuitLoading,
   lapRecord,
   lapRecordLoading,
+  raceStats,
 }: Props) {
   const distance =
     circuit ? Math.round(circuit.num_laps * circuit.track_length_km) : null
   const trackPath = circuit?.track_outline ?? FALLBACK_TRACK_PATH
   const [startX, startY] = pathStartPoint(trackPath)
+
+  // Empirical overtaking figures (null until the pre-season job has run).
+  const overtaking = raceStats?.stats?.overtaking
+  const avgOvertakes = overtaking?.avg_overtakes_per_race ?? null
+  const lap1 = overtaking?.avg_position_changes_lap1
+  const afterLap1 = overtaking?.avg_position_changes_after_lap1
+  // Share of position-change activity that happens on lap 1 vs the rest of the race.
+  const lap1Share =
+    lap1 != null && afterLap1 != null && lap1 + afterLap1 > 0
+      ? Math.round((lap1 / (lap1 + afterLap1)) * 100)
+      : null
 
   return (
     <Panel frosted className={styles.panel}>
@@ -71,16 +84,31 @@ export function CircuitProfile({
           ) : circuit ? (
             <>
               <div className={styles.cellBorder}>
-                <StatCell label="LAPS" value={circuit.num_laps} />
+                <StatCell label="LAPS" value={circuit.num_laps} size="md" />
               </div>
               <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
-                <StatCell label="DISTANCE" value={distance} unit="km" />
+                <StatCell label="DISTANCE" value={distance} unit="km" size="md" />
+              </div>
+              <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
+                <StatCell
+                  label="OVERTAKES/RACE"
+                  value={avgOvertakes != null ? avgOvertakes.toFixed(1) : '—'}
+                  size="md"
+                />
               </div>
               <div className={styles.cellBorder}>
-                <StatCell label="DRS ZONES" value={circuit.sm_zones} />
+                <StatCell label="DRS ZONES" value={circuit.sm_zones} size="md" />
               </div>
               <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
-                <StatCell label="CORNERS" value={circuit.num_corners} />
+                <StatCell label="CORNERS" value={circuit.num_corners} size="md" />
+              </div>
+              <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
+                <StatCell
+                  label="OVERTAKES IN L1"
+                  value={lap1Share != null ? lap1Share : '—'}
+                  unit={lap1Share != null ? '%' : undefined}
+                  size="md"
+                />
               </div>
               <div className={styles.lapRecord}>
                 <div className={styles.lapRecordLabel}>LAP RECORD</div>

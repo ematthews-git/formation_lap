@@ -89,21 +89,50 @@ export interface CircuitStats {
 }
 
 /** Empirical per-circuit race analytics over a trailing window (the JSONB `stats` blob).
- * Only the groups the frontend currently reads are typed; other groups (grid, overtaking,
- * weather, timing) are left loose. All numeric fields are nullable. */
+ * Groups mirror `race_metrics.aggregate`. All `*_rate`/`*_share` are fractions in [0,1];
+ * every numeric field is nullable (insufficient data → null). */
 export interface CircuitRaceStats {
   id: number | null
   circuit_id: string
   season: number
   updated_at: string | null
   stats: {
+    meta?: { n_races?: number; n_dry?: number; seasons?: number[] }
     incidents?: Record<string, number | null>
     pit?: Record<string, number | null>
+    overtaking?: {
+      avg_overtakes_per_race?: number | null
+      avg_position_changes_lap1?: number | null
+      avg_position_changes_after_lap1?: number | null
+    }
+    grid?: {
+      pole_to_win_rate?: number | null
+      win_outside_top3_quali_rate?: number | null
+      winner_outside_top5_rate?: number | null
+      podium_outside_top10_rate?: number | null
+      points_outside_top10_rate?: number | null
+      quali_finish_correlation?: number | null
+      // Grid slot (string key) → mean classified finish for that slot.
+      avg_finish_by_grid?: Record<string, number>
+    }
     tyres?: {
       compound_usage_frequency?: Record<string, number>
       max_stint_length?: number | null
       avg_tyre_age_at_pit?: number | null
       avg_stint_degradation_s_per_lap?: number | null
+    }
+    weather?: {
+      dry_race_share?: number | null
+      mixed_race_share?: number | null
+      wet_race_share?: number | null
+      rain_during_race_rate?: number | null
+      avg_air_temp_c?: number | null
+      avg_track_temp_c?: number | null
+    }
+    timing?: {
+      avg_race_duration_s?: number | null
+      avg_winner_to_p10_s?: number | null
+      avg_winner_to_last_s?: number | null
     }
     [group: string]: unknown
   }

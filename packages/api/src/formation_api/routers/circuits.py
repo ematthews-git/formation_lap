@@ -35,6 +35,11 @@ def _get_race_stats(circuit_id: str, season: int) -> CircuitRaceStats | None:
         return repositories.get_circuit_race_stats(conn, circuit_id, season)
 
 
+def _calendar_grid_averages(season: int) -> dict[str, float]:
+    with connection_scope() as conn:
+        return repositories.calendar_avg_finish_by_grid(conn, season)
+
+
 def _get_lap_record(circuit_id: str) -> LapRecord | None:
     with connection_scope() as conn:
         return repositories.get_lap_record_for_circuit(conn, circuit_id)
@@ -48,6 +53,17 @@ def _get_podiums(circuit_id: str, limit: int) -> list[RaceResult]:
 @router.get("/", response_model=list[Circuit])
 async def list_circuits() -> list[Circuit]:
     return await asyncio.to_thread(_list_all)
+
+
+# Declared before "/{circuit_id}" so the literal path isn't captured as a circuit id.
+@router.get("/calendar-grid-averages", response_model=dict[str, float])
+async def get_calendar_grid_averages(season: int) -> dict[str, float]:
+    """Calendar-wide mean finish per grid slot, pooled across all circuits for a season.
+
+    Empty ``{}`` when no circuit has race stats yet (rather than 404) — the frontend
+    overlays these as the grey baseline on the quali scatterplot.
+    """
+    return await asyncio.to_thread(_calendar_grid_averages, season)
 
 
 @router.get("/{circuit_id}", response_model=Circuit)

@@ -65,6 +65,27 @@ export function formatRaceDate(iso: string): string {
   return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
+/** Seconds → "H:MM:SS" (race durations are always over an hour). */
+export function formatDuration(seconds: number): string {
+  const total = Math.round(seconds)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+/** A positive gap in seconds → "+45.2s" under a minute, else "+M:SS". */
+export function formatGap(seconds: number): string {
+  if (seconds < 60) return `+${seconds.toFixed(1)}s`
+  let m = Math.floor(seconds / 60)
+  let s = Math.round(seconds % 60)
+  if (s === 60) {
+    m += 1
+    s = 0
+  }
+  return `+${m}:${String(s).padStart(2, '0')}`
+}
+
 /** Read an optional ?round= override from the URL. */
 export function roundOverrideFromUrl(): number | undefined {
   const raw = new URLSearchParams(window.location.search).get('round')

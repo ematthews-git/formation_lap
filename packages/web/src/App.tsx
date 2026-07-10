@@ -5,6 +5,7 @@ import {
   DEFAULT_SEASON,
   lookaheadWeekends,
   pickFeaturedWeekend,
+  useCalendarGridAverages,
   useCircuit,
   useCircuitRaceStats,
   useDrivers,
@@ -28,6 +29,8 @@ import { Header } from './components/Header/Header'
 import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
 import { StrategyEngine } from './components/StrategyEngine/StrategyEngine'
+import { QualiMetrics } from './components/QualiMetrics/QualiMetrics'
+import { RaceTiming } from './components/RaceTiming/RaceTiming'
 import { DriverForm } from './components/DriverForm/DriverForm'
 import { ConstructorStandings } from './components/ConstructorStandings/ConstructorStandings'
 import { PastResults } from './components/PastResults/PastResults'
@@ -61,6 +64,7 @@ export default function App() {
   const circuit = useCircuit(featured?.circuit_id)
   const lapRecord = useLapRecord(featured?.circuit_id)
   const circuitRaceStats = useCircuitRaceStats(featured?.circuit_id, SEASON)
+  const calendarGridAverages = useCalendarGridAverages(SEASON)
   const strategies = useStrategies(SEASON, featured?.round_number)
   const simStrategies = useSimStrategies(SEASON, featured?.round_number)
   const simStats = useSimStats(SEASON, featured?.round_number)
@@ -130,8 +134,13 @@ export default function App() {
             circuitLoading={circuit.isLoading}
             lapRecord={lapRecord.data}
             lapRecordLoading={lapRecord.isLoading}
+            raceStats={circuitRaceStats.data}
           />
-          <WeatherStrip weather={weather.data} weatherLoading={weather.isLoading} />
+          <WeatherStrip
+            weather={weather.data}
+            weatherLoading={weather.isLoading}
+            raceStats={circuitRaceStats.data}
+          />
         </section>
 
         <StrategyEngine
@@ -147,6 +156,19 @@ export default function App() {
           fallbackStats={simStatsLastSeason.data}
           fallbackStatsLoading={simStatsLastSeason.isLoading}
         />
+
+        <section className={styles.splitWide}>
+          <QualiMetrics
+            circuitId={featured.circuit_id}
+            raceStats={circuitRaceStats.data}
+            loading={circuitRaceStats.isLoading}
+            calendarAverages={calendarGridAverages.data}
+          />
+          <RaceTiming
+            raceStats={circuitRaceStats.data}
+            loading={circuitRaceStats.isLoading}
+          />
+        </section>
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>
           <WeekendSchedule

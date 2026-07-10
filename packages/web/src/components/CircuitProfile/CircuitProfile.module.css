@@ -7,7 +7,8 @@
 .body {
   flex: 1;
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
+  /* Track map shrunk so the stats block gets room for a third metric column. */
+  grid-template-columns: 1fr 1.55fr;
 }
 
 .diagram {
@@ -19,13 +20,13 @@
 }
 
 .track {
-  max-width: 360px;
+  max-width: 240px;
   overflow: visible;
 }
 
 .stats {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   /* Two metric rows sit at their natural height; the lap-record row absorbs the
      rest so it fills to the panel bottom and its hover reaches the edge. */
   grid-template-rows: auto auto 1fr;

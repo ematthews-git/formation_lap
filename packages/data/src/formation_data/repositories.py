@@ -756,6 +756,32 @@ def get_circuit_race_stats(
     return domain.CircuitRaceStats.model_validate(row._mapping) if row else None
 
 
+def calendar_avg_finish_by_grid(conn: Connection, season: int) -> dict[str, float]:
+    """Mean finish per grid slot pooled across every circuit's race stats for a season.
+
+    Reads each circuit's ``stats.grid.avg_finish_by_grid`` (itself a per-circuit mean of
+    finishes for that grid slot) and averages those across all circuits, giving the
+    calendar-wide baseline used as the grey reference on the quali scatterplot. Grid slots
+    missing from a circuit simply don't contribute to that slot's average. Returns ``{}``
+    when no circuit has race stats for the season.
+    """
+    rows = conn.execute(
+        select(schema.circuit_race_stats.c.stats).where(
+            schema.circuit_race_stats.c.season == season
+        )
+    ).all()
+    totals: dict[str, float] = {}
+    counts: dict[str, int] = {}
+    for (stats,) in rows:
+        by_grid = ((stats or {}).get("grid") or {}).get("avg_finish_by_grid") or {}
+        for slot, mean_finish in by_grid.items():
+            if mean_finish is None:
+                continue
+            totals[slot] = totals.get(slot, 0.0) + float(mean_finish)
+            counts[slot] = counts.get(slot, 0) + 1
+    return {slot: round(totals[slot] / counts[slot], 3) for slot in totals}
+
+
 def get_sim_race_stats(
     conn: Connection, season: int, round_number: int
 ) -> domain.SimRaceStats | None:

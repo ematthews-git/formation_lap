@@ -86,6 +86,18 @@ export function useCircuitRaceStats(
   })
 }
 
+/** Calendar-wide mean finish per grid slot (pooled across all circuits) — the grey
+ * baseline on the quali scatterplot. Empty `{}` until any circuit has race stats. */
+export function useCalendarGridAverages(season: number) {
+  return useQuery({
+    queryKey: ['calendar-grid-averages', season],
+    queryFn: () =>
+      api.get<Record<string, number>>(
+        `/circuits/calendar-grid-averages?season=${season}`,
+      ),
+  })
+}
+
 export function useWeather(season: number, round: number | undefined) {
   return useQuery({
     queryKey: ['weather', season, round],
