@@ -107,22 +107,56 @@
 }
 
 .metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-auto-rows: 1fr;
+  display: flex;
+  flex-direction: column;
 }
 
-.cellBorder {
+/* Three groups share the column height evenly, each vertically centred. Each is a
+   single standalone cell (whole-group hover, no internal dividers) matching the
+   correlation cell below. */
+.group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   border-bottom: 1px solid var(--border-soft);
   transition: background-color 0.12s ease;
 }
 
-.cellBorder:hover {
+.group:hover {
   background: var(--glass-bg-raised);
 }
 
-.cellLeft {
-  border-left: 1px solid var(--border-soft);
+.groupLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--text-fainter);
+  padding: 4px 18px 6px;
+}
+
+.groupGrid {
+  display: grid;
+}
+
+.cols3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.cols2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.standalone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: background-color 0.12s ease;
+}
+
+.standalone:hover {
+  background: var(--glass-bg-raised);
 }
 
 @media (max-width: 750px) {

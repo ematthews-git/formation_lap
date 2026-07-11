@@ -154,4 +154,13 @@
   .metaLine {
     margin-top: 12px;
   }
+
+  /* No hero photo on phones (see HeroBackdrop) — always use the bright
+     treatment instead of keying off this weekend's photo tone. */
+  .championship,
+  .meta,
+  .metaStrong,
+  .metaSlash {
+    color: var(--text-bright);
+  }
 }

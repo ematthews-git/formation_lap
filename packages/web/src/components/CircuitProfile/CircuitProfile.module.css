@@ -95,4 +95,20 @@
     align-items: flex-start;
     gap: 4px;
   }
+
+  /* Track map stacks above the stats (source order already puts .diagram
+     first) instead of squeezing beside them, and gets to run larger with
+     the full panel width to itself. */
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .diagram {
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .track {
+    max-width: 300px;
+  }
 }

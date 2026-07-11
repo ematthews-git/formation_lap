@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import type { CircuitRaceStats, WeatherForecast } from '../../api/types'
-import { Panel } from '../common/Panel'
-import { PanelHeader } from '../common/PanelHeader'
+import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, LoadingState } from '../common/Status'
 import { raceSession, sessionShort } from '../../lib/weather'
 import styles from './WeatherStrip.module.css'
@@ -21,12 +20,13 @@ export function WeatherStrip({ weather, weatherLoading, raceStats }: Props) {
   const hasAny = !!race || !!climate
 
   return (
-    <Panel frosted className={styles.panel}>
-      <PanelHeader
-        label="MET_FORECAST"
-        sub="RACE_WINDOW"
-        meta={race ? race.condition.toUpperCase() : undefined}
-      />
+    <CollapsiblePanel
+      label="MET_FORECAST"
+      sub="RACE_WINDOW"
+      meta={race ? race.condition.toUpperCase() : undefined}
+      frosted
+      className={styles.panel}
+    >
       {weatherLoading && !hasAny ? (
         <div className={styles.fill}>
           <LoadingState label="LOADING FORECAST" />
@@ -41,7 +41,7 @@ export function WeatherStrip({ weather, weatherLoading, raceStats }: Props) {
           />
         </div>
       )}
-    </Panel>
+    </CollapsiblePanel>
   )
 }
 

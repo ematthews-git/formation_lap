@@ -59,25 +59,9 @@
 }
 
 @media (max-width: 750px) {
-  /* Full-bleed on phones: the photo spans the whole width and only fades
-     vertically (top + bottom), rather than dissolving off to the right. */
+  /* No hero photo on phones — the header sits on the plain theme background
+     instead (see the always-bright header/countdown text at this breakpoint). */
   .backdrop {
-    width: 100%;
-    height: 560px;
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 84%, transparent 100%);
-    -webkit-mask-composite: source-over;
-    mask-image: linear-gradient(to bottom, #000 0%, #000 84%, transparent 100%);
-    mask-composite: add;
-  }
-
-  /* Drop the left-to-right darkening — with a full-width photo we only want the
-     bottom scrim that dissolves it into the theme and keeps the header legible. */
-  .scrim {
-    background: linear-gradient(
-      to top,
-      rgba(22, 21, 20, 0.86) 0%,
-      rgba(22, 21, 20, 0.42) 32%,
-      transparent 64%
-    );
+    display: none;
   }
 }

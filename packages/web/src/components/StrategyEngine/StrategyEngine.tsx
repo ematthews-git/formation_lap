@@ -140,13 +140,21 @@ export function StrategyEngine({
   const tyres = circuitRaceStats?.stats?.tyres
   const compoundFreq = tyres?.compound_usage_frequency
 
+  // The last-5-race window sometimes has no SC/VSC to measure a pit-loss delta from.
+  // When that happens, fall back to a multiple of the base (green-flag) pit loss —
+  // SC pits are slower under the full delta, VSC less so.
+  const scPitLoss = pit?.sc_pit_loss_s ?? (pitLoss != null ? pitLoss * 0.5 : null)
+  const vscPitLoss = pit?.vsc_pit_loss_s ?? (pitLoss != null ? pitLoss * 0.75 : null)
+  const scEstimated = pit?.sc_pit_loss_s == null && scPitLoss != null
+  const vscEstimated = pit?.vsc_pit_loss_s == null && vscPitLoss != null
+
   // Count-up targets for the top-row tiles — called unconditionally (hooks
   // can't live inside the conditional JSX below) so the numbers animate in
   // from 0 whenever a weekend's data first resolves.
   const animatedUndercut = useCountUp(undercut)
   const animatedPitLoss = useCountUp(pitLoss)
-  const animatedScPitLoss = useCountUp(pit?.sc_pit_loss_s)
-  const animatedVscPitLoss = useCountUp(pit?.vsc_pit_loss_s)
+  const animatedScPitLoss = useCountUp(scPitLoss)
+  const animatedVscPitLoss = useCountUp(vscPitLoss)
   const animatedMaxStint = useCountUp(tyres?.max_stint_length)
   const animatedAgeAtPit = useCountUp(tyres?.avg_tyre_age_at_pit)
   const animatedStintDeg = useCountUp(tyres?.avg_stint_degradation_s_per_lap)
@@ -255,7 +263,7 @@ export function StrategyEngine({
                   label="SC PIT LOSS"
                   value={
                     animatedScPitLoss != null
-                      ? `${animatedScPitLoss.toFixed(1)}s`
+                      ? `${animatedScPitLoss.toFixed(1)}s${scEstimated ? '*' : ''}`
                       : '—'
                   }
                 />
@@ -263,11 +271,16 @@ export function StrategyEngine({
                   label="VSC PIT LOSS"
                   value={
                     animatedVscPitLoss != null
-                      ? `${animatedVscPitLoss.toFixed(1)}s`
+                      ? `${animatedVscPitLoss.toFixed(1)}s${vscEstimated ? '*' : ''}`
                       : '—'
                   }
                 />
               </div>
+              {(scEstimated || vscEstimated) && (
+                <div className={styles.estimateFootnote}>
+                  *ESTIMATED FROM BASE PIT LOSS
+                </div>
+              )}
             </>
           ) : (
             <EmptyState hint="sim not yet available for this weekend" />

@@ -13,6 +13,9 @@ interface Props {
   meta?: ReactNode
   /** Start expanded even on mobile (default: collapsed). */
   defaultOpen?: boolean
+  /** Frosted-glass surface — for panels layered over the hero photo. */
+  frosted?: boolean
+  className?: string
   children: ReactNode
 }
 
@@ -27,6 +30,8 @@ export function CollapsiblePanel({
   sub,
   meta,
   defaultOpen = false,
+  frosted,
+  className,
   children,
 }: Props) {
   const isMobile = useMediaQuery('(max-width: 750px)')
@@ -34,7 +39,7 @@ export function CollapsiblePanel({
 
   if (!isMobile) {
     return (
-      <Panel>
+      <Panel frosted={frosted} className={className}>
         <PanelHeader label={label} sub={sub} meta={meta} />
         {children}
       </Panel>
@@ -42,7 +47,7 @@ export function CollapsiblePanel({
   }
 
   return (
-    <Panel>
+    <Panel frosted={frosted} className={className}>
       <PanelHeader
         label={label}
         sub={sub}

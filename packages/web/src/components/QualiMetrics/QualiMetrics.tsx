@@ -15,6 +15,8 @@ interface Props {
   calendarAverages: Record<string, number> | undefined
 }
 
+type Metric = { label: string; value: string }
+
 const pct = (v: number | null | undefined): string =>
   v != null ? `${Math.round(v * 100)}%` : '—'
 
@@ -28,13 +30,15 @@ export function QualiMetrics({
   const scatter = buildGridScatter(grid?.avg_finish_by_grid, calendarAverages)
   const corr = grid?.quali_finish_correlation
 
-  const metrics: { label: string; value: string }[] = [
+  // Wins from progressively-worse grid slots — the header carries the "WIN" subject.
+  const winMetrics: Metric[] = [
     { label: 'POLE → WIN', value: pct(grid?.pole_to_win_rate) },
-    { label: 'WIN OUTSIDE TOP 3', value: pct(grid?.win_outside_top3_quali_rate) },
-    { label: 'WIN OUTSIDE TOP 5', value: pct(grid?.winner_outside_top5_rate) },
+    { label: 'OUTSIDE TOP 3', value: pct(grid?.win_outside_top3_quali_rate) },
+    { label: 'OUTSIDE TOP 5', value: pct(grid?.winner_outside_top5_rate) },
+  ]
+  const comebackMetrics: Metric[] = [
     { label: 'PODIUM OUTSIDE TOP 10', value: pct(grid?.podium_outside_top10_rate) },
     { label: 'POINTS OUTSIDE TOP 10', value: pct(grid?.points_outside_top10_rate) },
-    { label: 'QUALI → FINISH CORR', value: corr != null ? corr.toFixed(2) : '—' },
   ]
 
   return (
@@ -63,14 +67,15 @@ export function QualiMetrics({
             </div>
           </div>
           <div className={styles.metrics}>
-            {metrics.map((m, i) => (
-              <div
-                key={m.label}
-                className={`${styles.cellBorder} ${i % 2 === 1 ? styles.cellLeft : ''}`}
-              >
-                <StatCell label={m.label} value={m.value} size="md" />
-              </div>
-            ))}
+            <MetricGroup label="WIN DISTRIBUTION" metrics={winMetrics} cols={3} />
+            <MetricGroup label="COMEBACK ABILITY" metrics={comebackMetrics} cols={2} />
+            <div className={styles.standalone}>
+              <StatCell
+                label="QUALI → RACE CORR"
+                value={corr != null ? corr.toFixed(2) : '—'}
+                size="md"
+              />
+            </div>
           </div>
         </div>
       ) : (
@@ -82,6 +87,27 @@ export function QualiMetrics({
         </div>
       )}
     </Panel>
+  )
+}
+
+function MetricGroup({
+  label,
+  metrics,
+  cols,
+}: {
+  label: string
+  metrics: Metric[]
+  cols: 2 | 3
+}) {
+  return (
+    <div className={styles.group}>
+      <div className={styles.groupLabel}>{label}</div>
+      <div className={`${styles.groupGrid} ${cols === 3 ? styles.cols3 : styles.cols2}`}>
+        {metrics.map((m) => (
+          <StatCell key={m.label} label={m.label} value={m.value} size="md" />
+        ))}
+      </div>
+    </div>
   )
 }
 
