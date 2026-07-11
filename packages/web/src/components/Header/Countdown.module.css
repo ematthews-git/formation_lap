@@ -19,6 +19,20 @@
   color: var(--accent-hot);
 }
 
+/* Post-zero replacement for the clock ("LIGHTS OUT" / "RACE COMPLETE") — same
+   display face and baseline slot, sized down since the text runs wider than
+   the digit train. */
+.raceState {
+  flex: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(34px, 4.6vw, 60px);
+  line-height: 0.84;
+  letter-spacing: 0.01em;
+  color: var(--accent-hot);
+  white-space: nowrap;
+}
+
 /* Saira Condensed's digit glyphs are proportional (no tabular-figures
    support), so pin each character to a fixed-width slot to stop per-tick
    jitter — `tabular-nums` above is a no-op for this font but kept as a
@@ -32,6 +46,10 @@
 @media (max-width: 750px) {
   .clock {
     font-size: clamp(38px, 11vw, 56px);
+  }
+
+  .raceState {
+    font-size: clamp(28px, 8vw, 42px);
   }
 
   /* No hero photo on phones (see HeroBackdrop) — match the header's always-

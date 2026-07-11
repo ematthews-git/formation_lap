@@ -2,7 +2,7 @@ import type { CircuitRaceStats } from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { StatCell } from '../common/StatCell'
-import { EmptyState, LoadingState } from '../common/Status'
+import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
 import { buildGridScatter } from '../../lib/gridScatter'
 import styles from './QualiMetrics.module.css'
@@ -11,6 +11,8 @@ interface Props {
   circuitId: string | undefined
   raceStats: CircuitRaceStats | null | undefined
   loading: boolean
+  /** Query failure (network/5xx) — distinct from "no race-stats yet". */
+  error?: boolean
   /** Calendar-wide mean-finish-by-grid baseline (grey dots). */
   calendarAverages: Record<string, number> | undefined
 }
@@ -24,6 +26,7 @@ export function QualiMetrics({
   circuitId,
   raceStats,
   loading,
+  error,
   calendarAverages,
 }: Props) {
   const grid = raceStats?.stats?.grid
@@ -77,6 +80,10 @@ export function QualiMetrics({
               />
             </div>
           </div>
+        </div>
+      ) : error ? (
+        <div className={styles.fill}>
+          <ErrorState message="couldn't load quali metrics" />
         </div>
       ) : (
         <div className={styles.fill}>

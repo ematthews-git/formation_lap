@@ -7,7 +7,7 @@ import type {
 } from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
-import { EmptyState, LoadingState } from '../common/Status'
+import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
 import { useCountUp } from '../../lib/useCountUp'
 import { StintTimeline } from './StintTimeline'
@@ -17,12 +17,17 @@ interface Props {
   weekend: RaceWeekend
   circuitRaceStats: CircuitRaceStats | null | undefined
   circuitRaceStatsLoading: boolean
+  /** Query failures (network/5xx) — distinct from "no data yet" empty states. */
+  circuitRaceStatsError?: boolean
   historicalStrategies: StrategyWithStints[] | undefined
   historicalStrategiesLoading: boolean
+  historicalStrategiesError?: boolean
   simStrategies: StrategyWithStints[] | undefined
   simStrategiesLoading: boolean
+  simStrategiesError?: boolean
   simStats: SimRaceStats | null | undefined
   simStatsLoading: boolean
+  simStatsError?: boolean
   /** Last season's sim stats — the fallback for the engine parameters. */
   fallbackStats: SimRaceStats | null | undefined
   fallbackStatsLoading: boolean
@@ -77,12 +82,16 @@ export function StrategyEngine({
   weekend,
   circuitRaceStats,
   circuitRaceStatsLoading,
+  circuitRaceStatsError,
   historicalStrategies,
   historicalStrategiesLoading,
+  historicalStrategiesError,
   simStrategies,
   simStrategiesLoading,
+  simStrategiesError,
   simStats,
   simStatsLoading,
+  simStatsError,
   fallbackStats,
   fallbackStatsLoading,
 }: Props) {
@@ -96,6 +105,7 @@ export function StrategyEngine({
   const selectedLoading = showSim
     ? simStrategiesLoading
     : historicalStrategiesLoading
+  const selectedError = showSim ? simStrategiesError : historicalStrategiesError
   const phase = simStrategies?.[0]?.phase ?? simStats?.phase ?? null
   // Undercut + pit loss come from this season's sim race-context numbers.
   const raceStats = simStats?.stats?.race_stats as
@@ -282,6 +292,8 @@ export function StrategyEngine({
                 </div>
               )}
             </>
+          ) : simStatsError ? (
+            <ErrorState message="couldn't load sim race context" />
           ) : (
             <EmptyState hint="sim not yet available for this weekend" />
           )}
@@ -336,6 +348,8 @@ export function StrategyEngine({
                 />
               </div>
             </div>
+          ) : circuitRaceStatsError ? (
+            <ErrorState message="couldn't load incident stats" />
           ) : (
             <EmptyState hint="race-stats not yet available" />
           )}
@@ -398,6 +412,8 @@ export function StrategyEngine({
           <LoadingState label="LOADING STRATEGIES" />
         ) : selected && selected.length > 0 ? (
           <StintTimeline strategies={selected} />
+        ) : selectedError ? (
+          <ErrorState message="couldn't load strategies" />
         ) : (
           <EmptyState
             label="NO STRATEGY DATA"

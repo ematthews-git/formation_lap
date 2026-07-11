@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '../../api/types'
 import { CollapsiblePanel } from '../common/CollapsiblePanel'
-import { EmptyState, LoadingState } from '../common/Status'
+import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
 import { circuitTimezone, formatClock, formatDayDate } from '../../lib/circuitTime'
 import styles from './WeekendSchedule.module.css'
@@ -10,6 +10,8 @@ interface Props {
   circuitId: string | undefined
   sessions: Session[] | undefined
   loading: boolean
+  /** Query failure (network/5xx) — distinct from "no schedule yet". */
+  error?: boolean
 }
 
 /** Sessions that anchor the weekend get a coloured accent bar. */
@@ -38,7 +40,7 @@ function isLive(session: Session, now: number): boolean {
   return now >= start && now < end
 }
 
-export function WeekendSchedule({ circuitId, sessions, loading }: Props) {
+export function WeekendSchedule({ circuitId, sessions, loading, error }: Props) {
   const tz = circuitTimezone(circuitId)
 
   // Re-tick each minute so the live "NOW" badge appears/clears without a reload.
@@ -97,6 +99,8 @@ export function WeekendSchedule({ circuitId, sessions, loading }: Props) {
             </div>
           )
         })
+      ) : error ? (
+        <ErrorState message="couldn't load the schedule" />
       ) : (
         <EmptyState label="NO SCHEDULE" />
       )}

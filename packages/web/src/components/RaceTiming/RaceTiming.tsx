@@ -2,16 +2,18 @@ import type { CircuitRaceStats } from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { StatCell } from '../common/StatCell'
-import { EmptyState, LoadingState } from '../common/Status'
+import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { formatDuration, formatGap } from '../../lib/format'
 import styles from './RaceTiming.module.css'
 
 interface Props {
   raceStats: CircuitRaceStats | null | undefined
   loading: boolean
+  /** Query failure (network/5xx) — distinct from "no race-stats yet". */
+  error?: boolean
 }
 
-export function RaceTiming({ raceStats, loading }: Props) {
+export function RaceTiming({ raceStats, loading, error }: Props) {
   const timing = raceStats?.stats?.timing
   const duration = timing?.avg_race_duration_s
   const toP10 = timing?.avg_winner_to_p10_s
@@ -37,6 +39,10 @@ export function RaceTiming({ raceStats, loading }: Props) {
             <SpreadBar label="WINNER → P10" value={toP10} max={toLast} accent />
             <SpreadBar label="WINNER → LAST" value={toLast} max={toLast} />
           </div>
+        </div>
+      ) : error ? (
+        <div className={styles.fill}>
+          <ErrorState message="couldn't load race timing" />
         </div>
       ) : (
         <div className={styles.fill}>

@@ -2,7 +2,7 @@ import type { Circuit, CircuitRaceStats, LapRecord } from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { StatCell } from '../common/StatCell'
-import { EmptyState, LoadingState } from '../common/Status'
+import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
 import { FALLBACK_TRACK_PATH, pathStartPoint } from '../../lib/trackPath'
 import styles from './CircuitProfile.module.css'
@@ -16,6 +16,8 @@ function formatLapTime(seconds: number): string {
 interface Props {
   circuit: Circuit | undefined
   circuitLoading: boolean
+  /** Query failure (network/5xx) — distinct from "no circuit data yet". */
+  circuitError?: boolean
   lapRecord: LapRecord | null | undefined
   lapRecordLoading: boolean
   raceStats: CircuitRaceStats | null | undefined
@@ -24,6 +26,7 @@ interface Props {
 export function CircuitProfile({
   circuit,
   circuitLoading,
+  circuitError,
   lapRecord,
   lapRecordLoading,
   raceStats,
@@ -128,6 +131,10 @@ export function CircuitProfile({
                 )}
               </div>
             </>
+          ) : circuitError ? (
+            <div className={styles.span2}>
+              <ErrorState message="couldn't load the circuit profile" />
+            </div>
           ) : (
             <div className={styles.span2}>
               <EmptyState label="NO CIRCUIT DATA" />

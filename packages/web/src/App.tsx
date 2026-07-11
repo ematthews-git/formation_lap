@@ -37,6 +37,7 @@ import { PastResults } from './components/PastResults/PastResults'
 import { WeekendSchedule } from './components/WeekendSchedule/WeekendSchedule'
 import { Footer } from './components/Footer/Footer'
 import { LoadingState, ErrorState } from './components/common/Status'
+import { SectionBoundary } from './components/common/SectionBoundary'
 import styles from './App.module.css'
 
 const SEASON = DEFAULT_SEASON
@@ -86,7 +87,11 @@ export default function App() {
     return (
       <div className={styles.fullState}>
         <ErrorState
-          message={`Could not reach the API — is uvicorn running on :8000? (${(weekends.error as Error).message})`}
+          message={
+            import.meta.env.DEV
+              ? `Could not reach the API — is uvicorn running on :8000? (${(weekends.error as Error).message})`
+              : 'the data feed is unreachable right now — please try again in a few minutes'
+          }
         />
       </div>
     )
@@ -110,6 +115,10 @@ export default function App() {
     ? Math.max(...weekends.data.map((w) => w.round_number))
     : featured.round_number
 
+  // Real lights-out instant for the countdown/clocks (same name match as
+  // WeekendSchedule's tone()); undefined until the sessions query resolves.
+  const raceStart = sessions.data?.find((s) => s.name === 'Race')?.start_time
+
   return (
     <div className={styles.page}>
       <TopBar
@@ -125,78 +134,107 @@ export default function App() {
           weekend={featured}
           circuit={circuit.data}
           totalRounds={totalRounds}
+          raceStart={raceStart}
         />
 
         <main className={styles.main}>
         <section className={`${styles.splitWide} ${styles.profileRow}`}>
-          <CircuitProfile
-            circuit={circuit.data}
-            circuitLoading={circuit.isLoading}
-            lapRecord={lapRecord.data}
-            lapRecordLoading={lapRecord.isLoading}
-            raceStats={circuitRaceStats.data}
-          />
-          <WeatherStrip
-            weather={weather.data}
-            weatherLoading={weather.isLoading}
-            raceStats={circuitRaceStats.data}
-          />
+          <SectionBoundary label="TRK_PROFILE">
+            <CircuitProfile
+              circuit={circuit.data}
+              circuitLoading={circuit.isLoading}
+              circuitError={circuit.isError}
+              lapRecord={lapRecord.data}
+              lapRecordLoading={lapRecord.isLoading}
+              raceStats={circuitRaceStats.data}
+            />
+          </SectionBoundary>
+          <SectionBoundary label="MET_FORECAST">
+            <WeatherStrip
+              weather={weather.data}
+              weatherLoading={weather.isLoading}
+              weatherError={weather.isError}
+              raceStats={circuitRaceStats.data}
+            />
+          </SectionBoundary>
         </section>
 
-        <StrategyEngine
-          weekend={featured}
-          circuitRaceStats={circuitRaceStats.data}
-          circuitRaceStatsLoading={circuitRaceStats.isLoading}
-          historicalStrategies={strategies.data}
-          historicalStrategiesLoading={strategies.isLoading}
-          simStrategies={simStrategies.data}
-          simStrategiesLoading={simStrategies.isLoading}
-          simStats={simStats.data}
-          simStatsLoading={simStats.isLoading}
-          fallbackStats={simStatsLastSeason.data}
-          fallbackStatsLoading={simStatsLastSeason.isLoading}
-        />
+        <SectionBoundary label="STRATEGY_ENGINE">
+          <StrategyEngine
+            weekend={featured}
+            circuitRaceStats={circuitRaceStats.data}
+            circuitRaceStatsLoading={circuitRaceStats.isLoading}
+            circuitRaceStatsError={circuitRaceStats.isError}
+            historicalStrategies={strategies.data}
+            historicalStrategiesLoading={strategies.isLoading}
+            historicalStrategiesError={strategies.isError}
+            simStrategies={simStrategies.data}
+            simStrategiesLoading={simStrategies.isLoading}
+            simStrategiesError={simStrategies.isError}
+            simStats={simStats.data}
+            simStatsLoading={simStats.isLoading}
+            simStatsError={simStats.isError}
+            fallbackStats={simStatsLastSeason.data}
+            fallbackStatsLoading={simStatsLastSeason.isLoading}
+          />
+        </SectionBoundary>
 
         <section className={styles.splitWide}>
-          <QualiMetrics
-            circuitId={featured.circuit_id}
-            raceStats={circuitRaceStats.data}
-            loading={circuitRaceStats.isLoading}
-            calendarAverages={calendarGridAverages.data}
-          />
-          <RaceTiming
-            raceStats={circuitRaceStats.data}
-            loading={circuitRaceStats.isLoading}
-          />
+          <SectionBoundary label="QUALI_METRICS">
+            <QualiMetrics
+              circuitId={featured.circuit_id}
+              raceStats={circuitRaceStats.data}
+              loading={circuitRaceStats.isLoading}
+              error={circuitRaceStats.isError}
+              calendarAverages={calendarGridAverages.data}
+            />
+          </SectionBoundary>
+          <SectionBoundary label="RACE_TIMING">
+            <RaceTiming
+              raceStats={circuitRaceStats.data}
+              loading={circuitRaceStats.isLoading}
+              error={circuitRaceStats.isError}
+            />
+          </SectionBoundary>
         </section>
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>
-          <WeekendSchedule
-            circuitId={featured.circuit_id}
-            sessions={sessions.data}
-            loading={sessions.isLoading}
-          />
-          <PastResults
-            circuitId={featured.circuit_id}
-            podiums={podiums.data}
-            loading={podiums.isLoading}
-          />
+          <SectionBoundary label="WEEKEND_SCHEDULE">
+            <WeekendSchedule
+              circuitId={featured.circuit_id}
+              sessions={sessions.data}
+              loading={sessions.isLoading}
+              error={sessions.isError}
+            />
+          </SectionBoundary>
+          <SectionBoundary label="PAST_RESULTS">
+            <PastResults
+              circuitId={featured.circuit_id}
+              podiums={podiums.data}
+              loading={podiums.isLoading}
+              error={podiums.isError}
+            />
+          </SectionBoundary>
         </section>
 
         <section className={`${styles.splitWide} ${styles.alignStart}`}>
-          <DriverForm
-            drivers={drivers.data}
-            driversLoading={drivers.isLoading}
-            driversError={drivers.isError}
-            standings={standings.data}
-            raceResults={raceResults.data}
-          />
-          <ConstructorStandings
-            standings={constructorStandings.data}
-            lastSeason={lastSeasonConstructors.data}
-            loading={constructorStandings.isLoading}
-            error={constructorStandings.isError}
-          />
+          <SectionBoundary label="DRIVER_FORM">
+            <DriverForm
+              drivers={drivers.data}
+              driversLoading={drivers.isLoading}
+              driversError={drivers.isError}
+              standings={standings.data}
+              raceResults={raceResults.data}
+            />
+          </SectionBoundary>
+          <SectionBoundary label="CONSTRUCTORS">
+            <ConstructorStandings
+              standings={constructorStandings.data}
+              lastSeason={lastSeasonConstructors.data}
+              loading={constructorStandings.isLoading}
+              error={constructorStandings.isError}
+            />
+          </SectionBoundary>
         </section>
         </main>
       </div>

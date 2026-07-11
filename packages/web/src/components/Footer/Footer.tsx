@@ -39,9 +39,33 @@ export function Footer() {
           Formation Lap is an unofficial, non-commercial project and is not
           associated in any way with Formula 1 companies or the FIA. The F1 logo,
           F1, FORMULA 1, and related marks are trademarks of Formula One Licensing
-          B.V. Timing and telemetry data via{' '}
-          <span className={styles.src}>FastF1</span>. Strategy projections are model
-          estimates shown for illustration only. Estimates may be incorrect.
+          B.V. Strategy projections are model estimates shown for illustration
+          only. Estimates may be incorrect.
+        </p>
+
+        <p className={styles.credits}>
+          Timing and telemetry data via{' '}
+          <a href="https://docs.fastf1.dev" target="_blank" rel="noreferrer">
+            FastF1
+          </a>
+          {' '}· schedule, results and standings via{' '}
+          <a
+            href="https://github.com/jolpica/jolpica-f1"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Jolpica F1
+          </a>
+          {' '}· weather forecasts by{' '}
+          <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">
+            Open-Meteo
+          </a>{' '}
+          (CC BY 4.0) · circuit photography via{' '}
+          <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">
+            Pexels
+          </a>
+          . Analytics are cookieless (Vercel Analytics) — no cookies set, no
+          personal data stored.
         </p>
 
         <div className={styles.legal}>

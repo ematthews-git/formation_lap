@@ -1,18 +1,20 @@
 import type { ReactNode } from 'react'
 import type { CircuitRaceStats, WeatherForecast } from '../../api/types'
 import { CollapsiblePanel } from '../common/CollapsiblePanel'
-import { EmptyState, LoadingState } from '../common/Status'
+import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { raceSession, sessionShort } from '../../lib/weather'
 import styles from './WeatherStrip.module.css'
 
 interface Props {
   weather: WeatherForecast[] | undefined
   weatherLoading: boolean
+  /** Query failure (network/5xx) — distinct from "forecast not published yet". */
+  weatherError?: boolean
   /** Historical climatology for the circuit — feeds the dry-race / avg-temp tiles. */
   raceStats: CircuitRaceStats | null | undefined
 }
 
-export function WeatherStrip({ weather, weatherLoading, raceStats }: Props) {
+export function WeatherStrip({ weather, weatherLoading, weatherError, raceStats }: Props) {
   const race = raceSession(weather)
   const climate = raceStats?.stats?.weather
   // The forecast (high/low/wind) lands ≤10 days out; the climatology tiles are
@@ -33,6 +35,10 @@ export function WeatherStrip({ weather, weatherLoading, raceStats }: Props) {
         </div>
       ) : hasAny ? (
         <Forecast race={race} sessions={weather} climate={climate} />
+      ) : weatherError ? (
+        <div className={styles.fill}>
+          <ErrorState message="couldn't load the forecast" />
+        </div>
       ) : (
         <div className={styles.fill}>
           <EmptyState

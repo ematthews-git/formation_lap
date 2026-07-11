@@ -1,6 +1,6 @@
 import type { RaceResult } from '../../api/types'
 import { CollapsiblePanel } from '../common/CollapsiblePanel'
-import { EmptyState, LoadingState } from '../common/Status'
+import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit, teamColorVar } from '../../lib/format'
 import styles from './PastResults.module.css'
 
@@ -32,9 +32,11 @@ interface Props {
   circuitId: string
   podiums: RaceResult[] | undefined
   loading: boolean
+  /** Query failure (network/5xx) — distinct from "no history at this circuit". */
+  error?: boolean
 }
 
-export function PastResults({ circuitId, podiums, loading }: Props) {
+export function PastResults({ circuitId, podiums, loading, error }: Props) {
   const races = podiums ? groupRaces(podiums) : []
 
   return (
@@ -75,6 +77,8 @@ export function PastResults({ circuitId, podiums, loading }: Props) {
             )
           })}
         </div>
+      ) : error ? (
+        <ErrorState message="couldn't load past results" />
       ) : (
         <EmptyState
           label="NO PAST RESULTS"

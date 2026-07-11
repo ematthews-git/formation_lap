@@ -3,13 +3,16 @@ import { circuitTimezone, formatClock } from '../../lib/circuitTime'
 import styles from './Countdown.module.css'
 
 /**
- * We only have race_date (no session time) from the API yet, so the target is
- * approximated at 13:00 UTC on race day — refine once a sessions/weather
- * endpoint provides the real start time.
+ * The countdown target: the Race session's real start time (UTC) once the
+ * sessions feed resolves; until then, approximated at 13:00 UTC on race day so
+ * the clock isn't blank while sessions load.
  */
-function raceTarget(raceDate: string | undefined) {
-  return raceDate ? `${raceDate}T13:00:00Z` : undefined
+function raceTarget(raceDate: string | undefined, raceStart: string | undefined) {
+  return raceStart ?? (raceDate ? `${raceDate}T13:00:00Z` : undefined)
 }
+
+/** F1's event time limit — treat the race as running for up to 3h after lights out. */
+const RACE_WINDOW_MS = 3 * 3_600_000
 
 /** Saira Condensed has no tabular-figures support and its digit glyphs vary
     widely in width, so `tabular-nums` alone can't stop per-tick jitter — pin
@@ -24,9 +27,28 @@ function Digits({ value }: { value: string }) {
   )
 }
 
-/** Big ticking lights-out countdown — DD:HH:MM.SS, sized to match the title. */
-export function Countdown({ raceDate }: { raceDate: string | undefined }) {
-  const { d, h, m, s } = useCountdown(raceTarget(raceDate))
+/** Big ticking lights-out countdown — DD:HH:MM.SS, sized to match the title.
+    Once the clock hits zero it flips to a race-underway / race-complete state
+    instead of sitting at 00:00:00. */
+export function Countdown({
+  raceDate,
+  raceStart,
+}: {
+  raceDate: string | undefined
+  raceStart: string | undefined
+}) {
+  const target = raceTarget(raceDate, raceStart)
+  const { d, h, m, s, done } = useCountdown(target)
+
+  if (done) {
+    const startMs = target ? Date.parse(target) : NaN
+    const racing = !Number.isNaN(startMs) && Date.now() - startMs < RACE_WINDOW_MS
+    return (
+      <div className={styles.raceState}>
+        {racing ? 'LIGHTS OUT' : 'RACE COMPLETE'}
+      </div>
+    )
+  }
 
   return (
     <div className={styles.clock}>
@@ -39,16 +61,18 @@ export function Countdown({ raceDate }: { raceDate: string | undefined }) {
 /** The two fixed lights-out times (circuit-local + viewer-local). Static. */
 export function LightsOut({
   raceDate,
+  raceStart,
   circuitId,
   light,
 }: {
   raceDate: string | undefined
+  raceStart: string | undefined
   circuitId: string | undefined
   /** Header tone (dark/night photo) — flips the mobile text to white, matching
       the other subheaders when the full-bleed hero sits behind these times. */
   light?: boolean
 }) {
-  const target = raceTarget(raceDate)
+  const target = raceTarget(raceDate, raceStart)
   const circuitTz = circuitTimezone(circuitId)
 
   return (

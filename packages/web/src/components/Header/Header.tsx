@@ -9,9 +9,12 @@ interface HeaderProps {
   weekend: RaceWeekend
   circuit: Circuit | undefined
   totalRounds: number
+  /** Race session start time (UTC ISO) from the sessions feed; the countdown
+      falls back to 13:00 UTC on race day until it resolves. */
+  raceStart: string | undefined
 }
 
-export function Header({ weekend, circuit, totalRounds }: HeaderProps) {
+export function Header({ weekend, circuit, totalRounds, raceStart }: HeaderProps) {
   const ghostPath = circuit?.track_outline ?? FALLBACK_TRACK_PATH
   // Header text tone is hardcoded per hero photo (see lib/hero.ts): 'light'
   // flips the black subheader text to white for dark/night photos.
@@ -37,7 +40,7 @@ export function Header({ weekend, circuit, totalRounds }: HeaderProps) {
             countdown reflows to just under the round line on mobile. */}
         <h1 className={styles.title}>{weekend.event_name}</h1>
         <div className={styles.clockSlot}>
-          <Countdown raceDate={weekend.race_date} />
+          <Countdown raceDate={weekend.race_date} raceStart={raceStart} />
         </div>
 
         {/* circuit meta + lights-out times */}
@@ -59,6 +62,7 @@ export function Header({ weekend, circuit, totalRounds }: HeaderProps) {
 
           <LightsOut
             raceDate={weekend.race_date}
+            raceStart={raceStart}
             circuitId={weekend.circuit_id}
             light={light}
           />

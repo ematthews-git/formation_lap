@@ -82,8 +82,26 @@
   padding-top: 16px;
 }
 
-.src {
+/* Attribution line — same voice as the disclaimer, no repeated top rule. */
+.credits {
+  margin: 0;
+  max-width: 78ch;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--text-ghost);
+}
+
+.disclaimer a,
+.credits a {
   color: var(--text-faint);
+  text-decoration: none;
+}
+
+.disclaimer a:hover,
+.credits a:hover {
+  color: var(--text);
+  text-decoration: underline;
 }
 
 .legal {
@@ -112,7 +130,8 @@
     gap: 14px;
   }
 
-  .disclaimer {
+  .disclaimer,
+  .credits {
     font-size: 10.5px;
   }
 
