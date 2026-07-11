@@ -428,12 +428,6 @@
     border-bottom: 1px solid var(--border-soft);
   }
 
-  .compoundsBody {
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .tyreStats,
   .incidentStats {
     flex-direction: row;
     flex-wrap: wrap;
