@@ -100,7 +100,7 @@ export function CircuitProfile({
                 />
               </div>
               <div className={styles.cellBorder}>
-                <StatCell label="DRS ZONES" value={circuit.sm_zones} size="md" />
+                <StatCell label="STRAIGHT MODE ZONES" value={circuit.sm_zones} size="md" />
               </div>
               <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
                 <StatCell label="CORNERS" value={circuit.num_corners} size="md" />

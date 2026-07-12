@@ -5,7 +5,7 @@ tire allocations, and historical timing data, runs a Monte-Carlo strategy simula
 each Grand Prix, and presents a per-weekend Strategy Briefing: circuit profile, session
 schedule, weather, standings, past results, and the recommended pit strategies.
 
-![Header preview](headerimg.png)
+![Header preview](img.png)
 
 ## What it does
 
