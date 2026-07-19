@@ -197,6 +197,53 @@ def session_results(ses) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+def session_lap_rainfall(ses) -> dict[int, bool]:
+    """Per-lap rainfall flag: lap number → whether rain was falling during that lap.
+
+    FastF1's weather feed is a ~1/min time series with a boolean ``Rainfall``; each lap
+    is mapped to the samples inside its [median start, median end] window across the
+    field. A lap window with no sample (rare — laps outlast the sampling interval)
+    falls back to the sample nearest the lap midpoint. Empty dict when the session has
+    no usable weather data.
+    """
+    try:
+        w = ses.weather_data
+    except Exception:
+        return {}
+    if w is None or not len(w) or "Rainfall" not in w or "Time" not in w:
+        return {}
+    laps = ses.laps
+    if laps is None or not len(laps):
+        return {}
+
+    sample_t = pd.to_timedelta(w["Time"], errors="coerce")
+    rain = w["Rainfall"].astype("boolean").fillna(False).to_numpy(dtype=bool)
+    ok = sample_t.notna().to_numpy()
+    sample_t, rain = sample_t[ok], rain[ok]
+    if not len(sample_t):
+        return {}
+
+    frame = pd.DataFrame({
+        "lap": laps["LapNumber"].astype("float"),
+        "start": pd.to_timedelta(laps["LapStartTime"], errors="coerce"),
+        "end": pd.to_timedelta(laps["Time"], errors="coerce"),
+    }).dropna(subset=["lap"])
+
+    out: dict[int, bool] = {}
+    for lap, g in frame.groupby("lap"):
+        start, end = g["start"].median(), g["end"].median()
+        if pd.isna(start) or pd.isna(end):
+            continue
+        in_window = (sample_t >= start) & (sample_t <= end)
+        if in_window.any():
+            wet = bool(rain[in_window.to_numpy()].any())
+        else:
+            mid = start + (end - start) / 2
+            wet = bool(rain[int((sample_t - mid).abs().argmin())])
+        out[int(lap)] = wet
+    return out
+
+
 def weather_summary(ses) -> dict:
     """Small dry/wet-relevant weather summary for a session."""
     empty = {

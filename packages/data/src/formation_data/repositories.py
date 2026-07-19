@@ -202,6 +202,28 @@ def upsert_circuit_race_stats(
     conn.execute(stmt)
 
 
+def upsert_race_trace(
+    conn: Connection, circuit_id: str, season: int, round_number: int, trace: dict
+) -> None:
+    """Upsert one race's lap-by-lap trace blob (one row per season+round).
+
+    Re-running for the same race replaces the blob — it's recomputed wholesale from the
+    FastF1 session, so there's nothing to merge.
+    """
+    stmt = insert(schema.race_traces).values(
+        circuit_id=circuit_id, season=season, round_number=round_number, trace=trace
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["season", "round_number"],
+        set_={
+            "circuit_id": stmt.excluded.circuit_id,
+            "trace": stmt.excluded.trace,
+            "updated_at": func.now(),
+        },
+    )
+    conn.execute(stmt)
+
+
 def upsert_derived_artifact(
     conn: Connection,
     *,
@@ -754,6 +776,22 @@ def get_circuit_race_stats(
         )
     ).first()
     return domain.CircuitRaceStats.model_validate(row._mapping) if row else None
+
+
+def list_race_traces_for_circuit(
+    conn: Connection, circuit_id: str, limit: int = 5
+) -> list[domain.RaceTrace]:
+    """The most recent race traces for a circuit, newest first."""
+    rows = conn.execute(
+        select(schema.race_traces)
+        .where(schema.race_traces.c.circuit_id == circuit_id)
+        .order_by(
+            schema.race_traces.c.season.desc(),
+            schema.race_traces.c.round_number.desc(),
+        )
+        .limit(limit)
+    ).all()
+    return [domain.RaceTrace.model_validate(row._mapping) for row in rows]
 
 
 def calendar_avg_finish_by_grid(conn: Connection, season: int) -> dict[str, float]:

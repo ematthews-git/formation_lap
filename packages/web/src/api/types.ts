@@ -159,6 +159,41 @@ export interface WeatherForecast {
   updated_at: string | null
 }
 
+export interface RaceTraceDriver {
+  code: string
+  /** Team the driver raced for in THAT event — a period-correct snapshot. */
+  team: string
+  second_car: boolean
+  finish_pos: number
+  classified: boolean
+  /** Seconds per lap, index 0 = lap 1; null = no time (e.g. after retirement). */
+  lap_times: (number | null)[]
+  pit_laps: number[]
+}
+
+/** Lap-by-lap trace of one historical race (the JSONB `trace` blob). */
+export interface RaceTraceBlob {
+  version: number
+  season: number
+  round_number: number
+  event_name: string
+  total_laps: number
+  track_status: string[]
+  weather: string[]
+  excitement: number[]
+  overtakes: number[]
+  drivers: RaceTraceDriver[]
+}
+
+export interface RaceTrace {
+  id: number | null
+  circuit_id: string
+  season: number
+  round_number: number
+  updated_at: string | null
+  trace: RaceTraceBlob
+}
+
 export interface StrategyStint {
   id: number | null
   strategy_id: number

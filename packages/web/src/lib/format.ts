@@ -13,6 +13,11 @@ export function teamColorVar(team: string): string {
   if (key.includes('red bull') || key.includes('redbull'))
     return 'var(--team-redbull)'
   if (key.includes('racing bull') || key.includes('rb')) return 'var(--team-racingbulls)'
+  // Historical names in the race-trace lookback window (2021+): rebrands map onto
+  // the lineage's current colour token.
+  if (key.includes('alphatauri') || key.includes('toro rosso'))
+    return 'var(--team-racingbulls)'
+  if (key.includes('alfa romeo')) return 'var(--team-audi)'
   if (key.includes('ferrari')) return 'var(--team-ferrari)'
   if (key.includes('mercedes')) return 'var(--team-mercedes)'
   if (key.includes('aston')) return 'var(--team-aston)'

@@ -201,6 +201,23 @@ class SessionResults(_Base):
     results: list[dict]
 
 
+class RaceTrace(_Base):
+    """Lap-by-lap trace of one historical race (the JSONB `trace` blob), API read shape.
+
+    `trace` carries per-lap track-status / weather / excitement / overtakes arrays plus
+    every starter's lap times, pit laps and the team they drove for in that race (a
+    snapshot, so lookbacks never show a driver's current team). Built by
+    formation_data.race_trace; keyed (season, official round), like race_results.
+    """
+
+    id: int | None = None
+    circuit_id: str
+    season: int
+    round_number: int
+    updated_at: datetime | None = None
+    trace: dict
+
+
 class RaceResult(_Base):
     id: int | None = None
     circuit_id: str

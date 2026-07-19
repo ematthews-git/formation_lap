@@ -7,6 +7,7 @@ import type {
   Driver,
   LapRecord,
   RaceResult,
+  RaceTrace,
   RaceWeekend,
   Session,
   SimRaceStats,
@@ -83,6 +84,17 @@ export function useCircuitRaceStats(
       api.getOptional<CircuitRaceStats>(
         `/circuits/${circuitId}/race-stats?season=${season}`,
       ),
+  })
+}
+
+/** Lap-by-lap traces for the last few races at a circuit, newest first (empty list
+ * until the race-traces backfill has run). Powers the RACE_TRACE panel. */
+export function useRaceTraces(circuitId: string | undefined, limit = 5) {
+  return useQuery({
+    queryKey: ['race-traces', circuitId, limit],
+    enabled: !!circuitId,
+    queryFn: () =>
+      api.get<RaceTrace[]>(`/circuits/${circuitId}/race-traces?limit=${limit}`),
   })
 }
 

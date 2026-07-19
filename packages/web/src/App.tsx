@@ -12,6 +12,7 @@ import {
   useCircuitPodiums,
   useLapRecord,
   useRaceResults,
+  useRaceTraces,
   useRaceWeekends,
   useSessions,
   useSimStats,
@@ -29,6 +30,7 @@ import { Header } from './components/Header/Header'
 import { CircuitProfile } from './components/CircuitProfile/CircuitProfile'
 import { WeatherStrip } from './components/WeatherStrip/WeatherStrip'
 import { StrategyEngine } from './components/StrategyEngine/StrategyEngine'
+import { RaceTrace } from './components/RaceTrace/RaceTrace'
 import { QualiMetrics } from './components/QualiMetrics/QualiMetrics'
 import { RaceTiming } from './components/RaceTiming/RaceTiming'
 import { DriverForm } from './components/DriverForm/DriverForm'
@@ -82,6 +84,7 @@ export default function App() {
   const lastSeasonConstructors = useStandings(SEASON - 1, 'constructor')
   const raceResults = useRaceResults(SEASON)
   const podiums = useCircuitPodiums(featured?.circuit_id)
+  const raceTraces = useRaceTraces(featured?.circuit_id)
 
   if (weekends.isError) {
     return (
@@ -176,6 +179,15 @@ export default function App() {
             simStatsError={simStats.isError}
             fallbackStats={simStatsLastSeason.data}
             fallbackStatsLoading={simStatsLastSeason.isLoading}
+          />
+        </SectionBoundary>
+
+        <SectionBoundary label="RACE_TRACE">
+          <RaceTrace
+            circuitId={featured.circuit_id}
+            traces={raceTraces.data}
+            loading={raceTraces.isLoading}
+            error={raceTraces.isError}
           />
         </SectionBoundary>
 

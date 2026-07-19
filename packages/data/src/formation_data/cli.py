@@ -25,6 +25,7 @@ from formation_data.jobs.pre_season import (
     circuit_stats,
     drivers,
     lap_records as pre_season_lap_records,
+    race_traces,
     race_weekends,
     sessions,
     track_maps,
@@ -44,6 +45,7 @@ sessions_app = typer.Typer(help="Weekend session timetable.")
 lap_records_app = typer.Typer(help="All-time race lap records.")
 circuit_stats_app = typer.Typer(help="Per-circuit per-season stats.")
 circuit_race_stats_app = typer.Typer(help="Empirical per-circuit race analytics.")
+race_traces_app = typer.Typer(help="Lap-by-lap race traces (RACE_TRACE panel).")
 weather_app = typer.Typer(help="Race weekend weather forecast.")
 strategies_app = typer.Typer(help="Historical (mined) strategy options.")
 sim_strategies_app = typer.Typer(help="Simulated strategy options.")
@@ -60,6 +62,7 @@ app.add_typer(sessions_app, name="sessions")
 app.add_typer(lap_records_app, name="lap-records")
 app.add_typer(circuit_stats_app, name="circuit-stats")
 app.add_typer(circuit_race_stats_app, name="circuit-race-stats")
+app.add_typer(race_traces_app, name="race-traces")
 app.add_typer(weather_app, name="weather")
 app.add_typer(strategies_app, name="strategies")
 app.add_typer(sim_strategies_app, name="sim-strategies")
@@ -150,6 +153,30 @@ def circuit_race_stats_recompute(
     """Mine empirical race analytics from the trailing seasons (all races, wet included)."""
     with connection_scope() as conn:
         circuit_race_stats.run(conn, season=season, circuit_id=circuit)
+
+
+@race_traces_app.command("backfill")
+def race_traces_backfill(
+    season: int = typer.Option(..., help="Upcoming season; traces the 5 seasons before it."),
+    circuit: str | None = typer.Option(None, "--circuit", help="Single circuit_id; default all."),
+) -> None:
+    """Build lap-by-lap traces for every race in the trailing seasons (resumable)."""
+    with connection_scope() as conn:
+        race_traces.run(conn, season=season, circuit_id=circuit)
+
+
+@race_traces_app.command("refresh")
+def race_traces_refresh(
+    season: int = typer.Option(...),
+    round: int = typer.Option(..., "--round", help="Official F1 round number."),
+    circuit: str = typer.Option(..., "--circuit", help="circuit_id the race was held at."),
+) -> None:
+    """Build the trace for a single race (manual escape hatch; post-race does this too)."""
+    with connection_scope() as conn:
+        stored = race_traces.run_single(
+            conn, circuit_id=circuit, season=season, round_number=round
+        )
+        typer.echo(f"race-traces {season} R{round}: {'stored' if stored else 'no data'}")
 
 
 @weather_app.command("refresh")
