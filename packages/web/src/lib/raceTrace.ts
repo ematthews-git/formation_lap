@@ -446,6 +446,8 @@ export function buildRaceTrace(
   view: RaceTraceView,
   width: number,
   compact: boolean,
+  /** 0 = full stack; 1 = pace pane expanded, excitement/overtakes collapsed. */
+  expand = 0,
 ): RaceTraceGeom {
   const laps = view.mode === 'race' ? view.race.totalLaps : view.average.totalLaps
   const plotW = Math.max(1, width - PAD_L - PAD_R)
@@ -456,15 +458,23 @@ export function buildRaceTrace(
 
   const allDrivers = view.mode === 'race' && view.scope === 'all'
 
-  /* ---- vertical stack ---- */
+  /* ---- vertical stack ----
+   * `expand` (0..1) grows the pace pane while the excitement and overtakes
+   * lanes concertina shut into it. The freed vertical space is exactly what the
+   * pace pane absorbs, so the status/weather strips and the overall height stay
+   * fixed — nothing below the chart reflows mid-animation. `f` is clamped just
+   * above zero so the collapsing lanes never divide by a zero height. */
+  const f = Math.max(0.001, 1 - expand)
   let y = PAD_T
   y += 10 // lane-label line above the pace pane
-  const paceH = (compact ? 150 : 200) + (allDrivers ? 56 : 0)
+  const paceBase = (compact ? 150 : 200) + (allDrivers ? 56 : 0)
+  const freed = LANE_GAP + EXCITE_H + LANE_GAP + OVERTAKE_H
+  const paceH = paceBase + (1 - f) * freed
   const paceBox: Box = { x0: PAD_L, y0: y, x1: PAD_L + plotW, y1: y + paceH }
-  y = paceBox.y1 + LANE_GAP
-  const exciteBox: Box = { x0: PAD_L, y0: y, x1: PAD_L + plotW, y1: y + EXCITE_H }
-  y = exciteBox.y1 + LANE_GAP
-  const overtakeBox: Box = { x0: PAD_L, y0: y, x1: PAD_L + plotW, y1: y + OVERTAKE_H }
+  y = paceBox.y1 + LANE_GAP * f
+  const exciteBox: Box = { x0: PAD_L, y0: y, x1: PAD_L + plotW, y1: y + EXCITE_H * f }
+  y = exciteBox.y1 + LANE_GAP * f
+  const overtakeBox: Box = { x0: PAD_L, y0: y, x1: PAD_L + plotW, y1: y + OVERTAKE_H * f }
   y = overtakeBox.y1 + STATUS_GAP
   const statusY = y
   y += STATUS_H
@@ -623,9 +633,12 @@ export function buildRaceTrace(
   const maxCount = Math.max(0.001, ...counts)
   const slotW = plotW / laps
   const barW = Math.max(1.5, +(slotW * 0.62).toFixed(1))
+  // Bar heights track the (collapsing) lane box, leaving 12px headroom at f=1
+  // for the peak-lap label; the headroom scales away with the lane.
+  const barSpan = Math.max(0, overtakeBox.y1 - overtakeBox.y0 - 12 * f)
   const bars = counts
     .map((count, i) => {
-      const h = +((count / maxCount) * (OVERTAKE_H - 12)).toFixed(1)
+      const h = +((count / maxCount) * barSpan).toFixed(1)
       return {
         lap: i + 1,
         count,

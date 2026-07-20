@@ -20,7 +20,7 @@ import logging
 
 from sqlalchemy import Connection
 
-from formation_data import race_metrics, repositories
+from formation_data import race_metrics, race_trace, repositories
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,9 @@ def run(conn: Connection, *, season: int, circuit_id: str | None = None) -> None
         for s in window:
             for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location):
                 try:
-                    ses = collector.load_session(s, r, "R", weather=True)
+                    # telemetry=True so avg_overtakes_per_race uses the same durable
+                    # on-track-pass counter as the race trace (consistent feeds).
+                    ses = collector.load_session(s, r, "R", weather=True, telemetry=True)
                     if ses is None:
                         # None = missing data OR the hourly budget was just spent. Once the
                         # collector reports rate-limiting, treat the circuit as incomplete.
@@ -60,10 +62,15 @@ def run(conn: Connection, *, season: int, circuit_id: str | None = None) -> None
                             interrupted = True
                             break
                         continue
+                    laps = collector.session_laps(ses)
+                    overtakes = race_trace.overtakes_by_lap(
+                        collector.driver_progress(ses), laps
+                    )
                     feat = race_metrics.race_features(
-                        collector.session_laps(ses),
+                        laps,
                         collector.session_results(ses),
                         collector.weather_summary(ses),
+                        overtakes=sum(overtakes.values()),
                     )
                 except Exception:  # noqa: BLE001 — a single unavailable/partial race must not
                     # sink the whole backfill; skip it and carry on.

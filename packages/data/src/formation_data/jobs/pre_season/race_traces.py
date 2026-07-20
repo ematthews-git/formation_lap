@@ -33,16 +33,21 @@ def run_single(
     (or the FastF1 budget is spent — distinguishable via ``collector.rate_limited()``)."""
     from formation_sim.data import collector
 
-    ses = collector.load_session(season, round_number, "R", weather=True)
+    # telemetry=True so on-track overtakes come from the durable-lead-change counter
+    # (race_trace.overtakes_by_lap) rather than the coarser lap-line fallback.
+    ses = collector.load_session(season, round_number, "R", weather=True, telemetry=True)
     if ses is None:
         return False
+    laps = collector.session_laps(ses)
+    overtakes = race_trace.overtakes_by_lap(collector.driver_progress(ses), laps)
     blob = race_trace.build_trace(
-        collector.session_laps(ses),
+        laps,
         collector.session_results(ses),
         collector.session_lap_rainfall(ses),
         season=season,
         round_number=round_number,
         event_name=str(ses.event["EventName"]),
+        overtakes_by_lap=overtakes,
     )
     if blob is None:
         return False

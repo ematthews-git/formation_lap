@@ -132,6 +132,86 @@ def test_passes_exclude_pit_cycle():
     assert rm.passes_by_lap(make_laps(rows)) == {}
 
 
+# --- telemetry-based overtakes (durable lead changes) ---
+
+
+def _progress(rows: dict[str, list[tuple[float, float, int]]]) -> dict:
+    """Build a progress dict: {driver: [(t, prog, lap), ...]}."""
+    return {
+        drv: pd.DataFrame(pts, columns=["t", "prog", "lap"])
+        for drv, pts in rows.items()
+    }
+
+
+def _flat_laps(codes: list[str], n_laps: int, **overrides) -> pd.DataFrame:
+    """Minimal laps frame carrying only the exclusion flags overtakes_by_lap reads."""
+    rows = []
+    for c in codes:
+        for lap in range(1, n_laps + 1):
+            r = {"driver": c, "lap": lap, "position": 1}
+            for key, laps_set in overrides.get(c, {}).items():
+                if lap in laps_set:
+                    r[key] = True
+            rows.append(r)
+    return make_laps(rows)
+
+
+def test_overtakes_durable_swap_counts_once():
+    # B is behind A, passes at t=20 and holds well beyond the 8s dwell → one pass on lap 2
+    # (lap 1 is excluded as the start scramble, tested separately below).
+    a = [(t, 1.0 + t * 0.001, 2) for t in range(0, 60, 2)]
+    b = [(t, 1.0 + t * 0.001 + (-0.02 if t < 20 else 0.02), 2) for t in range(0, 60, 2)]
+    prog = _progress({"A": a, "B": b})
+    laps = _flat_laps(["A", "B"], 2)
+    assert rt.overtakes_by_lap(prog, laps, dwell_s=8.0) == {2: 1}
+
+
+def test_overtakes_flipflop_below_dwell_not_counted():
+    # A and B trade the lead every 4s (below the 8s dwell) — a side-by-side scrap that
+    # must not inflate. No swap persists long enough to confirm a change.
+    a, b = [], []
+    for t in range(0, 80, 2):
+        lead = (t // 4) % 2 == 0  # flips every 4s
+        off = 0.02 if lead else -0.02
+        a.append((t, t * 0.001 + off, 1))
+        b.append((t, t * 0.001 - off, 1))
+    prog = _progress({"A": a, "B": b})
+    assert sum(rt.overtakes_by_lap(prog, _flat_laps(["A", "B"], 1), dwell_s=8.0).values()) == 0
+
+
+def test_overtakes_excludes_lap1_start_scramble():
+    # A durable swap on lap 1 (the standing-start scramble) is not counted; the same
+    # swap on a later lap is.
+    a1 = [(t, t * 0.001, 1) for t in range(0, 60, 2)]
+    b1 = [(t, t * 0.001 + (-0.02 if t < 20 else 0.02), 1) for t in range(0, 60, 2)]
+    assert rt.overtakes_by_lap(_progress({"A": a1, "B": b1}), _flat_laps(["A", "B"], 1),
+                               dwell_s=8.0) == {}
+    a2 = [(t, 1.0 + t * 0.001, 2) for t in range(0, 60, 2)]
+    b2 = [(t, 1.0 + t * 0.001 + (-0.02 if t < 20 else 0.02), 2) for t in range(0, 60, 2)]
+    assert rt.overtakes_by_lap(_progress({"A": a2, "B": b2}), _flat_laps(["A", "B"], 2),
+                               dwell_s=8.0) == {2: 1}
+
+
+def test_overtakes_excludes_swaps_under_sc():
+    # Swap on lap 2 (past the start), but under the safety car → excluded.
+    a = [(t, 1.0 + t * 0.001, 2) for t in range(0, 60, 2)]
+    b = [(t, 1.0 + t * 0.001 + (-0.02 if t < 20 else 0.02), 2) for t in range(0, 60, 2)]
+    prog = _progress({"A": a, "B": b})
+    laps = _flat_laps(["A", "B"], 2, A={"is_sc": {2}}, B={"is_sc": {2}})
+    assert rt.overtakes_by_lap(prog, laps, dwell_s=8.0) == {}
+
+
+def test_overtakes_falls_back_to_lap_resolution_without_telemetry():
+    # No progress → lap-resolution passes_by_lap, so a race still gets a count.
+    rows = []
+    order = {1: (1, 2), 2: (1, 2), 3: (2, 1), 4: (2, 1)}
+    for lap, (pv, ph) in order.items():
+        rows.append({"driver": "VER", "lap": lap, "position": pv})
+        rows.append({"driver": "HAM", "lap": lap, "position": ph})
+    laps = make_laps(rows)
+    assert rt.overtakes_by_lap({}, laps) == rm.passes_by_lap(laps) == {3: 1}
+
+
 # --- weather ---
 
 

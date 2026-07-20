@@ -6,6 +6,7 @@ import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit, teamColorVar } from '../../lib/format'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { useElementWidth } from '../../lib/useElementWidth'
+import { useTween } from '../../lib/useTween'
 import {
   buildAverageTrace,
   buildRaceTrace,
@@ -80,10 +81,15 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
   const compact = useMediaQuery('(max-width: 750px)')
   const [wrapRef, width] = useElementWidth<HTMLDivElement>()
   // Selected race as an index into `races` (newest first) — indices stay unambiguous
-  // even if a season ever contributes two races. 'avg' = the cross-race average.
-  const [sel, setSel] = useState<number | 'avg'>(0)
+  // even if a season ever contributes two races. 'avg' = the cross-race average and
+  // is the default; it gracefully falls back to the single race when there is no
+  // average to take (see `isAvg`/`race` below).
+  const [sel, setSel] = useState<number | 'avg'>('avg')
   const [scope, setScope] = useState<RaceScope>('trios')
+  const [expanded, setExpanded] = useState(false)
   const [hoverLap, setHoverLap] = useState<number | null>(null)
+  // Eased 0→1 that grows the pace pane and collapses the excitement/overtakes lanes.
+  const expand = useTween(expanded ? 1 : 0)
 
   const races = useMemo(() => (traces ?? []).map((t) => raceFromApi(t.trace)), [traces])
   const average = useMemo(() => buildAverageTrace(races), [races])
@@ -91,7 +97,7 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
   // A new circuit gets a fresh selection (the old index would silently point at a
   // different year, or past the end of a shorter history).
   useEffect(() => {
-    setSel(0)
+    setSel('avg')
     setHoverLap(null)
   }, [circuitId])
 
@@ -104,10 +110,15 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
       : null
 
   const geom = useMemo(
-    () => (view && width > 0 ? buildRaceTrace(view, width, compact) : null),
+    () => (view && width > 0 ? buildRaceTrace(view, width, compact, expand) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [races, average, sel, scope, width, compact],
+    [races, average, sel, scope, width, compact, expand],
   )
+
+  // Excitement/overtakes fade out a touch faster than the lanes finish
+  // collapsing, so the closing gap is empty rather than showing squashed content.
+  const laneOpacity = Math.max(0, 1 - expand * 1.35)
+  const showLanes = laneOpacity > 0.001
 
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     if (!geom) return
@@ -137,9 +148,18 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
           <LoadingState label="LOADING RACE TRACES" />
         ) : view ? (
           <>
-            {/* view controls: race / average, and driver scope */}
+            {/* view controls: average / race, driver scope, and pane expand */}
             <div className={styles.controls}>
               <div className={styles.toggle}>
+                {average && (
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${isAvg ? styles.btnActive : ''}`}
+                    onClick={() => setSel('avg')}
+                  >
+                    AVG
+                  </button>
+                )}
                 {races.map((r, i) => (
                   <button
                     key={`${r.season}-${i}`}
@@ -150,32 +170,45 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
                     {r.season}
                   </button>
                 ))}
-                {average && (
+              </div>
+              <div className={styles.controlsRight}>
+                <div className={styles.toggle}>
                   <button
                     type="button"
-                    className={`${styles.btn} ${isAvg ? styles.btnActive : ''}`}
-                    onClick={() => setSel('avg')}
+                    className={`${styles.btn} ${scope === 'trios' || isAvg ? styles.btnActive : ''}`}
+                    onClick={() => setScope('trios')}
                   >
-                    AVG
+                    TOP/BOT 3
                   </button>
-                )}
-              </div>
-              <div className={styles.toggle}>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${scope === 'all' && !isAvg ? styles.btnActive : ''}`}
+                    onClick={() => setScope('all')}
+                    disabled={isAvg}
+                    title={isAvg ? 'Average trace is top/bottom-3 only' : undefined}
+                  >
+                    ALL DRIVERS
+                  </button>
+                </div>
                 <button
                   type="button"
-                  className={`${styles.btn} ${scope === 'trios' || isAvg ? styles.btnActive : ''}`}
-                  onClick={() => setScope('trios')}
+                  className={`${styles.expandBtn} ${expanded ? styles.expandBtnActive : ''}`}
+                  onClick={() => setExpanded((v) => !v)}
+                  aria-pressed={expanded}
+                  title={
+                    expanded
+                      ? 'Restore excitement & overtakes lanes'
+                      : 'Hide excitement & overtakes, enlarge race pace'
+                  }
                 >
-                  TOP/BOT 3
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${scope === 'all' && !isAvg ? styles.btnActive : ''}`}
-                  onClick={() => setScope('all')}
-                  disabled={isAvg}
-                  title={isAvg ? 'Average trace is top/bottom-3 only' : undefined}
-                >
-                  ALL DRIVERS
+                  <svg className={styles.expandIcon} viewBox="0 0 10 10" aria-hidden="true">
+                    {expanded ? (
+                      <path d="M1 3.5 H3.5 V1 M9 6.5 H6.5 V9" />
+                    ) : (
+                      <path d="M3.5 1 H1 V3.5 M6.5 9 H9 V6.5" />
+                    )}
+                  </svg>
+                  {expanded ? 'COLLAPSE' : 'EXPAND'}
                 </button>
               </div>
             </div>
@@ -280,60 +313,70 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
                       </g>
                     ))}
 
-                    {/* excitement lane */}
-                    <text
-                      x={geom.plot.x0}
-                      y={geom.excitement.box.y0 - 6}
-                      className={styles.laneLabel}
-                    >
-                      EXCITEMENT INDEX · 0–100{isAvg && ' · MEAN'}
-                    </text>
-                    <line
-                      x1={geom.plot.x0}
-                      y1={geom.excitement.box.y1}
-                      x2={geom.plot.x1}
-                      y2={geom.excitement.box.y1}
-                      className={styles.laneBase}
-                    />
-                    <path d={geom.excitement.area} className={styles.exciteArea} />
-                    <path d={geom.excitement.line} className={styles.exciteLine} />
-
-                    {/* overtakes lane */}
-                    <text
-                      x={geom.plot.x0}
-                      y={geom.overtakes.box.y0 - 6}
-                      className={styles.laneLabel}
-                    >
-                      OVERTAKES / LAP{isAvg && ' · MEAN'}
-                    </text>
-                    <line
-                      x1={geom.plot.x0}
-                      y1={geom.overtakes.box.y1}
-                      x2={geom.plot.x1}
-                      y2={geom.overtakes.box.y1}
-                      className={styles.laneBase}
-                    />
-                    {geom.overtakes.bars.map((b) => (
-                      <rect
-                        key={b.lap}
-                        x={b.x}
-                        y={b.y}
-                        width={b.w}
-                        height={b.h}
-                        className={hoverLap === b.lap ? styles.barHot : styles.bar}
-                      />
-                    ))}
-                    {/* selective label: the busiest lap only */}
-                    {(() => {
-                      const peak = geom.overtakes.bars.find(
-                        (b) => b.count === geom.overtakes.max,
-                      )
-                      return peak ? (
-                        <text x={peak.x + peak.w / 2} y={peak.y - 3} className={styles.barLabel}>
-                          {Number.isInteger(peak.count) ? peak.count : peak.count.toFixed(1)}
+                    {/* excitement + overtakes lanes — fade out and concertina
+                        shut as the pace pane expands over their vacated space */}
+                    {showLanes && (
+                      <g opacity={laneOpacity}>
+                        {/* excitement lane */}
+                        <text
+                          x={geom.plot.x0}
+                          y={geom.excitement.box.y0 - 6}
+                          className={styles.laneLabel}
+                        >
+                          EXCITEMENT INDEX · 0–100{isAvg && ' · MEAN'}
                         </text>
-                      ) : null
-                    })()}
+                        <line
+                          x1={geom.plot.x0}
+                          y1={geom.excitement.box.y1}
+                          x2={geom.plot.x1}
+                          y2={geom.excitement.box.y1}
+                          className={styles.laneBase}
+                        />
+                        <path d={geom.excitement.area} className={styles.exciteArea} />
+                        <path d={geom.excitement.line} className={styles.exciteLine} />
+
+                        {/* overtakes lane */}
+                        <text
+                          x={geom.plot.x0}
+                          y={geom.overtakes.box.y0 - 6}
+                          className={styles.laneLabel}
+                        >
+                          OVERTAKES / LAP{isAvg && ' · MEAN'}
+                        </text>
+                        <line
+                          x1={geom.plot.x0}
+                          y1={geom.overtakes.box.y1}
+                          x2={geom.plot.x1}
+                          y2={geom.overtakes.box.y1}
+                          className={styles.laneBase}
+                        />
+                        {geom.overtakes.bars.map((b) => (
+                          <rect
+                            key={b.lap}
+                            x={b.x}
+                            y={b.y}
+                            width={b.w}
+                            height={b.h}
+                            className={hoverLap === b.lap ? styles.barHot : styles.bar}
+                          />
+                        ))}
+                        {/* selective label: the busiest lap only */}
+                        {(() => {
+                          const peak = geom.overtakes.bars.find(
+                            (b) => b.count === geom.overtakes.max,
+                          )
+                          return peak ? (
+                            <text
+                              x={peak.x + peak.w / 2}
+                              y={peak.y - 3}
+                              className={styles.barLabel}
+                            >
+                              {Number.isInteger(peak.count) ? peak.count : peak.count.toFixed(1)}
+                            </text>
+                          ) : null
+                        })()}
+                      </g>
+                    )}
 
                     {/* status strip, then weather directly beneath it */}
                     {[geom.status, geom.weather].map(
@@ -420,7 +463,7 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
               )}
             </div>
 
-            <Legend view={view} />
+            <Legend view={view} expanded={expanded} />
             <div className={styles.footnote}>
               {isAvg
                 ? `BANDS = TOP/BOTTOM-3 PACE ENVELOPE AVERAGED OVER ${average!.nRaces} RACES · STRIP OPACITY = PER-LAP PROBABILITY · HOVER FOR VALUES`
@@ -440,7 +483,7 @@ export function RaceTrace({ circuitId, traces, loading, error }: Props) {
   )
 }
 
-function Legend({ view }: { view: RaceTraceView }) {
+function Legend({ view, expanded }: { view: RaceTraceView; expanded: boolean }) {
   const isAvg = view.mode === 'average'
   const race = view.mode === 'race' ? view.race : null
   const seenStatus = race
@@ -487,13 +530,17 @@ function Legend({ view }: { view: RaceTraceView }) {
           </span>
         </>
       )}
-      <span className={styles.legendDivider} />
-      <span className={styles.legendItem}>
-        <span className={styles.swatchLine} /> EXCITEMENT
-      </span>
-      <span className={styles.legendItem}>
-        <span className={styles.swatchBar} /> OVERTAKES
-      </span>
+      {(!expanded || !isAvg) && <span className={styles.legendDivider} />}
+      {!expanded && (
+        <>
+          <span className={styles.legendItem}>
+            <span className={styles.swatchLine} /> EXCITEMENT
+          </span>
+          <span className={styles.legendItem}>
+            <span className={styles.swatchBar} /> OVERTAKES
+          </span>
+        </>
+      )}
       {!isAvg && (
         <span className={styles.legendItem}>
           <span className={styles.swatchPit} /> PIT STOP

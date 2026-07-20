@@ -204,11 +204,20 @@ def _stint_slopes(laps: pd.DataFrame) -> list[float]:
     return slopes
 
 
-def race_features(laps: pd.DataFrame, results: pd.DataFrame, weather: dict) -> dict | None:
+def race_features(
+    laps: pd.DataFrame,
+    results: pd.DataFrame,
+    weather: dict,
+    overtakes: float | None = None,
+) -> dict | None:
     """Reduce one race's frames to a flat feature dict, or None if the race has no laps.
 
     ``laps`` / ``results`` follow the collector's ``session_laps`` / ``session_results`` shape;
     ``weather`` its ``weather_summary`` dict. Flag columns may be nullable-boolean.
+
+    ``overtakes`` is the race's on-track pass count. Pass the telemetry-based count
+    (``race_trace.overtakes_by_lap`` summed) so this feed matches the race trace; when
+    omitted it falls back to the cheaper lap-resolution ``_on_track_passes``.
     """
     if laps is None or not len(laps):
         return None
@@ -265,7 +274,7 @@ def race_features(laps: pd.DataFrame, results: pd.DataFrame, weather: dict) -> d
         "sc_pit_losses": pit["sc"],
         "vsc_pit_losses": pit["vsc"],
         "green_pit_losses": pit["green"],
-        "overtakes": _on_track_passes(laps),
+        "overtakes": _on_track_passes(laps) if overtakes is None else float(overtakes),
         "pos_changes_after_lap1": _post_lap1_position_changes(laps, results),
         "pos_changes_lap1": _lap1_position_changes(laps, results),
         "winner_grid": winner_grid,
