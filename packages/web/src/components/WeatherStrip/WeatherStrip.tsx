@@ -79,14 +79,14 @@ function Forecast({
     <>
       <div className={styles.stats}>
         <Stat label="HIGH / LOW" value={highLow} />
-        <Stat label="AIR / TRACK" value={airTrack} left />
+        <Stat label="AIR / TRACK · AVG" value={airTrack} left />
         <Stat
           label="WIND"
           value={race ? Math.round(race.wind_speed_kph) : '—'}
           unit={race ? 'km/h' : undefined}
         />
         <Stat
-          label="DRY RACE"
+          label="DRY RACE · AVG"
           value={dryShare != null ? Math.round(dryShare * 100) : '—'}
           unit={dryShare != null ? '%' : undefined}
           left

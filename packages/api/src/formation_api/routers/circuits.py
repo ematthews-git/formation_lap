@@ -10,6 +10,7 @@ from formation_data.domain import (
     CircuitStats,
     LapRecord,
     RaceResult,
+    RaceTrace,
 )
 
 router = APIRouter(prefix="/circuits", tags=["circuits"])
@@ -48,6 +49,11 @@ def _get_lap_record(circuit_id: str) -> LapRecord | None:
 def _get_podiums(circuit_id: str, limit: int) -> list[RaceResult]:
     with connection_scope() as conn:
         return repositories.list_circuit_podiums(conn, circuit_id, limit)
+
+
+def _get_race_traces(circuit_id: str, limit: int) -> list[RaceTrace]:
+    with connection_scope() as conn:
+        return repositories.list_race_traces_for_circuit(conn, circuit_id, limit)
 
 
 @router.get("/", response_model=list[Circuit])
@@ -106,3 +112,14 @@ async def get_lap_record(circuit_id: str) -> LapRecord:
 async def get_circuit_podiums(circuit_id: str, limit: int = 5) -> list[RaceResult]:
     """Top-3 finishers for the last `limit` races at a circuit (most recent first)."""
     return await asyncio.to_thread(_get_podiums, circuit_id, limit)
+
+
+@router.get("/{circuit_id}/race-traces", response_model=list[RaceTrace])
+async def get_circuit_race_traces(circuit_id: str, limit: int = 5) -> list[RaceTrace]:
+    """Lap-by-lap traces for the last `limit` races at a circuit (most recent first).
+
+    Empty list (not 404) until the race-traces backfill has run — the frontend shows a
+    clean empty state. Each trace's `drivers[].team` is the team the driver raced for
+    in that event, so lookbacks stay period-correct.
+    """
+    return await asyncio.to_thread(_get_race_traces, circuit_id, limit)

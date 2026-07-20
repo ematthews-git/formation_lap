@@ -194,7 +194,8 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
     published, so an as-yet-unscored weekend is simply retried on the next run.
     """
     today = today or date.today()
-    processed: list[tuple[int, int]] = []  # (season, official_round) to refresh laps for
+    # (season, official_round, circuit_id) to refresh laps + race trace for
+    processed: list[tuple[int, int, str]] = []
     with connection_scope() as conn:
         pending = repositories.race_weekends_missing_results(conn, before=today)
         if not pending:
@@ -242,13 +243,14 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
                 season=rw.season,
                 round_number=official_round,
             )
-            processed.append((rw.season, official_round))
+            processed.append((rw.season, official_round, rw.circuit_id))
 
     # Keep the sim's current-season laps fresh in derived_artifacts so prelim/postquali runs in
-    # CI (which read laps from the DB) can see just-completed races. Done in its own transaction,
-    # after the results/standings above have committed, so a laps-fetch/upsert hiccup can never
+    # CI (which read laps from the DB) can see just-completed races, and build the weekend's
+    # race trace while the session is warm in the FastF1 cache. Done in their own transactions,
+    # after the results/standings above have committed, so a fetch/upsert hiccup can never
     # roll those back. Best-effort: a failure just means the round is retried next run.
-    for season, rnd in processed:
+    for season, rnd, circuit_id in processed:
         try:
             with connection_scope() as conn:
                 from formation_data import artifact_store
@@ -258,6 +260,18 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
         except Exception:
             logger.exception(
                 "run_post_race: laps dump failed for %s R%s (non-fatal)", season, rnd
+            )
+        try:
+            with connection_scope() as conn:
+                from formation_data.jobs.pre_season import race_traces
+
+                if race_traces.run_single(
+                    conn, circuit_id=circuit_id, season=season, round_number=rnd
+                ):
+                    logger.info("run_post_race: stored race trace for %s R%s", season, rnd)
+        except Exception:
+            logger.exception(
+                "run_post_race: race trace failed for %s R%s (non-fatal)", season, rnd
             )
 
 

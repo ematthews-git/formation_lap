@@ -115,21 +115,22 @@ def _pit_losses(laps: pd.DataFrame) -> dict[str, list[float]]:
     return out
 
 
-def _on_track_passes(laps: pd.DataFrame) -> float:
-    """On-track overtakes: over each pair of consecutive green racing laps, the number of car
-    pairs — both circulating (neither on an in/out lap) — that swap order. Counting only mutual
-    green-lap order reversals excludes the pit-cycle churn a naive lap-to-lap position-gain sum
-    counts as passes (a car promoted because a rival pitted was not overtaken on track)."""
+def passes_by_lap(laps: pd.DataFrame) -> dict[int, int]:
+    """On-track overtakes per lap: over each pair of consecutive green racing laps, the number
+    of car pairs — both circulating (neither on an in/out lap) — that swap order, credited to
+    the later lap of the pair. Counting only mutual green-lap order reversals excludes the
+    pit-cycle churn a naive lap-to-lap position-gain sum counts as passes (a car promoted
+    because a rival pitted was not overtaken on track). Laps with no passes are absent."""
     racing = laps[
         laps["is_green"] & ~laps["is_inlap"] & ~laps["is_outlap"] & laps["position"].notna()
     ]
     if not len(racing):
-        return 0.0
+        return {}
     piv = racing.pivot_table(
         index="lap_number", columns="driver", values="position", aggfunc="first"
     ).sort_index()
     lap_nums = piv.index.to_numpy()
-    passes = 0
+    out: dict[int, int] = {}
     for i in range(len(lap_nums) - 1):
         if lap_nums[i + 1] != lap_nums[i] + 1:
             continue  # only truly consecutive laps (a gap means a car was pitting / lapped out)
@@ -139,9 +140,17 @@ def _on_track_passes(laps: pd.DataFrame) -> float:
         pa, pb = a[valid], b[valid]
         # For each car x, count rivals y it was behind (pa[x] > pa[y]) and is now ahead of
         # (pb[x] < pb[y]) — each is one completed on-track pass. Self-compare is never a hit.
+        passes = 0
         for x in range(len(pa)):
             passes += int(np.sum((pa[x] > pa) & (pb[x] < pb)))
-    return float(passes)
+        if passes:
+            out[int(lap_nums[i + 1])] = passes
+    return out
+
+
+def _on_track_passes(laps: pd.DataFrame) -> float:
+    """Race total of :func:`passes_by_lap` (kept for the aggregate feed)."""
+    return float(sum(passes_by_lap(laps).values()))
 
 
 def _lap1_position_changes(laps: pd.DataFrame, results: pd.DataFrame) -> float:
@@ -195,11 +204,20 @@ def _stint_slopes(laps: pd.DataFrame) -> list[float]:
     return slopes
 
 
-def race_features(laps: pd.DataFrame, results: pd.DataFrame, weather: dict) -> dict | None:
+def race_features(
+    laps: pd.DataFrame,
+    results: pd.DataFrame,
+    weather: dict,
+    overtakes: float | None = None,
+) -> dict | None:
     """Reduce one race's frames to a flat feature dict, or None if the race has no laps.
 
     ``laps`` / ``results`` follow the collector's ``session_laps`` / ``session_results`` shape;
     ``weather`` its ``weather_summary`` dict. Flag columns may be nullable-boolean.
+
+    ``overtakes`` is the race's on-track pass count. Pass the telemetry-based count
+    (``race_trace.overtakes_by_lap`` summed) so this feed matches the race trace; when
+    omitted it falls back to the cheaper lap-resolution ``_on_track_passes``.
     """
     if laps is None or not len(laps):
         return None
@@ -256,7 +274,7 @@ def race_features(laps: pd.DataFrame, results: pd.DataFrame, weather: dict) -> d
         "sc_pit_losses": pit["sc"],
         "vsc_pit_losses": pit["vsc"],
         "green_pit_losses": pit["green"],
-        "overtakes": _on_track_passes(laps),
+        "overtakes": _on_track_passes(laps) if overtakes is None else float(overtakes),
         "pos_changes_after_lap1": _post_lap1_position_changes(laps, results),
         "pos_changes_lap1": _lap1_position_changes(laps, results),
         "winner_grid": winner_grid,

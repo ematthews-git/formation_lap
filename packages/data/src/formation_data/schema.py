@@ -273,6 +273,30 @@ session_results = Table(
 )
 
 
+# Lap-by-lap trace of one historical race — the RACE_TRACE panel's data. Like the other
+# derived feeds it's a single JSONB document (per-lap track status / weather / excitement /
+# overtakes arrays plus every starter's lap times, pit laps and — crucially — the team they
+# drove for in THAT race, so the frontend never joins against the current season's lineup).
+# Keyed (season, round_number) with round_number the official F1 round, matching
+# race_results; circuit_id is a denormalized FK for the per-circuit lookup the panel makes.
+race_traces = Table(
+    "race_traces",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
+    Column("season", Integer, nullable=False),
+    Column("round_number", Integer, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column("trace", JSONB, nullable=False),
+    UniqueConstraint("season", "round_number"),
+)
+
+
 race_results = Table(
     "race_results",
     metadata,
@@ -342,6 +366,7 @@ __all__ = [
     "sim_race_stats",
     "circuit_race_stats",
     "session_results",
+    "race_traces",
     "race_results",
     "standings",
     "derived_artifacts",
