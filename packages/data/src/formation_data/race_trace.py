@@ -35,7 +35,9 @@ TRACE_VERSION = 1
 _MIN_GREEN_LAPS = 5
 
 # On-track overtake counting (telemetry-based durable lead changes).
-OVERTAKE_DWELL_S = 8.0  # a swap must hold this long to count (filters side-by-side scraps)
+OVERTAKE_DWELL_S = (
+    8.0  # a swap must hold this long to count (filters side-by-side scraps)
+)
 _OVERTAKE_GRID_S = 0.5  # running-order sampling step
 
 # --------------------------------------------------------------------- excitement weights
@@ -102,7 +104,9 @@ def overtakes_by_lap(
             return False
         if isinstance(r, pd.DataFrame):
             r = r.iloc[0]
-        return bool(r["is_inlap"] or r["is_outlap"] or r["is_sc"] or r["is_vsc"] or r["is_red"])
+        return bool(
+            r["is_inlap"] or r["is_outlap"] or r["is_sc"] or r["is_vsc"] or r["is_red"]
+        )
 
     t_min = min(df["t"].iloc[0] for df in progress.values())
     t_max = max(df["t"].iloc[-1] for df in progress.values())
@@ -111,10 +115,18 @@ def overtakes_by_lap(
     grid = np.arange(t_min, t_max, grid_step_s)
 
     codes = list(progress)
-    prog = {c: np.interp(grid, progress[c]["t"], progress[c]["prog"], left=np.nan, right=np.nan)
-            for c in codes}
-    lapg = {c: np.interp(grid, progress[c]["t"], progress[c]["lap"], left=np.nan, right=np.nan)
-            for c in codes}
+    prog = {
+        c: np.interp(
+            grid, progress[c]["t"], progress[c]["prog"], left=np.nan, right=np.nan
+        )
+        for c in codes
+    }
+    lapg = {
+        c: np.interp(
+            grid, progress[c]["t"], progress[c]["lap"], left=np.nan, right=np.nan
+        )
+        for c in codes
+    }
     min_run = max(1, int(round(dwell_s / grid_step_s)))
 
     per_lap: dict[int, int] = {}
@@ -149,7 +161,11 @@ def overtakes_by_lap(
                         # The start shuffle is captured separately by the lap-1 position
                         # changes; SC-start races race from a later restart lap, which is
                         # green and counts normally.
-                        if 2 <= lp <= total_laps and not excluded(a, lp) and not excluded(b, lp):
+                        if (
+                            2 <= lp <= total_laps
+                            and not excluded(a, lp)
+                            and not excluded(b, lp)
+                        ):
                             per_lap[lp] = per_lap.get(lp, 0) + 1
                     confirmed = int(sign[i])
                 i = j
@@ -162,13 +178,15 @@ def status_by_lap(laps: pd.DataFrame, total_laps: int) -> list[str]:
     ``any`` across the cars running that lap, worst status wins — a deployment mid-lap
     flags the whole lap, which is what a lap-resolution strip can honestly show.
     """
-    flags = pd.DataFrame({
-        "lap": laps["lap_number"].astype(float),
-        "red": _b(laps["is_red"]),
-        "sc": _b(laps["is_sc"]),
-        "vsc": _b(laps["is_vsc"]),
-        "yellow": _b(laps["is_yellow"]),
-    })
+    flags = pd.DataFrame(
+        {
+            "lap": laps["lap_number"].astype(float),
+            "red": _b(laps["is_red"]),
+            "sc": _b(laps["is_sc"]),
+            "vsc": _b(laps["is_vsc"]),
+            "yellow": _b(laps["is_yellow"]),
+        }
+    )
     by_lap = flags.groupby("lap").any()
     out: list[str] = []
     for lap in range(1, total_laps + 1):
@@ -199,10 +217,12 @@ def weather_by_lap(
     falling → damp; otherwise dry.
     """
     rain = lap_rainfall or {}
-    comp = pd.DataFrame({
-        "lap": laps["lap_number"].astype(float),
-        "compound": laps["compound"].astype("string"),
-    }).dropna(subset=["lap"])
+    comp = pd.DataFrame(
+        {
+            "lap": laps["lap_number"].astype(float),
+            "compound": laps["compound"].astype("string"),
+        }
+    ).dropna(subset=["lap"])
     out: list[str] = []
     for lap in range(1, total_laps + 1):
         c = comp.loc[comp["lap"] == lap, "compound"].dropna()
@@ -230,7 +250,11 @@ def _front_gap_by_lap(laps: pd.DataFrame, total_laps: int) -> list[float]:
     cum = piv.cumsum(skipna=False)
     out: list[float] = []
     for lap in range(1, total_laps + 1):
-        row = cum.loc[lap].dropna().sort_values() if lap in cum.index else pd.Series(dtype=float)
+        row = (
+            cum.loc[lap].dropna().sort_values()
+            if lap in cum.index
+            else pd.Series(dtype=float)
+        )
         out.append(float(row.iloc[1] - row.iloc[0]) if len(row) >= 2 else float("nan"))
     return out
 
@@ -261,7 +285,11 @@ def _excitement(
             v += _EXC_RAIN_START if was_dry else _EXC_RAIN_RUNNING
         v += min(_EXC_PIT_PER_STOP * pit_counts[i], _EXC_PIT_CAP)
         gap = front_gap[i]
-        if lap > total_laps - _EXC_GAP_WINDOW and np.isfinite(gap) and gap < _EXC_GAP_THRESHOLD_S:
+        if (
+            lap > total_laps - _EXC_GAP_WINDOW
+            and np.isfinite(gap)
+            and gap < _EXC_GAP_THRESHOLD_S
+        ):
             v += min((_EXC_GAP_THRESHOLD_S - gap) * _EXC_GAP_PER_S, _EXC_GAP_CAP)
         out.append(int(round(max(0.0, min(100.0, v)))))
     return out
@@ -299,7 +327,9 @@ def _driver_rows(
     ).reindex(range(1, total_laps + 1))
     inlaps = laps[_b(laps["is_inlap"])]
     pit_by_driver: dict[str, list[int]] = {
-        str(d): sorted(int(l) for l in g["lap_number"].dropna() if int(l) >= first_green)
+        str(d): sorted(
+            int(lap) for lap in g["lap_number"].dropna() if int(lap) >= first_green
+        )
         for d, g in inlaps.groupby("driver")
     }
     numbers = (
@@ -325,17 +355,26 @@ def _driver_rows(
     rows: list[dict] = []
     for i, r in res.iterrows():
         code = str(r["driver"])
-        col = times[code] if code in times.columns else pd.Series(np.nan, index=times.index)
+        col = (
+            times[code]
+            if code in times.columns
+            else pd.Series(np.nan, index=times.index)
+        )
         fin_v = float(r["finish_position"])
-        rows.append({
-            "code": code,
-            "team": str(r["team"]),
-            "second_car": code in second,
-            "finish_pos": int(fin_v) if np.isfinite(fin_v) else int(i) + 1,
-            "classified": bool(r["classified"]),
-            "lap_times": [round(float(t), 3) if np.isfinite(t) else None for t in col.to_numpy(dtype=float)],
-            "pit_laps": pit_by_driver.get(code, []),
-        })
+        rows.append(
+            {
+                "code": code,
+                "team": str(r["team"]),
+                "second_car": code in second,
+                "finish_pos": int(fin_v) if np.isfinite(fin_v) else int(i) + 1,
+                "classified": bool(r["classified"]),
+                "lap_times": [
+                    round(float(t), 3) if np.isfinite(t) else None
+                    for t in col.to_numpy(dtype=float)
+                ],
+                "pit_laps": pit_by_driver.get(code, []),
+            }
+        )
     return rows
 
 
@@ -385,8 +424,12 @@ def build_trace(
         "track_status": status,
         "weather": weather,
         "excitement": _excitement(
-            status, weather, overtakes, pit_counts,
-            _front_gap_by_lap(laps, total_laps), total_laps,
+            status,
+            weather,
+            overtakes,
+            pit_counts,
+            _front_gap_by_lap(laps, total_laps),
+            total_laps,
         ),
         "overtakes": overtakes,
         "drivers": _driver_rows(laps, results, total_laps, first_green),
