@@ -34,19 +34,32 @@ def run_single(
     from formation_sim.data import collector
 
     # telemetry=True so on-track overtakes come from the durable-lead-change counter
-    # (race_trace.overtakes_by_lap) rather than the coarser lap-line fallback.
-    ses = collector.load_session(season, round_number, "R", weather=True, telemetry=True)
+    # (race_trace.overtakes_by_lap) rather than the coarser lap-line fallback; messages=True
+    # brings the authoritative track-status time-series used for neutralisation/restart.
+    ses = collector.load_session(
+        season, round_number, "R", weather=True, messages=True, telemetry=True
+    )
     if ses is None:
         return False
     laps = collector.session_laps(ses)
-    overtakes = race_trace.overtakes_by_lap(collector.driver_progress(ses), laps)
+    results = collector.session_results(ses)
+    total_laps = int(laps["lap_number"].max()) if len(laps) else 0
+    # One authoritative status strip drives both the blob and the overtake exclusion, so the
+    # neutralised laps shaded in the panel are exactly the ones no pass is credited to.
+    status = race_trace.status_by_lap(
+        laps, total_laps, windows=collector.session_track_status(ses)
+    )
+    overtakes = race_trace.overtakes_by_lap(
+        collector.driver_progress(ses), laps, status=status, results=results
+    )
     blob = race_trace.build_trace(
         laps,
-        collector.session_results(ses),
+        results,
         collector.session_lap_rainfall(ses),
         season=season,
         round_number=round_number,
         event_name=str(ses.event["EventName"]),
+        status=status,
         overtakes_by_lap=overtakes,
     )
     if blob is None:

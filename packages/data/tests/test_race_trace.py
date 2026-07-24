@@ -354,3 +354,127 @@ def test_excitement_deterministic():
     a = rt.build_trace(laps, results, {}, season=2024, round_number=3, event_name="X")
     b = rt.build_trace(laps, results, {}, season=2024, round_number=3, event_name="X")
     assert a == b
+
+
+def test_excitement_red_restart_bumps_like_sc_restart():
+    # A red flag on lap 5 then a green restart on lap 6 spikes the restart lap, same as an
+    # SC restart would (bunched field, cold tyres) — not only ``prev == "sc"``.
+    laps = two_driver_race(10)
+    status = ["green"] * 10
+    status[4] = "red"  # lap 5 red-flagged, lap 6 is the restart
+    trace = rt.build_trace(laps, make_results(TWO_RESULTS), {}, season=2021,
+                           round_number=1, event_name="X", status=status)
+    exc = trace["excitement"]
+    assert exc[5] > exc[6]  # restart lap (6) more exciting than the plain lap after it
+
+
+# --- authoritative track status (windows -> laps) ---
+
+
+def test_status_from_windows_restart_lap_is_green():
+    # Half-open overlap: lap 3 starts exactly when the red window ends, so it is NOT
+    # neutralised — it is the (green) restart lap, not one lap late.
+    windows = pd.DataFrame(
+        [(0.0, 100.0, "green"), (100.0, 200.0, "red"), (200.0, 300.0, "green")],
+        columns=["t_start", "t_end", "status"],
+    )
+    bounds = {1: (0.0, 100.0), 2: (100.0, 200.0), 3: (200.0, 300.0)}
+    assert rt._status_from_windows(windows, bounds, 3) == ["green", "red", "green"]
+
+
+def test_status_from_windows_worst_status_and_uniform():
+    # A lap overlapping two windows takes the worse (sc > vsc); a lap with no data is green.
+    windows = pd.DataFrame(
+        [(0.0, 50.0, "vsc"), (50.0, 120.0, "sc"), (120.0, 300.0, "green")],
+        columns=["t_start", "t_end", "status"],
+    )
+    bounds = {1: (0.0, 100.0), 2: (120.0, 200.0)}  # lap 1 spans vsc+sc, lap 2 fully green
+    assert rt._status_from_windows(windows, bounds, 3) == ["sc", "green", "green"]
+
+
+def test_status_by_lap_prefers_windows_over_flags():
+    # Per-lap flags say lap 2 is green for both cars, but the authoritative window puts an
+    # SC across lap 2's time span → lap 2 is sc (a mid-lap deployment some cars missed).
+    rows = []
+    for lap, (lo, hi) in {1: (0, 90), 2: (90, 180), 3: (180, 270)}.items():
+        for drv in ("VER", "HAM"):
+            rows.append({"driver": drv, "lap": lap})
+    laps = make_laps(rows)
+    laps["lap_start_s"] = laps["lap_number"].map({1: 0.0, 2: 90.0, 3: 180.0})
+    laps["lap_end_s"] = laps["lap_number"].map({1: 90.0, 2: 180.0, 3: 270.0})
+    windows = pd.DataFrame(
+        [(0.0, 90.0, "green"), (90.0, 180.0, "sc"), (180.0, 400.0, "green")],
+        columns=["t_start", "t_end", "status"],
+    )
+    assert rt.status_by_lap(laps, 3, windows=windows) == ["green", "sc", "green"]
+
+
+def test_red_restart_laps_after_each_red_block():
+    # First racing (green/yellow) lap after a red block, plus the lap after it; sc/vsc laps
+    # in between are skipped, not treated as the restart.
+    assert rt._red_restart_laps(
+        ["green", "red", "red", "green", "green"]
+    ) == {4, 5}
+    assert rt._red_restart_laps(
+        ["green", "red", "sc", "green"]  # red -> sc -> green: restart is the green lap
+    ) == {4, 5}
+
+
+# --- overtake counter: neutralisation, DNF, jitter, no-netting ---
+
+
+def test_overtakes_excludes_race_level_neutralised_lap():
+    # A swap completes on lap 3, which is race-level SC even though the pair's own lap flags
+    # read green (only some cars carried the code). It must not count.
+    a = [(t, 2.0 + t * 0.001, 3) for t in range(0, 60, 2)]
+    b = [(t, 2.0 + t * 0.001 + (-0.02 if t < 20 else 0.02), 3) for t in range(0, 60, 2)]
+    prog = _progress({"A": a, "B": b})
+    laps = _flat_laps(["A", "B"], 3)  # all-green per-driver flags
+    assert rt.overtakes_by_lap(prog, laps, status=["green", "green", "sc"]) == {}
+    # control: race-level green -> the same swap counts
+    assert rt.overtakes_by_lap(prog, laps, status=["green", "green", "green"]) == {3: 1}
+
+
+def test_overtakes_suppresses_dying_car():
+    # B slows on lap 2 (its last) and is passed — the field streaming past a retiring car is
+    # not a racing overtake.
+    a = [(t, 1.0 + t * 0.001, 2) for t in range(0, 60, 2)]
+    b = [(t, 1.0 + t * 0.001 + (0.02 if t < 20 else -0.02), 2) for t in range(0, 60, 2)]
+    prog = _progress({"A": a, "B": b})
+    laps = _flat_laps(["A", "B"], 2)
+    dnf = make_results([
+        {"driver": "A", "finish": 1},
+        {"driver": "B", "finish": 19, "classified": False, "dnf": True, "laps_completed": 2},
+    ])
+    assert rt.overtakes_by_lap(prog, laps, results=dnf) == {}
+    # control: B finishes -> the pass counts
+    ok = make_results([
+        {"driver": "A", "finish": 1},
+        {"driver": "B", "finish": 2, "laps_completed": 2},
+    ])
+    assert rt.overtakes_by_lap(prog, laps, results=ok) == {2: 1}
+
+
+def test_overtakes_nose_to_tail_jitter_not_counted():
+    # Two cars glued within a few car-lengths (gap below min_sep) whose order flips every 12s
+    # (past the dwell): telemetry jitter, not passes. None count.
+    a, b = [], []
+    for t in range(0, 120, 2):
+        off = 0.003 if (t // 12) % 2 == 0 else -0.003  # < min_sep (~0.0056 at a 90s lap)
+        a.append((t, 1.0 + t * 0.001, 2))
+        b.append((t, 1.0 + t * 0.001 - off, 2))
+    prog = _progress({"A": a, "B": b})
+    assert sum(rt.overtakes_by_lap(prog, _flat_laps(["A", "B"], 2)).values()) == 0
+
+
+def test_overtakes_counts_every_real_pass_without_netting():
+    # A and B trade the lead three times, each drawing clear (0.02 > min_sep) and holding past
+    # the dwell. All three count — the durable-event counter does NOT net them to one (which a
+    # lap-to-lap position diff would). This is the property the counter exists to preserve.
+    a, b = [], []
+    for t in range(0, 120, 2):
+        off = 0.02 if (t // 30) % 2 == 0 else -0.02  # phases: +,-,+,- over 120s = 3 swaps
+        a.append((t, 1.0 + t * 0.001, 2))
+        b.append((t, 1.0 + t * 0.001 - off, 2))
+    prog = _progress({"A": a, "B": b})
+    assert rt.overtakes_by_lap(prog, _flat_laps(["A", "B"], 2)) == {2: 3}

@@ -94,6 +94,10 @@ def session_laps(ses) -> pd.DataFrame:
         "team": laps["Team"].astype("string"),
         "lap_number": laps["LapNumber"].astype("float"),
         "lap_time_s": _seconds(laps["LapTime"]),
+        # Absolute session-time bounds of each lap (seconds), so a race-level status
+        # time-series (see session_track_status) can be mapped onto lap numbers.
+        "lap_start_s": _seconds(laps["LapStartTime"]),
+        "lap_end_s": _seconds(laps["Time"]),
         "stint": laps["Stint"].astype("float"),
         "compound": laps["Compound"].map(schema.normalize_compound).astype("string"),
         "tyre_life": laps["TyreLife"].astype("float"),
@@ -201,6 +205,47 @@ def session_results(ses) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+# FastF1 TrackStatus code -> canonical race-level status token.
+_TRACK_STATUS_CODE = {
+    "1": "green", "3": "green", "2": "yellow",
+    "4": "sc", "5": "red", "6": "vsc", "7": "vsc",
+}
+
+
+def session_track_status(ses) -> pd.DataFrame:
+    """Authoritative race-level track-status windows from ``ses.track_status``.
+
+    Returns a frame ``[t_start, t_end, status]`` (session seconds; ``status`` one of
+    ``green|yellow|sc|vsc|red``), one row per status change. Unlike the per-lap
+    ``TrackStatus`` strings on each driver-lap — which smear a stoppage across lap
+    numbers and differ car-to-car — this is the single timeline the race actually ran on,
+    so :func:`formation_data.race_trace.status_by_lap` can map it uniformly onto every
+    lap. Empty frame when the session exposes no track-status feed.
+    """
+    empty = pd.DataFrame(columns=["t_start", "t_end", "status"])
+    try:
+        ts = ses.track_status
+    except Exception:
+        return empty
+    if ts is None or not len(ts) or "Time" not in ts or "Status" not in ts:
+        return empty
+    t = _seconds(ts["Time"]).to_numpy(dtype=float)
+    codes = ts["Status"].astype("string").fillna("").to_numpy()
+    # Close the last window at the last recorded lap end (fallback: last status stamp).
+    laps = ses.laps
+    end = np.nan
+    if laps is not None and len(laps) and "Time" in laps:
+        end = _seconds(laps["Time"]).max()
+    rows = []
+    for i in range(len(t)):
+        t0 = t[i]
+        if not np.isfinite(t0):
+            continue
+        t1 = t[i + 1] if i + 1 < len(t) else max(end if np.isfinite(end) else t0, t0)
+        rows.append((float(t0), float(t1), _TRACK_STATUS_CODE.get(str(codes[i]), "green")))
+    return pd.DataFrame(rows, columns=["t_start", "t_end", "status"])
+
+
 def driver_progress(ses) -> dict[str, pd.DataFrame]:
     """Per-driver continuous race progress from telemetry, for on-track order.
 
@@ -256,6 +301,13 @@ def driver_progress(ses) -> dict[str, pd.DataFrame]:
             "prog": ((frame["lap"] - 1) + rel).to_numpy(),
             "lap": frame["lap"].astype(int).to_numpy(),
         }).drop_duplicates("t")
+        # Drop post-finish cool-down telemetry: after taking the flag (or retiring) a car
+        # decelerates and the field concertinas, which the on-track order counter would
+        # otherwise read as a flurry of last-lap "passes". Trim to the completion time of
+        # the driver's last timed lap (the checkered-flag / final-lap crossing).
+        t_end = _seconds(dl["Time"]).dropna().max()
+        if pd.notna(t_end):
+            df = df[df["t"] <= float(t_end)]
         if len(df) >= 2:
             out[str(drv)] = df
     return out

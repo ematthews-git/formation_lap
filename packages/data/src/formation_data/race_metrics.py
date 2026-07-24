@@ -115,12 +115,18 @@ def _pit_losses(laps: pd.DataFrame) -> dict[str, list[float]]:
     return out
 
 
-def passes_by_lap(laps: pd.DataFrame) -> dict[int, int]:
+def passes_by_lap(laps: pd.DataFrame, neutral: set[int] | None = None) -> dict[int, int]:
     """On-track overtakes per lap: over each pair of consecutive green racing laps, the number
     of car pairs — both circulating (neither on an in/out lap) — that swap order, credited to
     the later lap of the pair. Counting only mutual green-lap order reversals excludes the
     pit-cycle churn a naive lap-to-lap position-gain sum counts as passes (a car promoted
-    because a rival pitted was not overtaken on track). Laps with no passes are absent."""
+    because a rival pitted was not overtaken on track). Laps with no passes are absent.
+
+    ``neutral`` is the set of race-level SC/VSC/red laps: passes credited to one are dropped.
+    Per-driver ``is_green`` already excludes a car's own neutralised laps, but on a lap only
+    *some* cars carry the code (a mid-lap deployment) the rest would otherwise still count —
+    the race-level set closes that leak, matching the telemetry counter."""
+    neutral = neutral or set()
     racing = laps[
         laps["is_green"] & ~laps["is_inlap"] & ~laps["is_outlap"] & laps["position"].notna()
     ]
@@ -134,6 +140,9 @@ def passes_by_lap(laps: pd.DataFrame) -> dict[int, int]:
     for i in range(len(lap_nums) - 1):
         if lap_nums[i + 1] != lap_nums[i] + 1:
             continue  # only truly consecutive laps (a gap means a car was pitting / lapped out)
+        credit = int(lap_nums[i + 1])
+        if credit in neutral:
+            continue
         a = piv.iloc[i].to_numpy(dtype=float)
         b = piv.iloc[i + 1].to_numpy(dtype=float)
         valid = np.isfinite(a) & np.isfinite(b)
@@ -144,7 +153,7 @@ def passes_by_lap(laps: pd.DataFrame) -> dict[int, int]:
         for x in range(len(pa)):
             passes += int(np.sum((pa[x] > pa) & (pb[x] < pb)))
         if passes:
-            out[int(lap_nums[i + 1])] = passes
+            out[credit] = passes
     return out
 
 

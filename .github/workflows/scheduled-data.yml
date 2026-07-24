@@ -3,9 +3,11 @@ name: Scheduled data jobs
 # Free fallback path for the scheduler. Mirrors the AWS EventBridge cron table from the plan.
 # Each job calls the same `formation-data` CLI that the production ECS task runs.
 #
-# LIVE: the schedules below fire against the hosted Supabase database via the `DATABASE_URL`
-# repo secret. Every job calls the same idempotent `formation-data` CLI, so re-runs outside
-# their window are cheap no-ops. To pause the schedules, re-add `if: false` to the `run` job.
+# The scheduled crons below are DISABLED (see the `if:` on the `run` job): these jobs now run
+# on the VM via systemd timers (scripts/run-data-job.sh + deploy/systemd/), because GitHub's
+# datacenter IPs are blocked by F1's livetiming API while the VM's IP is not. `workflow_dispatch`
+# still works as a manual fallback. Every job calls the same idempotent `formation-data` CLI, so
+# re-runs outside their window are cheap no-ops. To re-enable the crons, drop the `if:` below.
 
 on:
   schedule:
@@ -44,6 +46,8 @@ on:
 
 jobs:
   run:
+    # Scheduled runs moved to the VM's systemd timers; only manual dispatch runs here now.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
