@@ -107,7 +107,7 @@ formation-lap/                # uv workspace root
 
 ## Data model
 
-Thirteen tables, all keyed by a `UniqueConstraint` for upsert conflict resolution. The
+Seventeen tables, all keyed by a `UniqueConstraint` for upsert conflict resolution. The
 schema lives in `schema.py`, mirrored by the Pydantic models in `domain.py`.
 
 | Table | Purpose | Upsert key |
@@ -125,6 +125,10 @@ schema lives in `schema.py`, mirrored by the Pydantic models in `domain.py`.
 | `sim_race_stats` | The simulator's derived race-context stats for a weekend, stored as JSONB | `race_weekend_id` |
 | `race_results` | Finishing order per round | `(season, round_number, position)` |
 | `standings` | Driver and constructor standings after each round | `(season, after_round, type, position)` |
+| `circuit_race_stats` | Empirical per-circuit race analytics mined from the trailing five seasons, stored as JSONB | `(circuit_id, season)` |
+| `race_traces` | One race's lap-by-lap trace (status, weather, excitement, overtakes, per-driver lap times and period-correct teams), stored as JSONB | `(season, round_number)` |
+| `race_overtakes` | Every change of on-track order in one race, each labelled with its cause and located to a corner, stored as JSONB | `(season, round_number)` |
+| `derived_artifacts` | Parquet blobs of cleaned per-race lap frames, so the sim can run without FastF1 | `(kind, year, round_number)` |
 
 Notes:
 

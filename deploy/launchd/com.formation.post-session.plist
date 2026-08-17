@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.formation.post-session</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__REPO__/scripts/run-data-job.sh</string>
+		<string>post-session</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>__REPO__</string>
+	<!-- Every hour, every day (simpler than the old FRI,SAT,SUN + MON-0..5-UTC cron,
+	     which launchd's calendar triggers can't express as a range — only OR'd exact
+	     times). Safe to broaden: run_post_session's first step is a plain DB query
+	     (session_results_due) that gates any FastF1 call, so hours off a race weekend
+	     are a cheap no-op, not an extra livetiming request. Also more resilient to the
+	     laptop being asleep at the "real" trigger time. -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>__REPO__/logs/post-session.log</string>
+	<key>StandardErrorPath</key>
+	<string>__REPO__/logs/post-session.log</string>
+</dict>
+</plist>

@@ -5,6 +5,7 @@ the repository root; :func:`resolve_path` turns them into absolute paths.
 """
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -31,8 +32,15 @@ def resolve_path(rel: str | Path) -> Path:
 
 
 def cache_dir(cfg: dict | None = None) -> Path:
-    """Return the FastF1 cache dir, creating it if needed."""
-    cfg = cfg or load_settings()
-    p = resolve_path(cfg["data"]["cache_dir"])
+    """Return the FastF1 cache dir, creating it if needed.
+
+    ``FASTF1_CACHE_DIR`` wins over the settings path. FastF1's cache is process-global,
+    so whichever caller enables it last decides where every later download lands: the
+    data package sets the env-var path in ``cli.main()``, then the first
+    ``collector.load_session`` used to override it back to the in-repo default and
+    telemetry re-downloaded on every containerised run.
+    """
+    env = os.environ.get("FASTF1_CACHE_DIR")
+    p = Path(env) if env else resolve_path((cfg or load_settings())["data"]["cache_dir"])
     p.mkdir(parents=True, exist_ok=True)
     return p

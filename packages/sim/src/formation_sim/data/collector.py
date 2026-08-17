@@ -47,8 +47,9 @@ def load_session(year: int, rnd: int, session: str = "R",
     """Load a FastF1 session. Returns None if data is unavailable.
 
     ``telemetry`` stays off by default (the light load most jobs want); pass True only
-    where per-driver car/position streams are needed (e.g. the race trace's on-track
-    overtake counting) — it is a much larger download and cache footprint.
+    where per-driver car/position streams are needed (e.g. overtake detection, which
+    projects them onto the track in :mod:`formation_sim.data.track_position`) — it is a
+    much larger download and cache footprint.
 
     Cached sessions load without network. Once the hourly API budget is exhausted
     we stop attempting further network loads this run (returning None) instead of
@@ -110,6 +111,11 @@ def session_laps(ses) -> pd.DataFrame:
         "is_green": ts.str.fullmatch(r"[13]+").fillna(False),
         "is_inlap": laps["PitInTime"].notna(),
         "is_outlap": laps["PitOutTime"].notna(),
+        # Exact pit-lane entry/exit stamps, not just the lap they fell on: the overtake
+        # classifier has to know whether a car was in the pits at a given *moment*, and
+        # excluding whole in/out laps throws away the real racing either side of the stop.
+        "pit_in_s": _seconds(laps["PitInTime"]),
+        "pit_out_s": _seconds(laps["PitOutTime"]),
         "deleted": laps["Deleted"].astype("boolean").fillna(False),
         "is_accurate": laps["IsAccurate"].astype("boolean").fillna(False),
     })
@@ -244,73 +250,6 @@ def session_track_status(ses) -> pd.DataFrame:
         t1 = t[i + 1] if i + 1 < len(t) else max(end if np.isfinite(end) else t0, t0)
         rows.append((float(t0), float(t1), _TRACK_STATUS_CODE.get(str(codes[i]), "green")))
     return pd.DataFrame(rows, columns=["t_start", "t_end", "status"])
-
-
-def driver_progress(ses) -> dict[str, pd.DataFrame]:
-    """Per-driver continuous race progress from telemetry, for on-track order.
-
-    Returns ``{driver_code: DataFrame(t, prog, lap)}`` where ``t`` is session time in
-    seconds and ``prog = (lap - 1) + relative_distance_into_lap`` — a monotonic
-    "distance covered" measure whose ordering across drivers at a given ``t`` is the
-    on-track running order. Requires a session loaded with ``telemetry=True``; returns
-    ``{}`` when telemetry is unavailable (so callers can fall back to lap-resolution).
-
-    Feeds :func:`formation_data.race_trace.overtakes_by_lap`; kept here so all FastF1
-    access stays in the collector seam.
-    """
-    laps = ses.laps
-    if laps is None or not len(laps):
-        return {}
-    out: dict[str, pd.DataFrame] = {}
-    for drv in laps["Driver"].dropna().unique():
-        dl = ses.laps.pick_drivers(drv)
-        # One telemetry fetch for the whole race, then assign each sample to its lap
-        # and normalise distance within that lap — far cheaper than get_telemetry()
-        # per lap, same "(lap - 1) + fraction-through-lap" progress.
-        try:
-            tel = dl.get_telemetry().add_distance()
-        except Exception:
-            continue
-        st = pd.to_timedelta(tel["SessionTime"], errors="coerce")
-        frame = pd.DataFrame({"st": st, "dist": tel["Distance"].astype("float")}).dropna()
-        frame = frame.sort_values("st")
-        if len(frame) < 2:
-            continue
-        # Lap boundaries: each sample belongs to the most recent lap whose start it
-        # follows. Lap 1's start is often NaT (standing start) — anchor it at the
-        # first telemetry sample so opening-lap samples still map to lap 1.
-        starts = pd.DataFrame({
-            "LapStartTime": pd.to_timedelta(dl["LapStartTime"], errors="coerce"),
-            "lap": dl["LapNumber"].astype("float"),
-        }).sort_values("lap")
-        starts["LapStartTime"] = starts["LapStartTime"].fillna(frame["st"].iloc[0])
-        starts = starts.dropna().sort_values("LapStartTime")
-        if not len(starts):
-            continue
-        frame = pd.merge_asof(
-            frame, starts, left_on="st", right_on="LapStartTime", direction="backward"
-        ).dropna(subset=["lap"])
-        if len(frame) < 2:
-            continue
-        # Per-lap 0..1 distance (robust whether Distance is cumulative or per-lap).
-        g = frame.groupby("lap")["dist"]
-        span = (g.transform("max") - g.transform("min")).replace(0.0, np.nan)
-        rel = ((frame["dist"] - g.transform("min")) / span).clip(0.0, 1.0).fillna(0.0)
-        df = pd.DataFrame({
-            "t": frame["st"].dt.total_seconds().to_numpy(),
-            "prog": ((frame["lap"] - 1) + rel).to_numpy(),
-            "lap": frame["lap"].astype(int).to_numpy(),
-        }).drop_duplicates("t")
-        # Drop post-finish cool-down telemetry: after taking the flag (or retiring) a car
-        # decelerates and the field concertinas, which the on-track order counter would
-        # otherwise read as a flurry of last-lap "passes". Trim to the completion time of
-        # the driver's last timed lap (the checkered-flag / final-lap crossing).
-        t_end = _seconds(dl["Time"]).dropna().max()
-        if pd.notna(t_end):
-            df = df[df["t"] <= float(t_end)]
-        if len(df) >= 2:
-            out[str(drv)] = df
-    return out
 
 
 def session_lap_rainfall(ses) -> dict[int, bool]:

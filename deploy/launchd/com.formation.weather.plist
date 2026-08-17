@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.formation.weather</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__REPO__/scripts/run-data-job.sh</string>
+		<string>weather</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>__REPO__</string>
+	<!-- Daily 06:00 local time (the old cron used 06:00 UTC; launchd calendar
+	     triggers run in the machine's local time zone, not UTC). -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>6</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>__REPO__/logs/weather.log</string>
+	<key>StandardErrorPath</key>
+	<string>__REPO__/logs/weather.log</string>
+</dict>
+</plist>

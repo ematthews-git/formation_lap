@@ -224,9 +224,9 @@ def race_features(
     ``laps`` / ``results`` follow the collector's ``session_laps`` / ``session_results`` shape;
     ``weather`` its ``weather_summary`` dict. Flag columns may be nullable-boolean.
 
-    ``overtakes`` is the race's on-track pass count. Pass the telemetry-based count
-    (``race_trace.overtakes_by_lap`` summed) so this feed matches the race trace; when
-    omitted it falls back to the cheaper lap-resolution ``_on_track_passes``.
+    ``overtakes`` is the race's on-track pass count. Pass the classified racing total from
+    :mod:`formation_data.overtakes` (``totals.racing``) so this feed matches the race
+    trace; when omitted it falls back to the cheaper lap-resolution ``_on_track_passes``.
     """
     if laps is None or not len(laps):
         return None
@@ -361,6 +361,19 @@ def _rate(flags) -> float | None:
     return sum(flags) / len(flags) if flags else None
 
 
+def _hotspots(features: list[dict], top: int = 8) -> dict[str, int]:
+    """Where this circuit's racing passes actually happen: corner label → count.
+
+    Pooled across every race in the window, so a one-off wet race can't define a track's
+    character. Absent for races processed without telemetry (no corner attribution).
+    """
+    out: dict[str, int] = {}
+    for f in features:
+        for corner, n in (f.get("overtake_corners") or {}).items():
+            out[str(corner)] = out.get(str(corner), 0) + int(n)
+    return dict(sorted(out.items(), key=lambda kv: -kv[1])[:top])
+
+
 def aggregate(features: list[dict], *, seasons: list[int]) -> dict:
     """Roll per-race feature dicts into the grouped ``circuit_race_stats`` blob.
 
@@ -409,6 +422,7 @@ def aggregate(features: list[dict], *, seasons: list[int]) -> dict:
                 _mean(f["pos_changes_after_lap1"] for f in features), 1
             ),
             "avg_position_changes_lap1": _r(_mean(f["pos_changes_lap1"] for f in features), 1),
+            "hotspots": _hotspots(features),
         },
         "grid": {
             "pole_to_win_rate": _r(_rate(g == 1 for g in winner_grids)),

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.formation.post-race</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__REPO__/scripts/run-data-job.sh</string>
+		<string>post-race</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>__REPO__</string>
+	<!-- Monday 06:00 local time (old cron: Monday 06:00 UTC — see the weather plist's
+	     note on local-time calendar triggers). Weekday 1 = Monday. -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Weekday</key>
+		<integer>1</integer>
+		<key>Hour</key>
+		<integer>6</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>__REPO__/logs/post-race.log</string>
+	<key>StandardErrorPath</key>
+	<string>__REPO__/logs/post-race.log</string>
+</dict>
+</plist>

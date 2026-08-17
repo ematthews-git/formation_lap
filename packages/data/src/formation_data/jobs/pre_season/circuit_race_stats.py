@@ -20,7 +20,8 @@ import logging
 
 from sqlalchemy import Connection
 
-from formation_data import race_metrics, race_trace, repositories
+from formation_data import race_metrics, repositories
+from formation_data.jobs.pre_season import race_overtakes
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +53,10 @@ def run(conn: Connection, *, season: int, circuit_id: str | None = None) -> None
         for s in window:
             for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location):
                 try:
-                    # telemetry=True so avg_overtakes_per_race uses the same durable
-                    # on-track-pass counter as the race trace (consistent feeds); messages=True
-                    # for the authoritative track-status the same counter now neutralises on.
+                    # telemetry=True so avg_overtakes_per_race comes from the same
+                    # classified on-track event list as the race trace (consistent feeds);
+                    # messages=True for the authoritative track-status those events are
+                    # neutralised against.
                     ses = collector.load_session(
                         s, r, "R", weather=True, messages=True, telemetry=True
                     )
@@ -67,19 +69,19 @@ def run(conn: Connection, *, season: int, circuit_id: str | None = None) -> None
                         continue
                     laps = collector.session_laps(ses)
                     res = collector.session_results(ses)
-                    total_laps = int(laps["lap_number"].max()) if len(laps) else 0
-                    status = race_trace.status_by_lap(
-                        laps, total_laps, windows=collector.session_track_status(ses)
-                    )
-                    overtakes = race_trace.overtakes_by_lap(
-                        collector.driver_progress(ses), laps, status=status, results=res
+                    status_windows = collector.session_track_status(ses)
+                    ot_blob = race_overtakes.build_for_session(
+                        ses, laps=laps, results=res, status_windows=status_windows
                     )
                     feat = race_metrics.race_features(
                         laps,
                         res,
                         collector.weather_summary(ses),
-                        overtakes=sum(overtakes.values()),
+                        overtakes=(None if ot_blob is None
+                                   else ot_blob["totals"]["racing"]),
                     )
+                    if feat is not None and ot_blob is not None:
+                        feat["overtake_corners"] = ot_blob["by_corner"]
                 except Exception:  # noqa: BLE001 — a single unavailable/partial race must not
                     # sink the whole backfill; skip it and carry on.
                     logger.warning(

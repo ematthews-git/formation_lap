@@ -218,6 +218,24 @@ class RaceTrace(_Base):
     trace: dict
 
 
+class RaceOvertakes(_Base):
+    """Every change of on-track order in one race (the JSONB `overtakes` blob).
+
+    `overtakes` carries `totals` (`racing` — the headline count of genuine racing passes —
+    plus a broadcast-comparable `gross` and the full per-kind breakdown), a per-lap array
+    of racing passes, a per-corner histogram, and the individual `events` with the two
+    drivers, the lap, the corner and why the position changed. Built by
+    formation_data.overtakes; keyed (season, official round), like race_traces.
+    """
+
+    id: int | None = None
+    circuit_id: str
+    season: int
+    round_number: int
+    updated_at: datetime | None = None
+    overtakes: dict
+
+
 class RaceResult(_Base):
     id: int | None = None
     circuit_id: str
@@ -270,6 +288,8 @@ __all__ = [
     "SimRaceStats",
     "CircuitRaceStats",
     "SessionResults",
+    "RaceTrace",
+    "RaceOvertakes",
     "RaceResult",
     "Standing",
     "DerivedArtifact",

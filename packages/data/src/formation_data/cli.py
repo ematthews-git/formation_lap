@@ -25,6 +25,7 @@ from formation_data.jobs.pre_season import (
     circuit_stats,
     drivers,
     lap_records as pre_season_lap_records,
+    race_overtakes,
     race_traces,
     race_weekends,
     sessions,
@@ -46,6 +47,7 @@ lap_records_app = typer.Typer(help="All-time race lap records.")
 circuit_stats_app = typer.Typer(help="Per-circuit per-season stats.")
 circuit_race_stats_app = typer.Typer(help="Empirical per-circuit race analytics.")
 race_traces_app = typer.Typer(help="Lap-by-lap race traces (RACE_TRACE panel).")
+race_overtakes_app = typer.Typer(help="Classified on-track overtakes, per race.")
 weather_app = typer.Typer(help="Race weekend weather forecast.")
 strategies_app = typer.Typer(help="Historical (mined) strategy options.")
 sim_strategies_app = typer.Typer(help="Simulated strategy options.")
@@ -63,6 +65,7 @@ app.add_typer(lap_records_app, name="lap-records")
 app.add_typer(circuit_stats_app, name="circuit-stats")
 app.add_typer(circuit_race_stats_app, name="circuit-race-stats")
 app.add_typer(race_traces_app, name="race-traces")
+app.add_typer(race_overtakes_app, name="overtakes")
 app.add_typer(weather_app, name="weather")
 app.add_typer(strategies_app, name="strategies")
 app.add_typer(sim_strategies_app, name="sim-strategies")
@@ -177,6 +180,37 @@ def race_traces_refresh(
             conn, circuit_id=circuit, season=season, round_number=round
         )
         typer.echo(f"race-traces {season} R{round}: {'stored' if stored else 'no data'}")
+
+
+@race_overtakes_app.command("backfill")
+def race_overtakes_backfill(
+    season: int = typer.Option(..., help="Upcoming season; mines the 5 seasons before it."),
+    circuit: str | None = typer.Option(None, "--circuit", help="Single circuit_id; default all."),
+) -> None:
+    """Detect and classify on-track overtakes for every race in the trailing seasons."""
+    with connection_scope() as conn:
+        race_overtakes.run(conn, season=season, circuit_id=circuit)
+
+
+@race_overtakes_app.command("refresh")
+def race_overtakes_refresh(
+    season: int = typer.Option(...),
+    round: int = typer.Option(..., "--round", help="Official F1 round number."),
+    circuit: str = typer.Option(..., "--circuit", help="circuit_id the race was held at."),
+) -> None:
+    """Detect overtakes for a single race (the race-traces job does this too)."""
+    with connection_scope() as conn:
+        blob = race_overtakes.run_single(
+            conn, circuit_id=circuit, season=season, round_number=round
+        )
+        if blob is None:
+            typer.echo(f"overtakes {season} R{round}: no data")
+        else:
+            t = blob["totals"]
+            typer.echo(
+                f"overtakes {season} R{round}: racing={t['racing']} gross={t['gross']} "
+                f"{ {k: v for k, v in t['by_kind'].items() if v} }"
+            )
 
 
 @weather_app.command("refresh")

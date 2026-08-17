@@ -224,6 +224,29 @@ def upsert_race_trace(
     conn.execute(stmt)
 
 
+def upsert_race_overtakes(
+    conn: Connection, circuit_id: str, season: int, round_number: int, overtakes: dict
+) -> None:
+    """Upsert one race's classified overtake blob (one row per season+round).
+
+    Re-running replaces the blob wholesale — it is recomputed from the FastF1 session, so
+    there is nothing to merge.
+    """
+    stmt = insert(schema.race_overtakes).values(
+        circuit_id=circuit_id, season=season, round_number=round_number,
+        overtakes=overtakes,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["season", "round_number"],
+        set_={
+            "circuit_id": stmt.excluded.circuit_id,
+            "overtakes": stmt.excluded.overtakes,
+            "updated_at": func.now(),
+        },
+    )
+    conn.execute(stmt)
+
+
 def upsert_derived_artifact(
     conn: Connection,
     *,
@@ -792,6 +815,35 @@ def list_race_traces_for_circuit(
         .limit(limit)
     ).all()
     return [domain.RaceTrace.model_validate(row._mapping) for row in rows]
+
+
+def get_race_overtakes(
+    conn: Connection, season: int, round_number: int
+) -> domain.RaceOvertakes | None:
+    """One race's classified overtake blob, or None."""
+    row = conn.execute(
+        select(schema.race_overtakes).where(
+            schema.race_overtakes.c.season == season,
+            schema.race_overtakes.c.round_number == round_number,
+        )
+    ).first()
+    return domain.RaceOvertakes.model_validate(row._mapping) if row else None
+
+
+def list_race_overtakes_for_circuit(
+    conn: Connection, circuit_id: str, limit: int = 5
+) -> list[domain.RaceOvertakes]:
+    """The most recent overtake blobs for a circuit, newest first."""
+    rows = conn.execute(
+        select(schema.race_overtakes)
+        .where(schema.race_overtakes.c.circuit_id == circuit_id)
+        .order_by(
+            schema.race_overtakes.c.season.desc(),
+            schema.race_overtakes.c.round_number.desc(),
+        )
+        .limit(limit)
+    ).all()
+    return [domain.RaceOvertakes.model_validate(row._mapping) for row in rows]
 
 
 def calendar_avg_finish_by_grid(conn: Connection, season: int) -> dict[str, float]:

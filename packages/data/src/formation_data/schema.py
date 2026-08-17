@@ -297,6 +297,30 @@ race_traces = Table(
 )
 
 
+# Every change of on-track order in one race, each labelled with why it happened (racing /
+# attrition / pit / lapped / neutralised / start) plus where on the circuit it occurred.
+# Kept out of race_traces deliberately: that blob is served whole, five at a time, to the
+# race-trace panel, and an event list runs to a couple of hundred rows per race. The
+# per-lap counts and per-corner histogram are precomputed into the blob so the common reads
+# never have to unpack `events`.
+race_overtakes = Table(
+    "race_overtakes",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
+    Column("season", Integer, nullable=False),
+    Column("round_number", Integer, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column("overtakes", JSONB, nullable=False),
+    UniqueConstraint("season", "round_number"),
+)
+
+
 race_results = Table(
     "race_results",
     metadata,

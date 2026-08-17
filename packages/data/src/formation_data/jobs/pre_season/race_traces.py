@@ -20,6 +20,7 @@ import logging
 from sqlalchemy import Connection
 
 from formation_data import race_trace, repositories
+from formation_data.jobs.pre_season import race_overtakes
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +31,17 @@ def run_single(
     conn: Connection, *, circuit_id: str, season: int, round_number: int
 ) -> bool:
     """Build + upsert the trace for one race. False when the race has no usable data
-    (or the FastF1 budget is spent — distinguishable via ``collector.rate_limited()``)."""
+    (or the FastF1 budget is spent — distinguishable via ``collector.rate_limited()``).
+
+    Also writes the race's overtake blob: detecting overtakes needs the same
+    telemetry-loaded session, which is by far the expensive part, so both feeds are
+    produced from one load and are guaranteed to agree.
+    """
     from formation_sim.data import collector
 
-    # telemetry=True so on-track overtakes come from the durable-lead-change counter
-    # (race_trace.overtakes_by_lap) rather than the coarser lap-line fallback; messages=True
-    # brings the authoritative track-status time-series used for neutralisation/restart.
+    # telemetry=True so overtakes come from the classified on-track event detector rather
+    # than the coarser lap-line fallback; messages=True brings the authoritative
+    # track-status time-series used for neutralisation and restarts.
     ses = collector.load_session(
         season, round_number, "R", weather=True, messages=True, telemetry=True
     )
@@ -43,15 +49,19 @@ def run_single(
         return False
     laps = collector.session_laps(ses)
     results = collector.session_results(ses)
+    status_windows = collector.session_track_status(ses)
     total_laps = int(laps["lap_number"].max()) if len(laps) else 0
     # One authoritative status strip drives both the blob and the overtake exclusion, so the
     # neutralised laps shaded in the panel are exactly the ones no pass is credited to.
-    status = race_trace.status_by_lap(
-        laps, total_laps, windows=collector.session_track_status(ses)
+    status = race_trace.status_by_lap(laps, total_laps, windows=status_windows)
+
+    ot_blob = race_overtakes.build_for_session(
+        ses, laps=laps, results=results, status_windows=status_windows
     )
-    overtakes = race_trace.overtakes_by_lap(
-        collector.driver_progress(ses), laps, status=status, results=results
-    )
+    overtakes = None
+    if ot_blob is not None:
+        repositories.upsert_race_overtakes(conn, circuit_id, season, round_number, ot_blob)
+        overtakes = {i + 1: n for i, n in enumerate(ot_blob["by_lap"]) if n}
     blob = race_trace.build_trace(
         laps,
         results,

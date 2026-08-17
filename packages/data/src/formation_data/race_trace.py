@@ -15,8 +15,9 @@ Conventions:
   * track status is one of ``green | yellow | vsc | sc | red`` (worst status any car saw
     on that lap wins, red > sc > vsc > yellow);
   * weather is ``dry | damp | wet`` from rainfall + the field's tyre choice;
-  * overtakes are telemetry-based durable on-track passes (see :func:`overtakes_by_lap`),
-    the single source of truth shared with ``circuit_race_stats`` so the two feeds agree;
+  * overtakes are supplied by the caller from :mod:`formation_data.overtakes`, which
+    classifies every change of on-track order and counts only the racing ones — the single
+    source of truth shared with ``circuit_race_stats`` so the two feeds agree;
   * the excitement index is a 0–100 composite; weights live in the ``_EXC_*`` constants
     and the blob carries ``version`` so the recipe can evolve without ambiguity.
 """
@@ -28,7 +29,7 @@ import pandas as pd
 
 from formation_data.race_metrics import _b, passes_by_lap
 
-TRACE_VERSION = 2
+TRACE_VERSION = 3
 
 # Full-course neutralisations: no racing, so no overtakes are credited on these laps.
 _NEUTRAL = frozenset({"sc", "vsc", "red"})
@@ -37,19 +38,6 @@ _STATUS_RANK = {"green": 0, "yellow": 1, "vsc": 2, "sc": 3, "red": 4}
 # A race must have actually raced to be worth tracing: fewer green laps than this and
 # the pace pane would be wall-to-wall interpolation (2021 Spa: two laps behind the SC).
 _MIN_GREEN_LAPS = 5
-
-# On-track overtake counting (telemetry-based durable lead changes).
-OVERTAKE_DWELL_S = (
-    8.0  # a swap must hold this long to count (filters side-by-side scraps)
-)
-_OVERTAKE_GRID_S = 0.5  # running-order sampling step
-# A pass only counts once the passing car has actually drawn clear by ~this many seconds.
-# Two cars running nose-to-tail (well within a second — normal, real racing) sit at a
-# near-zero telemetry gap whose sign jitters, and each jitter flip would otherwise read as a
-# change of places; requiring the leader to pull a few car-lengths clear tells a completed
-# pass from that jitter WITHOUT netting repeated real passes away (a genuine slipstream fight,
-# where each car does draw clear in turn, still counts every pass).
-_OVERTAKE_MIN_SEP_S = 0.5
 
 # --------------------------------------------------------------------- excitement weights
 _EXC_BASE = 15.0
@@ -74,192 +62,6 @@ def _total_laps(laps: pd.DataFrame) -> int:
         return 0
     m = np.nanmax(laps["lap_number"].to_numpy(dtype=float))
     return int(m) if np.isfinite(m) else 0
-
-
-def _red_restart_laps(status: list[str]) -> set[int]:
-    """1-based laps to treat like a race start after a RED-flag suspension.
-
-    After a red flag the field re-forms and relaunches (standing or rolling) from a
-    bunched grid — the order shuffle that produces is a restart, not overtaking (same
-    reason lap 1 is excluded). Returns the first racing lap (green/yellow) after each red
-    block and the lap after it (the launch spills across ~1.5 laps). SC/VSC restarts are
-    NOT included here — those keep their real post-restart passes; their bunched-pack
-    concertina is removed instead by masking neutralised samples out of pass detection.
-    """
-    out: set[int] = set()
-    in_red = False
-    for i, s in enumerate(status):
-        if s == "red":
-            in_red = True
-        elif s in ("sc", "vsc"):
-            continue  # still neutralised — keep waiting for the racing lap
-        elif in_red:  # first green/yellow lap after the red block
-            out.add(i + 1)
-            out.add(i + 2)
-            in_red = False
-    return out
-
-
-def _dnf_last_lap(results: pd.DataFrame | None) -> dict[str, int]:
-    """Retiring driver → last lap they completed. A car that slows to retire gets
-    streamed past on-track (the whole field "overtakes" a dying car); those aren't
-    racing passes, so swaps involving it on that lap and after are dropped."""
-    if results is None or not len(results) or "dnf" not in results.columns:
-        return {}
-    out: dict[str, int] = {}
-    for r in results.itertuples():
-        if bool(getattr(r, "dnf", False)):
-            lc = getattr(r, "laps_completed", np.nan)
-            if np.isfinite(lc):
-                out[str(r.driver)] = int(lc)
-    return out
-
-
-def overtakes_by_lap(
-    progress: dict[str, pd.DataFrame],
-    laps: pd.DataFrame,
-    *,
-    dwell_s: float = OVERTAKE_DWELL_S,
-    grid_step_s: float = _OVERTAKE_GRID_S,
-    min_sep_s: float = _OVERTAKE_MIN_SEP_S,
-    status: list[str] | None = None,
-    results: pd.DataFrame | None = None,
-) -> dict[int, int]:
-    """On-track overtakes per lap, as telemetry-based durable lead changes.
-
-    ``progress`` is the collector's per-driver ``(t, prog, lap)`` frames
-    (:func:`formation_sim.data.collector.driver_progress`); ``laps`` its
-    ``session_laps`` frame. All drivers are resampled onto a common time grid, and for
-    each pair every order swap that then holds ``>= dwell_s`` AND draws clear by
-    ``>= min_sep_s`` is counted once, credited to the lap it completes on. Every real,
-    completed pass counts — a repeated slipstream fight counts each pass — but two cars
-    running nose-to-tail at a near-zero gap, whose telemetry sign merely jitters, do not.
-    Excluded: lap 1 and red-flag restart laps (bunched-grid relaunches, not overtaking);
-    pit in/out laps (per-driver); and any lap under SC/VSC/red. Crucially, samples taken
-    while either car is under a full-course neutralisation are masked OUT of the swap
-    detection itself, not just the credit — otherwise the pack concertina under an SC/VSC
-    settles on the green restart lap and reads as a flurry of phantom passes.
-
-    ``status`` is the race-level per-lap status (from :func:`status_by_lap`); when
-    omitted it is derived from ``laps``. ``results`` (with ``dnf`` / ``laps_completed``)
-    enables dying-car suppression. Falls back to the lap-resolution
-    :func:`race_metrics.passes_by_lap` when telemetry progress is unavailable.
-    """
-    total_laps = _total_laps(laps)
-    if status is None:
-        status = status_by_lap(laps, total_laps)
-    neutral = {i + 1 for i, s in enumerate(status) if s in _NEUTRAL}
-    red_restart = _red_restart_laps(status)
-    dnf_last = _dnf_last_lap(results)
-
-    if not progress or total_laps < 1:
-        return passes_by_lap(laps, neutral=neutral)
-
-    # Per-(driver, lap) pit in/out flags (the only per-car exclusion; neutralisation is
-    # applied at race level so a mid-lap deployment neutralises the lap for everyone).
-    flags = laps.copy()
-    for col in ("is_inlap", "is_outlap"):
-        flags[col] = _b(flags[col])
-    flags = flags.set_index(["driver", "lap_number"])
-
-    def in_out(drv: str, lap: int) -> bool:
-        try:
-            r = flags.loc[(drv, float(lap))]
-        except KeyError:
-            return False
-        if isinstance(r, pd.DataFrame):
-            r = r.iloc[0]
-        return bool(r["is_inlap"] or r["is_outlap"])
-
-    t_min = min(df["t"].iloc[0] for df in progress.values())
-    t_max = max(df["t"].iloc[-1] for df in progress.values())
-    if not (np.isfinite(t_min) and np.isfinite(t_max)) or t_max <= t_min:
-        return passes_by_lap(laps, neutral=neutral)
-    grid = np.arange(t_min, t_max, grid_step_s)
-
-    codes = list(progress)
-    prog = {
-        c: np.interp(
-            grid, progress[c]["t"], progress[c]["prog"], left=np.nan, right=np.nan
-        )
-        for c in codes
-    }
-    lapg = {
-        c: np.interp(
-            grid, progress[c]["t"], progress[c]["lap"], left=np.nan, right=np.nan
-        )
-        for c in codes
-    }
-    # Per-car mask: is this sample on a neutralised lap for that car? Masked samples are
-    # dropped from detection so an SC/VSC concertina never registers as a confirmed swap.
-    neutral_arr = np.array(sorted(neutral), dtype=float)
-    car_neutral = {
-        c: (np.isin(np.round(lapg[c]), neutral_arr) if neutral_arr.size
-            else np.zeros(len(grid), dtype=bool))
-        for c in codes
-    }
-    min_run = max(1, int(round(dwell_s / grid_step_s)))
-    # Separation threshold in progress units: convert the ~0.5s "drew clear" margin by the
-    # race's median green lap time (a lap of progress == that many seconds), so it means the
-    # same on-track distance whether the lap is 75s (Monaco) or 105s (Spa).
-    lt = pd.to_numeric(laps.get("lap_time_s"), errors="coerce") if "lap_time_s" in laps else None
-    med_lap = float(np.nanmedian(lt)) if lt is not None and lt.notna().any() else np.nan
-    if not np.isfinite(med_lap) or med_lap <= 0:
-        med_lap = 90.0
-    min_sep = min_sep_s / med_lap
-
-    def credited(lp: int, a: str, b: str) -> bool:
-        return (
-            2 <= lp <= total_laps
-            and lp not in neutral
-            and lp not in red_restart
-            and not in_out(a, lp)
-            and not in_out(b, lp)
-            and not (a in dnf_last and lp >= dnf_last[a])
-            and not (b in dnf_last and lp >= dnf_last[b])
-        )
-
-    per_lap: dict[int, int] = {}
-    n = len(grid)
-    for ia in range(len(codes)):
-        a = codes[ia]
-        for ib in range(ia + 1, len(codes)):
-            b = codes[ib]
-            d = prog[a] - prog[b]
-            valid = np.isfinite(d) & ~(car_neutral[a] | car_neutral[b])
-            if valid.sum() < min_run:
-                continue
-            sign = np.where(d > 0, 1, np.where(d < 0, -1, 0))
-            confirmed: int | None = None
-            i = 0
-            while i < n:
-                if not valid[i]:
-                    # A masked stretch — SC/VSC/red, or a data gap — re-baselines the order:
-                    # the field pits and concertinas under a neutralisation, so a reorder that
-                    # emerges on the far side is a pit-cycle / restart shuffle, not a pass.
-                    # Dropping `confirmed` means only changes between two runs of uninterrupted
-                    # racing count.
-                    confirmed = None
-                    i += 1
-                    continue
-                if sign[i] == 0:
-                    i += 1
-                    continue
-                j = i
-                while j < n and valid[j] and sign[j] == sign[i]:
-                    j += 1
-                # A settled order: held past the dwell AND the leader drew clear (the gap
-                # opened past min_sep at some point) — otherwise it's nose-to-tail jitter.
-                if j - i >= min_run and float(np.max(np.abs(d[i:j]))) >= min_sep:
-                    if confirmed is not None and sign[i] != confirmed:
-                        la, lb = lapg[a][i], lapg[b][i]
-                        present = [v for v in (la, lb) if np.isfinite(v)]
-                        lp = int(round(min(present))) if present else -1
-                        if credited(lp, a, b):
-                            per_lap[lp] = per_lap.get(lp, 0) + 1
-                    confirmed = int(sign[i])
-                i = j
-    return per_lap
 
 
 def _lap_bounds(laps: pd.DataFrame) -> dict[int, tuple[float, float]] | None:
@@ -288,7 +90,9 @@ def _lap_bounds(laps: pd.DataFrame) -> dict[int, tuple[float, float]] | None:
         )
     for lap in sorted(bounds):
         lo, hi = bounds[lap]
-        if not np.isfinite(lo) and np.isfinite(bounds.get(lap - 1, (np.nan, np.nan))[1]):
+        if not np.isfinite(lo) and np.isfinite(
+            bounds.get(lap - 1, (np.nan, np.nan))[1]
+        ):
             bounds[lap] = (bounds[lap - 1][1], hi)
     return bounds
 
@@ -305,8 +109,7 @@ def _status_from_windows(
     instead of only the cars whose own lap happened to carry the code.
     """
     wins = [
-        (float(r.t_start), float(r.t_end), str(r.status))
-        for r in windows.itertuples()
+        (float(r.t_start), float(r.t_end), str(r.status)) for r in windows.itertuples()
     ]
     out: list[str] = []
     for lap in range(1, total_laps + 1):
@@ -315,7 +118,11 @@ def _status_from_windows(
         hi_eff = hi if np.isfinite(hi) else lo_eff
         best = "green"
         for w0, w1, st in wins:
-            if w0 < hi_eff and lo_eff < w1 and _STATUS_RANK.get(st, 0) > _STATUS_RANK[best]:
+            if (
+                w0 < hi_eff
+                and lo_eff < w1
+                and _STATUS_RANK.get(st, 0) > _STATUS_RANK[best]
+            ):
                 best = st
         out.append(best)
     return out
@@ -555,9 +362,10 @@ def build_trace(
 
     ``status`` is the precomputed race-level per-lap status (from :func:`status_by_lap`
     with the authoritative windows); when omitted it is derived from ``laps`` (the
-    per-lap-flag fallback the unit tests use). ``overtakes_by_lap`` is the telemetry-based
-    per-lap pass count from :func:`overtakes_by_lap`; when omitted it falls back to the
-    lap-resolution ``race_metrics.passes_by_lap`` (used by the unit tests, no telemetry).
+    per-lap-flag fallback the unit tests use). ``overtakes_by_lap`` maps lap number → count
+    of racing passes, built from the classified events in :mod:`formation_data.overtakes`
+    (``formation_data.overtakes.by_lap``); when omitted it falls back to the lap-resolution
+    ``race_metrics.passes_by_lap``, which is all that is available without telemetry.
     """
     total_laps = _total_laps(laps)
     if total_laps < 2 or not len(results):

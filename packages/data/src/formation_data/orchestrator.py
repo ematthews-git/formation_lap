@@ -265,10 +265,15 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
             with connection_scope() as conn:
                 from formation_data.jobs.pre_season import race_traces
 
+                # Also writes the race's classified overtake blob — both feeds come off
+                # the one telemetry load, which is the expensive part.
                 if race_traces.run_single(
                     conn, circuit_id=circuit_id, season=season, round_number=rnd
                 ):
-                    logger.info("run_post_race: stored race trace for %s R%s", season, rnd)
+                    logger.info(
+                        "run_post_race: stored race trace + overtakes for %s R%s",
+                        season, rnd,
+                    )
         except Exception:
             logger.exception(
                 "run_post_race: race trace failed for %s R%s (non-fatal)", season, rnd
