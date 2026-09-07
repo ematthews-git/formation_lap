@@ -4,7 +4,7 @@ import { PanelHeader } from '../common/PanelHeader'
 import { StatCell } from '../common/StatCell'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
-import { FALLBACK_TRACK_PATH, pathStartPoint } from '../../lib/trackPath'
+import { pathStartPoint } from '../../lib/trackPath'
 import styles from './CircuitProfile.module.css'
 
 function formatLapTime(seconds: number): string {
@@ -33,8 +33,8 @@ export function CircuitProfile({
 }: Props) {
   const distance =
     circuit ? Math.round(circuit.num_laps * circuit.track_length_km) : null
-  const trackPath = circuit?.track_outline ?? FALLBACK_TRACK_PATH
-  const [startX, startY] = pathStartPoint(trackPath)
+  const trackPath = circuit?.track_outline
+  const [startX, startY] = trackPath ? pathStartPoint(trackPath) : [0, 0]
 
   // Empirical overtaking figures (null until the pre-season job has run).
   const overtaking = raceStats?.stats?.overtaking
@@ -58,25 +58,29 @@ export function CircuitProfile({
       />
       <div className={styles.body}>
         <div className={styles.diagram}>
-          <svg viewBox="0 0 400 248" width="100%" className={styles.track}>
-            <path
-              d={trackPath}
-              fill="none"
-              stroke="#4A4744"
-              strokeWidth="9"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-            <path
-              d={trackPath}
-              fill="none"
-              stroke="var(--text)"
-              strokeWidth="2.4"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-            <circle cx={startX} cy={startY} r="4" fill="var(--accent)" />
-          </svg>
+          {trackPath ? (
+            <svg viewBox="0 0 400 248" width="100%" className={styles.track}>
+              <path
+                d={trackPath}
+                fill="none"
+                stroke="#4A4744"
+                strokeWidth="9"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <path
+                d={trackPath}
+                fill="none"
+                stroke="var(--text)"
+                strokeWidth="2.4"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <circle cx={startX} cy={startY} r="4" fill="var(--accent)" />
+            </svg>
+          ) : (
+            circuit && <EmptyState label="NEW CIRCUIT" hint="No track outline yet" />
+          )}
         </div>
 
         <div className={styles.stats}>
