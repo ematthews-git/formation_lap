@@ -3,7 +3,8 @@
 Cadence: rare. Re-run only when the FIA calendar gains/loses a circuit, when sm_zones
 are confirmed, or when track measurements change.
 
-Data is hand written. sm_zones yet to be confirmed for future races (currently reflects DRS zones)
+Data is hand written. sm_zones = FIA-confirmed Straight Mode zones where announced (Sepang: 4); the other
+circuits' values yet to be confirmed (currently reflect DRS zones)
 
 jolpica_id and lat/lon were verified against the live Jolpica 2026 schedule
 (GET /ergast/f1/2026.json — Circuit.circuitId and Circuit.Location).
@@ -228,6 +229,18 @@ CIRCUITS = [
         jolpica_id="baku",
         lat=40.3725,
         lon=49.8533,
+    ),
+    Circuit(
+        circuit_id="sepang",
+        fastf1_location="Kuala Lumpur",
+        country="Malaysia",
+        track_length_km=5.543,
+        num_corners=15,
+        num_laps=56,
+        sm_zones=4,
+        jolpica_id="sepang",
+        lat=2.76083,
+        lon=101.738,
     ),
     Circuit(
         circuit_id="singapore",

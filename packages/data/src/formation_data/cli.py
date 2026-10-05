@@ -11,7 +11,7 @@ import logging
 
 import typer
 
-from formation_data import db, orchestrator, repositories
+from formation_data import calendar_sync, db, orchestrator, repositories
 from formation_data.db import connection_scope
 from formation_data.jobs.post_race import (
     lap_records as post_race_lap_records,
@@ -116,17 +116,45 @@ def drivers_refresh(season: int = typer.Option(...)) -> None:
         drivers.run(conn, season=season)
 
 
+_DRY_RUN_OPT = typer.Option(
+    False, "--dry-run", help="Show what would change without writing anything."
+)
+
+
+def _echo_plan(plan: calendar_sync.CalendarPlan | None, *, dry_run: bool) -> None:
+    if plan is None:
+        return
+    for line in calendar_sync.describe_plan(plan):
+        typer.echo(line)
+    if dry_run:
+        typer.echo("(dry run — nothing written)")
+    elif plan.inserts:
+        typer.echo(
+            f"New weekend(s) need their timetable: formation-data sessions refresh "
+            f"--season {plan.season}"
+        )
+
+
 @weekends_app.command("seed")
-def weekends_seed(season: int = typer.Option(2026)) -> None:
-    """Hand-curated calendar (v1). Use `refresh` to pull from Jolpica instead."""
+def weekends_seed(
+    season: int = typer.Option(2026), dry_run: bool = _DRY_RUN_OPT
+) -> None:
+    """Hand-curated calendar (offline fallback). Prefer `refresh`, which reads Jolpica."""
     with connection_scope() as conn:
-        static_weekends.run(conn, season=season)
+        plan = static_weekends.run(conn, season=season, dry_run=dry_run)
+    _echo_plan(plan, dry_run=dry_run)
 
 
 @weekends_app.command("refresh")
-def weekends_refresh(season: int = typer.Option(...)) -> None:
+def weekends_refresh(
+    season: int = typer.Option(...), dry_run: bool = _DRY_RUN_OPT
+) -> None:
+    """Re-sync the season calendar from Jolpica (+ FastF1 local dates). Try --dry-run first.
+
+    Renumbers existing weekends in place; skips (with a warning) any unseeded circuit."""
     with connection_scope() as conn:
-        race_weekends.run(conn, season=season)
+        plan = race_weekends.run(conn, season=season, dry_run=dry_run)
+    _echo_plan(plan, dry_run=dry_run)
 
 
 @sessions_app.command("refresh")

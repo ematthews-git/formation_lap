@@ -5,9 +5,9 @@ Cadence: T+1 (Monday after the race), once Jolpica has published results.
 Source: sources.jolpica_client.get_race(season, round_number).
 
 The circuit is taken from the race's own Circuit.circuitId (mapped to our
-circuit_id via jolpica_id), not from the round number — our hand-curated seed
-calendar doesn't line up with Jolpica's real rounds. Races at a circuit we don't
-seed (e.g. Bahrain/Jeddah) are skipped, since circuit_id is a FK.
+circuit_id via jolpica_id), not from the round number, so a result never lands on the
+wrong circuit if the calendars briefly disagree. Races at a circuit we don't seed
+(e.g. Jeddah) are skipped, since circuit_id is a FK.
 
 driver_id is stored as the accent-stripped lowercase surname, matching the
 drivers seed convention so results join cleanly to drivers.

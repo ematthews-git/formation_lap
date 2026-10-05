@@ -19,6 +19,7 @@ const CIRCUIT_TZ: Record<string, string> = {
   monza: 'Europe/Rome',
   madrid: 'Europe/Madrid',
   baku: 'Asia/Baku',
+  sepang: 'Asia/Kuala_Lumpur',
   singapore: 'Asia/Singapore',
   austin: 'America/Chicago',
   mexico_city: 'America/Mexico_City',

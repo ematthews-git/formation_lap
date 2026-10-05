@@ -5,9 +5,9 @@ publishes the timetable.
 
 Source: sources.fastf1_client.get_event_sessions(season, fastf1_location, race_date).
 FastF1's event schedule carries Session1..5 names plus SessionNDateUtc start
-times. We match the event by the circuit's fastf1_location (round numbers differ
-from our seed, which skips unseeded circuits) and store each session's start as a
-UTC instant.
+times. We match the event by the circuit's fastf1_location rather than round number, so
+this stays correct while a mid-season calendar change is still propagating, and store
+each session's start as a UTC instant.
 
 Rows produced: up to 5 Session rows per weekend —
 - Conventional: Practice 1, Practice 2, Practice 3, Qualifying, Race

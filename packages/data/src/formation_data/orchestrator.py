@@ -4,11 +4,12 @@ These are what the scheduler (AWS EventBridge / GitHub Actions / docker compose 
 Each flow opens a single connection_scope, finds the right target weekend by consulting
 RaceWeekend, and dispatches the relevant per-cadence jobs in order.
 
-Round-number note: our seed calendar is compacted (unseeded circuits dropped), so
-``race_weekends.round_number`` is *not* the official F1 round. Jobs that read our DB
-(weather, the sim) take the seed round; jobs that fetch external data keyed on the real
-round (results, standings, the lap-record check) are handed the official round the
-post-race flow resolves from Jolpica.
+Round-number note: ``race_weekends.round_number`` is the official F1 round (FastF1's
+``RoundNumber``) — the simulator addresses a race by it, so ``weekends refresh`` /
+``weekends seed`` keep it in step with the real calendar, renumbering in place when a race is
+added mid-season (see ``calendar_sync``). The post-race flow still resolves the official
+round from Jolpica by circuit rather than trusting ours, so results/standings/lap-record
+jobs stay correct even if the two were ever to drift.
 """
 
 from __future__ import annotations

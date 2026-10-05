@@ -102,8 +102,8 @@ def get_event_sessions(
     (1, "Practice 1", 2026-07-03 11:30+00:00) ... (5, "Race", ...). `start_utc`
     is a timezone-aware UTC datetime, taken from FastF1's SessionNDateUtc.
 
-    The event is matched on Location (not round number — FastF1 numbers the full
-    calendar while our seed skips unseeded circuits, so the two disagree). When a
+    The event is matched on Location (not round number), so it keeps working while a
+    mid-season calendar change is still propagating between FastF1 and our table. When a
     location hosts two rounds in a season (a double-header), `race_date`
     disambiguates against the event's Sunday. Returns `[]` if no event matches or
     the schedule carries no session data.

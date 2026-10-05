@@ -156,8 +156,31 @@ GitHub Actions cron table against the hosted database:
 | **Post-race** | `run-post-race` | Monday after a race — results, standings, fastest-lap update |
 | **Post-session** | `run-post-session` | Hourly on race weekends — saves each session's results ~45 min after it ends, and runs the postquali sim once Qualifying is done |
 
-Every job is idempotent, so firing outside its intended window is a cheap no-op. A single
-round can be forced with:
+Every job is idempotent, so firing outside its intended window is a cheap no-op.
+
+**Calendar changes mid-season** (a race added, replaced or rescheduled — e.g. 2026's
+"Bahrain Grand Prix in Malaysia" appeared as round 16 and pushed every later round up one):
+
+```bash
+# 1. a brand-new venue needs a circuit row first (hand-curated: jobs/static/circuits.py) and,
+#    ideally, its Pirelli nomination in packages/sim/.../config/nominations.yaml; add its
+#    IANA timezone to packages/web/src/lib/circuitTime.ts
+# 2. preview, then apply (reads Jolpica, takes local dates from FastF1)
+formation-data weekends refresh --season 2026 --dry-run
+formation-data weekends refresh --season 2026
+# 3. load the new weekend's session timetable, then (after the race) the usual jobs
+formation-data sessions refresh --season 2026
+formation-data run-post-race
+```
+
+`weekends refresh` renumbers existing weekends *in place* (matched by circuit), so their
+sessions, strategies, weather and sims follow the circuit instead of the round number. A
+round whose circuit isn't seeded is skipped with a warning, and it refuses to run if a
+weekend that would move already has results/standings/traces stored under its old round.
+Seed new circuits individually rather than re-running the whole `circuits seed`, which
+overwrites any hand-edited values in the table.
+
+A single round can be forced with:
 
 ```bash
 formation-data sim-strategies generate --season YYYY --round N --mode {prelim,postquali}

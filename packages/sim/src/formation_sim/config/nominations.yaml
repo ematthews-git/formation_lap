@@ -105,8 +105,9 @@
   Lusail:       [1, 2, 3]
   Yas Island:   [3, 4, 5]
 
-# 2026 calendar: 22 rounds. Bahrain (Sakhir) and Saudi (Jeddah) were cancelled and
-# are intentionally absent. The Spanish GP moved to the new Madrid street circuit
+# 2026 calendar: 23 rounds. Saudi (Jeddah) was cancelled and is intentionally absent; the
+# Bahrain GP was re-staged at Sepang (Kuala Lumpur) as the "Bahrain Grand Prix in Malaysia"
+# (round 16, added mid-season). The Spanish GP moved to the new Madrid street circuit
 # (Madring) — no training history there, so it is omitted (graceful degradation).
 # Rounds 1-11 are Pirelli's confirmed 2026 nominations (press releases up to the
 # Belgian/Hungarian batch). Rounds 12+ were not yet nominated at the time of writing
@@ -123,6 +124,7 @@
   Silverstone:  [1, 2, 3]
   Spa-Francorchamps: [2, 3, 4]
   Budapest:     [3, 4, 5]
+  Kuala Lumpur: [2, 3, 4]   # Sepang (Bahrain GP in Malaysia): Pirelli C2/C3/C4 — no FastF1 history there
   # --- below: not yet nominated for 2026, copied from 2025 (see header) ---
   Zandvoort:    [2, 3, 4]   # copied from 2025 (2026 TBC)
   Monza:        [3, 4, 5]   # copied from 2025 (2026 TBC)

@@ -505,10 +505,10 @@ def race_weekends_missing_results(
     only the most recent. Ordered oldest-first, so cumulative standings load in
     chronological order.
 
-    Matched on (circuit_id, season), not round_number: `race_weekends` carries our
-    compacted seed round while `race_results` stores the official F1 round, so the two
-    don't share a round space. Unambiguous for current-season use (one race per circuit);
-    a historical double-header would need the round to disambiguate.
+    Matched on (circuit_id, season), not round_number: `race_results` stores the round
+    Jolpica reported when the results were written, which can lag a mid-season renumber of
+    `race_weekends`, so the round isn't a safe join key. Unambiguous for current-season use
+    (one race per circuit); a historical double-header would need the round to disambiguate.
     """
     rw = schema.race_weekends
     rr = schema.race_results

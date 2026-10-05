@@ -106,9 +106,10 @@ race_weekends = Table(
     Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
     Column("season", Integer, nullable=False),
     Column("round_number", Integer, nullable=False),
-    # FastF1's EventName for this round, stored verbatim. This is the season-
-    # specific event label (e.g. "Styrian Grand Prix"); it is NOT a stable circuit
-    # key, which is why circuit identity lives on circuit_id, not here.
+    # Jolpica's raceName for this round, stored verbatim — the season-specific event
+    # label (e.g. "Styrian Grand Prix", "Bahrain Grand Prix in Malaysia"); it is NOT a
+    # stable circuit key, which is why circuit identity lives on circuit_id, not here.
+    # (FastF1's own EventName can differ — "São Paulo" vs Jolpica's "Brazilian".)
     Column("event_name", String, nullable=False),
     Column("race_date", Date, nullable=False),
     Column("is_sprint", Boolean, nullable=False),

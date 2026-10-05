@@ -70,10 +70,18 @@ def get_drivers(season: int):
     return []
 
 
-def get_schedule(season: int):
-    # TODO: httpx.get(f"{BASE_URL}/{season}.json").json()["MRData"]["RaceTable"]["Races"]
-    logger.info("jolpica.get_schedule season=%s (skeleton)", season)
-    return []
+def get_schedule(season: int) -> list[dict]:
+    """The season's race calendar, one dict per round in round order.
+
+    Each race carries `round`, `raceName`, `date` (the race's UTC date — an evening race
+    like Las Vegas lands a day after its local date), `Circuit.circuitId` and, on sprint
+    weekends, a `Sprint` key. Raises httpx.HTTPError on a network/HTTP failure.
+    """
+    races = _get_json(f"/{season}.json", params={"limit": _PAGE_SIZE})["MRData"][
+        "RaceTable"
+    ]["Races"]
+    logger.info("jolpica.get_schedule season=%s rounds=%d", season, len(races))
+    return races
 
 
 def get_race(season: int, round_number: int) -> dict | None:
