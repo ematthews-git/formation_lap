@@ -80,6 +80,8 @@ def run(conn: Connection, *, season: int, circuit_id: str | None = None) -> None
                 circuit.circuit_id,
             )
             raise
+        except fastf1_client.F1TVAuthError:
+            raise  # a setup problem: every later circuit would fail the same way
         except Exception as exc:  # noqa: BLE001 - one bad circuit shouldn't sink the batch
             logger.warning(
                 "track_maps.run: could not trace %s from %s R%s (%s); skipping",

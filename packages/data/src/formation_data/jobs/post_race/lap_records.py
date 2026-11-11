@@ -29,13 +29,21 @@ logger = logging.getLogger(__name__)
 
 
 def run(conn: Connection, *, circuit_id: str, season: int, round_number: int) -> None:
-    """Update `circuit_id`'s lap record if `season` R`round_number` beat it."""
+    """Update `circuit_id`'s lap record if `season` R`round_number` beat it.
+
+    Raises F1TVAuthError when FastF1 can't sign in. That's a setup problem the caller
+    has to surface, not a per-race hiccup to skip.
+    """
     try:
         session = fastf1_client.get_race_session(season, round_number)
+    except fastf1_client.F1TVAuthError:
+        raise
+    except fastf1_client.SessionDataUnavailable as exc:
+        logger.warning("post_race.lap_records.run: %s Skipping the lap-record check.", exc)
+        return
     except RateLimitExceededError:
-        # Unlike the historical miner we don't re-raise: results + standings for this
-        # weekend are already written in the shared transaction, and the lap record is a
-        # refinement — log and move on rather than roll the whole batch back.
+        # Don't re-raise: the lap record is a refinement, and the post-race flow retries
+        # it next run (the weekend stays in its FastF1 catch-up set until it has a trace).
         logger.error(
             "post_race.lap_records.run: FastF1 rate limit loading %s R%s; skipping "
             "lap-record check (retry once the bucket refills)",

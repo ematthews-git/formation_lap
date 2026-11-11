@@ -24,3 +24,7 @@ Formation Lap-bgpic.html
 Formation Lap.html
 
 node_modules/
+
+# FastF1 disk cache and F1TV sign-in token used by scripts/run-data-job.sh
+fastf1_cache/
+fastf1_auth/

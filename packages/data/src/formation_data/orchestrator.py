@@ -37,6 +37,7 @@ from formation_data.jobs.pre_season import (
 )
 from formation_data.jobs.static import circuits as static_circuits
 from formation_data.sources import jolpica_client
+from formation_data.sources.fastf1_client import F1TVAuthError
 
 logger = logging.getLogger(__name__)
 
@@ -188,96 +189,159 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
     repo inactivity) plus back-to-back race weekends would otherwise leave a permanent
     hole. Idempotent upserts make catch-up free.
 
-    Per weekend it loads the finishing order, refreshes the driver + constructor
-    standings, and checks whether the race set a new circuit lap record. The official F1
-    round is resolved from Jolpica (by circuit) because our seed round is compacted and
-    can't address the external APIs directly; that lookup also gates on results being
-    published, so an as-yet-unscored weekend is simply retried on the next run.
+    Two stages, so a FastF1 problem never holds back results:
+
+    1. Jolpica: finishing order + driver/constructor standings, one transaction per
+       weekend. The official F1 round is resolved from Jolpica (by circuit) because our
+       seed round can't address the external APIs directly; that lookup also gates on
+       results being published, so an as-yet-unscored weekend is retried next run.
+    2. FastF1: lap record, stored laps frame and race trace (+ overtakes) for every race
+       of the latest season that has results but is still missing FastF1 data. Keyed
+       on what's missing, not on this run's weekends, so a race FastF1 couldn't serve
+       last time (unpublished, rate-limited, signed out) is picked up again.
+
+    Raises F1TVAuthError (after stage 1 has committed) if FastF1 can't sign in.
     """
     today = today or date.today()
-    # (season, official_round, circuit_id) to refresh laps + race trace for
-    processed: list[tuple[int, int, str]] = []
     with connection_scope() as conn:
         pending = repositories.race_weekends_missing_results(conn, before=today)
-        if not pending:
-            logger.info(
-                "run_post_race_for_last_weekend today=%s: all past races have results",
-                today,
+        latest = repositories.most_recent_race_weekend_before(conn, today)
+
+    if not pending:
+        logger.info(
+            "run_post_race_for_last_weekend today=%s: all past races have results", today
+        )
+    for rw in pending:
+        # Own transaction per weekend: a failure further on can't roll back weekends
+        # already loaded. Oldest-first, so cumulative standings stay in order.
+        with connection_scope() as conn:
+            _load_results_and_standings(conn, rw)
+
+    if latest is not None:
+        _refresh_fastf1_data(latest.season)
+
+
+def _load_results_and_standings(conn, rw) -> None:
+    """Stage 1 of the post-race flow for one weekend (see run_post_race_for_last_weekend)."""
+    circuit = repositories.get_circuit(conn, rw.circuit_id)
+    if circuit is None:
+        logger.warning(
+            "run_post_race: weekend %s R%s references unknown circuit %s; skipping",
+            rw.season,
+            rw.round_number,
+            rw.circuit_id,
+        )
+        return
+
+    try:
+        race = jolpica_client.get_circuit_race(rw.season, circuit.jolpica_id)
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "run_post_race: Jolpica round lookup failed for %s %s (%s); skipping",
+            circuit.circuit_id,
+            rw.season,
+            exc,
+        )
+        return
+    if race is None or not race.get("Results"):
+        logger.info(
+            "run_post_race: no published results yet for %s %s; will retry",
+            circuit.circuit_id,
+            rw.season,
+        )
+        return
+
+    official_round = int(race["round"])
+    race_results.run(conn, season=rw.season, round_number=official_round)
+    standings.run(conn, season=rw.season, round_number=official_round)
+
+
+def _refresh_fastf1_data(season: int) -> None:
+    """Stage 2 of the post-race flow: FastF1-derived data for `season`'s raced rounds."""
+    from formation_sim.data import collector
+
+    with connection_scope() as conn:
+        todo = repositories.races_missing_fastf1_data(conn, season)
+    if not todo:
+        logger.info("run_post_race: FastF1 data is complete for %s", season)
+        return
+    logger.info(
+        "run_post_race: fetching FastF1 data for %s %s",
+        season,
+        ", ".join(f"R{rnd}" for _, rnd, _ in todo),
+    )
+
+    for i, (s, rnd, circuit_id) in enumerate(todo):
+        try:
+            _refresh_fastf1_race(s, rnd, circuit_id)
+        except F1TVAuthError:
+            logger.error(
+                "run_post_race: stopped, FastF1 can't sign in to F1TV. Results and "
+                "standings are saved; FastF1 data for %s %s is still missing and will be "
+                "fetched on the next run after signing in.",
+                s,
+                ", ".join(f"R{r}" for _, r, _ in todo[i:]),
+            )
+            raise
+        if collector.rate_limited():
+            logger.warning(
+                "run_post_race: FastF1 hourly rate limit reached at %s R%s; progress is "
+                "cached, and the next run picks up the rest.",
+                s,
+                rnd,
             )
             return
 
-        for rw in pending:
-            circuit = repositories.get_circuit(conn, rw.circuit_id)
-            if circuit is None:
-                logger.warning(
-                    "run_post_race: weekend %s R%s references unknown circuit %s; skipping",
-                    rw.season,
-                    rw.round_number,
-                    rw.circuit_id,
-                )
-                continue
 
-            try:
-                race = jolpica_client.get_circuit_race(rw.season, circuit.jolpica_id)
-            except httpx.HTTPError as exc:
-                logger.warning(
-                    "run_post_race: Jolpica round lookup failed for %s %s (%s); skipping",
-                    circuit.circuit_id,
-                    rw.season,
-                    exc,
-                )
-                continue
-            if race is None or not race.get("Results"):
-                logger.info(
-                    "run_post_race: no published results yet for %s %s; will retry",
-                    circuit.circuit_id,
-                    rw.season,
-                )
-                continue
+def _refresh_fastf1_race(season: int, rnd: int, circuit_id: str) -> None:
+    """Lap record, laps frame and race trace for one race, each in its own transaction.
 
-            official_round = int(race["round"])
-            race_results.run(conn, season=rw.season, round_number=official_round)
-            standings.run(conn, season=rw.season, round_number=official_round)
-            post_race_lap_records.run(
-                conn,
-                circuit_id=rw.circuit_id,
-                season=rw.season,
-                round_number=official_round,
-            )
-            processed.append((rw.season, official_round, rw.circuit_id))
+    Every step is best-effort and idempotent, and anything missing is retried next run,
+    except F1TVAuthError, which stops the run because every later race would fail too.
+    """
+    from formation_data import artifact_store
+    from formation_data.jobs.pre_season import race_traces
 
-    # Keep the sim's current-season laps fresh in derived_artifacts so prelim/postquali runs in
-    # CI (which read laps from the DB) can see just-completed races, and build the weekend's
-    # race trace while the session is warm in the FastF1 cache. Done in their own transactions,
-    # after the results/standings above have committed, so a fetch/upsert hiccup can never
-    # roll those back. Best-effort: a failure just means the round is retried next run.
-    for season, rnd, circuit_id in processed:
+    steps = (
+        (
+            "lap record",
+            lambda conn: post_race_lap_records.run(
+                conn, circuit_id=circuit_id, season=season, round_number=rnd
+            ),
+        ),
+        # Keeps the sim's current-season laps in derived_artifacts, so prelim/postquali
+        # runs that read laps from the DB can see just-completed races.
+        ("laps", lambda conn: artifact_store.dump_race_laps(conn, season, rnd)),
+        # Also writes the classified overtake blob: both come off one telemetry load.
+        (
+            "race trace + overtakes",
+            lambda conn: race_traces.run_single(
+                conn, circuit_id=circuit_id, season=season, round_number=rnd
+            ),
+        ),
+    )
+    for label, step in steps:
         try:
             with connection_scope() as conn:
-                from formation_data import artifact_store
-
-                if artifact_store.dump_race_laps(conn, season, rnd):
-                    logger.info("run_post_race: stored laps for %s R%s", season, rnd)
+                stored = step(conn)
+        except F1TVAuthError:
+            raise
         except Exception:
             logger.exception(
-                "run_post_race: laps dump failed for %s R%s (non-fatal)", season, rnd
+                "run_post_race: %s failed for %s R%s (non-fatal; retried next run)",
+                label,
+                season,
+                rnd,
             )
-        try:
-            with connection_scope() as conn:
-                from formation_data.jobs.pre_season import race_traces
-
-                # Also writes the race's classified overtake blob — both feeds come off
-                # the one telemetry load, which is the expensive part.
-                if race_traces.run_single(
-                    conn, circuit_id=circuit_id, season=season, round_number=rnd
-                ):
-                    logger.info(
-                        "run_post_race: stored race trace + overtakes for %s R%s",
-                        season, rnd,
-                    )
-        except Exception:
-            logger.exception(
-                "run_post_race: race trace failed for %s R%s (non-fatal)", season, rnd
+            continue
+        if stored is True:
+            logger.info("run_post_race: stored %s for %s R%s", label, season, rnd)
+        elif stored is False:
+            logger.warning(
+                "run_post_race: no FastF1 data for the %s of %s R%s yet; retried next run",
+                label,
+                season,
+                rnd,
             )
 
 

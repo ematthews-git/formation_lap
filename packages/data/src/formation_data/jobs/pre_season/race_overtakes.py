@@ -113,6 +113,8 @@ def run(conn: Connection, *, season: int, circuit_id: str | None = None) -> None
                     stored = run_single(
                         conn, circuit_id=circuit.circuit_id, season=s, round_number=r
                     )
+                except fastf1_client.F1TVAuthError:
+                    raise  # a setup problem: every later race would fail the same way
                 except Exception:  # noqa: BLE001 — one unavailable/partial race must not
                     # sink the whole backfill; skip it and carry on.
                     logger.warning(

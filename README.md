@@ -233,6 +233,7 @@ Copy `.env.example` to `.env` to get started.
 |---|---|---|
 | `DATABASE_URL` | `postgresql+psycopg2://formation:formation@localhost:5432/formation_lap` | data + API |
 | `FASTF1_CACHE_DIR` | `~/.cache/fastf1` | data |
+| `F1_USERNAME` / `F1_PASSWORD` | unset | data. F1TV Access account FastF1 signs in with (see below) |
 | `POSTGRES_USER` | `formation` | docker-compose |
 | `POSTGRES_PASSWORD` | `formation` | docker-compose |
 | `POSTGRES_DB` | `formation_lap` | docker-compose |
@@ -244,9 +245,29 @@ Copy `.env.example` to `.env` to get started.
   the VM over SSH via `docker-compose.prod.yml`. It only fires when a change actually
   affects the image (Python packages, lockfile, or the workflow itself).
 - **Web** — deployed on Vercel from `packages/web`.
-- **Scheduled data jobs** — `.github/workflows/scheduled-data.yml` runs the pipeline cron
-  table against the Supabase database using the `DATABASE_URL` repo secret. Any command can
-  also be triggered manually via `workflow_dispatch`.
+- **Scheduled data jobs** run on a home machine via the launchd agents in `deploy/launchd/`,
+  which call `scripts/run-data-job.sh` (the same image as the API, one throwaway container
+  per job, configured from the repo's `.env`). F1's livetiming API blocks datacenter IPs, so
+  `.github/workflows/scheduled-data.yml` is now a manual `workflow_dispatch` fallback only.
+
+### F1TV sign-in (FastF1)
+
+Since mid-October 2026 F1's timing archive (`livetiming.formula1.com/static`) returns
+**401** unless the request carries an F1TV token, so FastF1 (>= 3.9) needs an **F1TV
+Access (or higher)** account. Tokens last about four days.
+
+- **Locally:** `uv run --package formation-data formation-data f1tv login` prompts for
+  the account and stores a token. Check it with `formation-data f1tv status`.
+- **Unattended jobs:** set `F1_USERNAME` and `F1_PASSWORD` (in `.env` for
+  `run-data-job.sh`, as repo secrets for the dispatch workflow) and FastF1 signs in again
+  on its own whenever the token runs out. `run-data-job.sh` keeps the token in
+  `fastf1_auth/` (gitignored) so each container reuses it; `run-data-job.sh f1tv-login`
+  signs in interactively instead.
+
+If FastF1 can't sign in, jobs stop with an `F1TV sign-in required` error instead of
+reporting the race as unpublished. `run-post-race` still saves results and standings
+(they come from Jolpica) and fetches the missing FastF1 data (lap records, laps, race
+traces) on the next run after signing in.
 
 ## Development
 

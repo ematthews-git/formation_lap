@@ -82,6 +82,8 @@ def run(conn: Connection, *, season: int, circuit_id: str | None = None) -> None
                     )
                     if feat is not None and ot_blob is not None:
                         feat["overtake_corners"] = ot_blob["by_corner"]
+                except fastf1_client.F1TVAuthError:
+                    raise  # a setup problem: every later race would fail the same way
                 except Exception:  # noqa: BLE001 — a single unavailable/partial race must not
                     # sink the whole backfill; skip it and carry on.
                     logger.warning(

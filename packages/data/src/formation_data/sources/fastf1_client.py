@@ -16,8 +16,62 @@ from datetime import date, datetime, timezone
 from functools import lru_cache
 
 import pandas as pd
+from formation_sim.data import f1tv
+from formation_sim.data.collector import has_laps
+from formation_sim.data.f1tv import F1TVAuthError
 
 logger = logging.getLogger(__name__)
+
+__all__ = ["F1TVAuthError", "SessionDataUnavailable"]
+
+
+class SessionDataUnavailable(Exception):
+    """FastF1 has no timing data for a session, and it isn't a sign-in problem.
+
+    Usually F1 just hasn't published it yet (typically 30 to 60 minutes after the
+    session ends). Callers should skip the session and let the next run retry it.
+    """
+
+    def __init__(self, season: int, round_number: int, session_name: str, event: str = ""):
+        self.season = season
+        self.round_number = round_number
+        self.session_name = session_name
+        where = f"{season} R{round_number} {session_name}" + (f" ({event})" if event else "")
+        super().__init__(
+            f"No FastF1 timing data for {where}. F1 may not have published it yet; "
+            "it will be retried on the next run."
+        )
+
+
+def load_session(
+    season: int,
+    round_number: int,
+    session_name: str,
+    *,
+    telemetry: bool = False,
+    weather: bool = False,
+    messages: bool = False,
+):
+    """Load a FastF1 session with its laps, or raise with a reason anyone can act on.
+
+    FastF1's ``Session.load`` returns normally even when every request failed. It
+    logs warnings and leaves the session empty, so the real problem only shows up
+    later as a confusing ``DataNotLoadedError``. This checks straight away instead:
+
+    - F1TVAuthError: no F1TV sign-in. A setup problem, so don't swallow it.
+    - SessionDataUnavailable: signed in, but there's no data for this session yet.
+    """
+    session = fastf1.get_session(season, round_number, session_name)
+    session.load(laps=True, telemetry=telemetry, weather=weather, messages=messages)
+    if not has_laps(session):
+        f1tv.raise_if_auth_problem()
+        event = ""
+        try:
+            event = str(session.event["EventName"])
+        except Exception:  # noqa: BLE001 - the label is optional
+            pass
+        raise SessionDataUnavailable(season, round_number, session_name, event)
+    return session
 
 
 def enable_cache() -> None:
@@ -130,10 +184,12 @@ def get_event_sessions(
 
 
 def get_race_session(season: int, round_number: int):
-    """Return a FastF1 race session, loaded with laps + results + messages."""
+    """Return a FastF1 race session, loaded with laps + results + messages.
 
-    session = fastf1.get_session(season, round_number, "R")
-    session.load(laps=True, telemetry=False, weather=False, messages=True)
+    Raises F1TVAuthError / SessionDataUnavailable (see `load_session`).
+    """
+
+    session = load_session(season, round_number, "R", messages=True)
 
     logger.info("get_race_session season=%s round=%s", season, round_number)
     return session
@@ -176,8 +232,12 @@ def get_session_results(
     round_number = int(events.iloc[0].RoundNumber)
 
     try:
-        session = fastf1.get_session(season, round_number, session_name)
-        session.load(laps=True, telemetry=False, weather=False, messages=False)
+        session = load_session(season, round_number, session_name)
+    except F1TVAuthError:
+        raise  # a setup problem, not "not published yet". Retrying won't fix it.
+    except SessionDataUnavailable as exc:
+        logger.info("get_session_results: %s", exc)
+        return []
     except Exception as exc:  # noqa: BLE001 — data often not yet published; retry later
         logger.warning(
             "get_session_results: load failed for %s R%s %r (%s); no results",
@@ -307,8 +367,7 @@ def get_fastest_lap_track(season: int, round_number: int):
     degrees (from `get_circuit_info()`) so every generated map can be oriented
     consistently. Loads telemetry, which is heavier than a plain lap load.
     """
-    session = fastf1.get_session(season, round_number, "R")
-    session.load(laps=True, telemetry=True, weather=False, messages=False)
+    session = load_session(season, round_number, "R", telemetry=True)
 
     telemetry = session.laps.pick_fastest().get_telemetry()
     rotation = float(session.get_circuit_info().rotation)

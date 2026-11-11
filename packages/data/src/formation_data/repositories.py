@@ -525,6 +525,39 @@ def race_weekends_missing_results(
     return [domain.RaceWeekend.model_validate(row._mapping) for row in rows]
 
 
+def races_missing_fastf1_data(conn: Connection, season: int) -> list[tuple[int, int, str]]:
+    """`(season, round_number, circuit_id)` of `season`'s races that have results but
+    are still missing a race trace or a stored laps frame. Ordered by round.
+
+    These are the FastF1-derived pieces of the post-race flow. Results come from Jolpica
+    and can land while FastF1 is still unpublished, rate-limited or signed out, so
+    the flow keys its FastF1 catch-up on what's missing rather than on which weekends
+    got results this run. The round is the official one stored with the results.
+    """
+    rr, rt, da = schema.race_results, schema.race_traces, schema.derived_artifacts
+    has_trace = (
+        select(rt.c.id)
+        .where(rt.c.season == rr.c.season, rt.c.round_number == rr.c.round_number)
+        .exists()
+    )
+    has_laps = (
+        select(da.c.id)
+        .where(
+            da.c.kind == "laps",
+            da.c.year == rr.c.season,
+            da.c.round_number == rr.c.round_number,
+        )
+        .exists()
+    )
+    rows = conn.execute(
+        select(rr.c.season, rr.c.round_number, rr.c.circuit_id)
+        .where(rr.c.season == season, ~(has_trace & has_laps))
+        .distinct()
+        .order_by(rr.c.round_number)
+    ).all()
+    return [(int(s), int(r), str(c)) for s, r, c in rows]
+
+
 def most_recent_race_weekend_before(
     conn: Connection, today: date
 ) -> domain.RaceWeekend | None:

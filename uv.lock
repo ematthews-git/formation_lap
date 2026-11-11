@@ -552,7 +552,7 @@ wheels = [
 
 [[package]]
 name = "fastf1"
-version = "3.8.3"
+version = "3.9.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -571,9 +571,9 @@ dependencies = [
     { name = "timple" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/8f/3281f9add386bcd7f20f2f487917d5dc2422ec32581b22ec42a5a5c8a670/fastf1-3.8.3.tar.gz", hash = "sha256:9277e1a759debfcf63e65c248b9d440c561724147512fd5e95115dd8a71ac350", size = 137053, upload-time = "2026-04-29T21:24:04.164Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/89/7b2335260dba3cf7ca86d7216b8cb4a72fb2ca42f59f2fd41bd31fd803d6/fastf1-3.9.2.tar.gz", hash = "sha256:cf7fb6bae88b7c0a83bacfe44b8a85be05259dc5a5407c4ce3ddd65836535466", size = 146756, upload-time = "2026-11-02T20:20:01.79Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/7b/fd211595db7d433c7180184559e5c1aad5621a964fc1c8724218fa3690d5/fastf1-3.8.3-py3-none-any.whl", hash = "sha256:e3270f6d60838662dd3e15cf6236519228a7fcfcc009f5edb195798769c845ad", size = 135960, upload-time = "2026-04-29T21:24:01.912Z" },
+    { url = "https://files.pythonhosted.org/packages/07/50/792ea395a86acfc11cc8674958627d6fa73b23c1dd994460b4f8b329fd18/fastf1-3.9.2-py3-none-any.whl", hash = "sha256:2515020d6b39b910d5339434ccdbcfffde8e0dfee035e9652cef06ccdca54da9", size = 149141, upload-time = "2026-11-02T20:20:00.323Z" },
 ]
 
 [[package]]
@@ -664,7 +664,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastf1", specifier = ">=3.4.0" },
+    { name = "fastf1", specifier = ">=3.9.2" },
     { name = "formation-sim", editable = "packages/sim" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "numpy", specifier = ">=1.26" },
@@ -713,7 +713,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastf1", specifier = ">=3.4.0" },
+    { name = "fastf1", specifier = ">=3.9.2" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0" },

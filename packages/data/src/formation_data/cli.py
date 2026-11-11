@@ -8,8 +8,15 @@ today and will fetch + upsert via the repository layer in a follow-up.
 from __future__ import annotations
 
 import logging
+import os
+import sys
 
+import httpx
 import typer
+from fastf1.exceptions import RateLimitExceededError
+from formation_sim.data import f1tv
+from sqlalchemy import exc as sa_exc
+from sqlalchemy.engine import url as sa_url
 
 from formation_data import calendar_sync, db, orchestrator, repositories
 from formation_data.db import connection_scope
@@ -56,6 +63,7 @@ standings_app = typer.Typer(help="Driver + constructor standings.")
 session_results_app = typer.Typer(help="Per-session classification / timesheet.")
 derived_app = typer.Typer(help="Derived-artifact store (sim laps in the DB).")
 db_app = typer.Typer(help="Database schema management.")
+f1tv_app = typer.Typer(help="F1TV sign-in, which FastF1 needs to fetch F1 timing data.")
 
 app.add_typer(circuits_app, name="circuits")
 app.add_typer(drivers_app, name="drivers")
@@ -74,10 +82,19 @@ app.add_typer(standings_app, name="standings")
 app.add_typer(session_results_app, name="session-results")
 app.add_typer(derived_app, name="derived")
 app.add_typer(db_app, name="db")
+app.add_typer(f1tv_app, name="f1tv")
+
+_verbose = False
 
 
 @app.callback()
-def _configure_logging(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
+def _configure_logging(
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Debug logging, and full tracebacks on errors."
+    ),
+) -> None:
+    global _verbose
+    _verbose = verbose
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -449,9 +466,134 @@ def db_upgrade() -> None:
     db.upgrade()
 
 
+# --- F1TV sign-in ---
+
+
+@f1tv_app.command("login")
+def f1tv_login(
+    method: str = typer.Option(
+        None, help="'password' (default: F1_USERNAME/F1_PASSWORD or a prompt) or 'browser'."
+    ),
+) -> None:
+    """Sign in to F1TV and store a token for FastF1 (valid ~4 days)."""
+    status = f1tv.sign_in(method)
+    typer.echo(f"Signed in to F1TV. {_describe_token(status)}")
+
+
+@f1tv_app.command("status")
+def f1tv_status() -> None:
+    """Show whether FastF1 has a usable F1TV token. Exits 1 if jobs can't sign in."""
+    status = f1tv.token_status()
+    if status is None:
+        typer.echo("Not signed in to F1TV.")
+    elif status.valid:
+        typer.echo(f"Signed in to F1TV. {_describe_token(status)}")
+    else:
+        typer.echo(f"F1TV token expired at {status.expires_at:%Y-%m-%d %H:%M} UTC.")
+
+    if f1tv.credentials_in_env():
+        typer.echo(
+            f"{f1tv.ENV_USERNAME}/{f1tv.ENV_PASSWORD} are set, so jobs sign in again on "
+            "their own when the token expires."
+        )
+    elif status is None or not status.valid:
+        typer.echo(
+            "Run `formation-data f1tv login` to sign in, or set "
+            f"{f1tv.ENV_USERNAME}/{f1tv.ENV_PASSWORD} so jobs can sign in on their own."
+        )
+        raise typer.Exit(code=1)
+    else:
+        typer.echo(
+            f"{f1tv.ENV_USERNAME}/{f1tv.ENV_PASSWORD} are not set, so run "
+            "`formation-data f1tv login` again when the token expires."
+        )
+
+
+@f1tv_app.command("logout")
+def f1tv_logout() -> None:
+    """Delete the stored F1TV token."""
+    f1tv.sign_out()
+    typer.echo("Signed out of F1TV (stored token removed).")
+
+
+def _describe_token(status: f1tv.TokenStatus) -> str:
+    plan = " / ".join(p for p in (status.product, status.subscription_status) if p)
+    return f"Token valid until {status.expires_at:%Y-%m-%d %H:%M} UTC" + (
+        f" ({plan})." if plan else "."
+    )
+
+
+# --- error reporting ---
+
+
+def _explain(exc: BaseException) -> tuple[str, str] | None:
+    """(title, what-to-do) for failures with a known cause, else None."""
+    if isinstance(exc, f1tv.F1TVAuthError):
+        return "FastF1 couldn't sign in to F1TV", str(exc)
+    if isinstance(exc, fastf1_client.SessionDataUnavailable):
+        return "No FastF1 data for this session", str(exc)
+    if isinstance(exc, RateLimitExceededError):
+        return (
+            "FastF1 rate limit reached",
+            "FastF1's hourly request budget is used up. Everything fetched so far is "
+            "cached on disk and doesn't count again, so re-run in about an hour to "
+            "pick up where this left off.",
+        )
+    if isinstance(exc, sa_exc.OperationalError) and _is_connection_failure(exc):
+        return "Can't reach the database", _database_hint(exc)
+    if isinstance(exc, httpx.HTTPStatusError):
+        return (
+            "An external API request failed",
+            f"{exc.request.method} {exc.request.url} returned HTTP "
+            f"{exc.response.status_code}. If it's a 5xx or 429, it's usually temporary, "
+            "so retry later.",
+        )
+    if isinstance(exc, httpx.TransportError):
+        return (
+            "An external API couldn't be reached",
+            f"{type(exc).__name__}: {exc}. Check the network connection and retry.",
+        )
+    return None
+
+
+def _is_connection_failure(exc: sa_exc.OperationalError) -> bool:
+    text = str(exc.orig).lower()
+    return any(
+        s in text
+        for s in ("connection refused", "could not connect", "connection to server",
+                  "could not translate host name", "timeout expired")
+    )
+
+
+def _database_hint(exc: sa_exc.OperationalError) -> str:
+    url = sa_url.make_url(db._database_url())
+    where = f"{url.host}:{url.port or 5432}/{url.database}"
+    first_line = str(exc.orig).strip().splitlines()[0] if str(exc.orig).strip() else ""
+    hint = f"Couldn't connect to Postgres at {where}"
+    hint += f" ({first_line})." if first_line else "."
+    if "DATABASE_URL" not in os.environ:
+        hint += (
+            "\nDATABASE_URL isn't set, so this is the local default. Start the local "
+            "database with:\n    docker compose up -d db"
+        )
+    else:
+        hint += "\nCheck DATABASE_URL and that the database server is running."
+    return hint
+
+
 def main() -> None:
     fastf1_client.enable_cache()
-    app()
+    try:
+        app()
+    except Exception as exc:
+        explained = _explain(exc)
+        if explained is None or _verbose:
+            raise
+        title, detail = explained
+        typer.secho(f"\nError: {title}", fg=typer.colors.RED, bold=True, err=True)
+        typer.echo(detail, err=True)
+        typer.echo("(Re-run with --verbose for the full traceback.)", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

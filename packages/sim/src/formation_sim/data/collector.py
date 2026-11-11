@@ -13,13 +13,9 @@ import fastf1  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-try:
-    from fastf1.exceptions import RateLimitExceededError
-except Exception:  # pragma: no cover - fastf1 version guard
-    class RateLimitExceededError(Exception):
-        pass
+from fastf1.exceptions import DataNotLoadedError, RateLimitExceededError  # noqa: E402
 
-from formation_sim.data import schema  # noqa: E402
+from formation_sim.data import f1tv, schema  # noqa: E402
 from formation_sim.settings import cache_dir, load_settings  # noqa: E402
 
 _CACHE_READY = False
@@ -54,6 +50,10 @@ def load_session(year: int, rnd: int, session: str = "R",
     Cached sessions load without network. Once the hourly API budget is exhausted
     we stop attempting further network loads this run (returning None) instead of
     crashing, so partial builds degrade gracefully.
+
+    Raises :class:`~formation_sim.data.f1tv.F1TVAuthError` when the session came back
+    empty because FastF1 couldn't sign in to F1TV. That's a setup problem that would
+    otherwise silently empty every uncached load, not a missing race.
     """
     global _RATE_LIMITED
     ensure_cache()
@@ -65,9 +65,24 @@ def load_session(year: int, rnd: int, session: str = "R",
         return None
     except Exception:
         return None
-    if ses.laps is None or len(ses.laps) == 0:
+    if not has_laps(ses):
+        f1tv.raise_if_auth_problem()
         return None
     return ses
+
+
+def has_laps(ses) -> bool:
+    """True if `ses` loaded a non-empty lap table.
+
+    FastF1's ``Session.load`` logs failures and returns normally, leaving ``laps``
+    unset, and reading it then raises ``DataNotLoadedError``. Check it with this
+    instead of touching ``ses.laps`` directly.
+    """
+    try:
+        laps = ses.laps
+    except DataNotLoadedError:
+        return False
+    return laps is not None and len(laps) > 0
 
 
 def _seconds(series: pd.Series) -> pd.Series:

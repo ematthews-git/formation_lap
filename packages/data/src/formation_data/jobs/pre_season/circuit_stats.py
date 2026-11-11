@@ -37,9 +37,10 @@ def run(conn: Connection, *, season: int) -> None:
     try:
         for circuit in repositories.list_circuits(conn):
             sessions_race = [
-                fastf1_client.get_race_session(s, r)
+                ses
                 for s in range(season - HISTORY_SEASONS, season)
                 for r in fastf1_client.rounds_for_location(s, circuit.fastf1_location)
+                if (ses := _race_or_none(s, r)) is not None
             ]
             if not sessions_race:
                 continue  # suggests new venue
@@ -72,6 +73,18 @@ def run(conn: Connection, *, season: int) -> None:
         len(items),
         HISTORY_SEASONS,
     )
+
+
+def _race_or_none(season: int, round_number: int):
+    """The race session, or None (logged) when FastF1 has no data for it.
+
+    F1TVAuthError and RateLimitExceededError still propagate, since both stop the run.
+    """
+    try:
+        return fastf1_client.get_race_session(season, round_number)
+    except fastf1_client.SessionDataUnavailable as exc:
+        logger.warning("pre_season.circuit_stats: skipping race: %s", exc)
+        return None
 
 
 def _safety_car_probability(sessions) -> int:

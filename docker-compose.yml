@@ -24,13 +24,21 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-formation}:${POSTGRES_PASSWORD:-formation}@db:5432/${POSTGRES_DB:-formation_lap}
       FASTF1_CACHE_DIR: /cache/fastf1
+      # F1TV Access account. F1's timing archive needs it, and FastF1 signs in on its own
+      # when the stored token (~4 days) runs out. Its token lives under XDG_DATA_HOME.
+      F1_USERNAME: ${F1_USERNAME:-}
+      F1_PASSWORD: ${F1_PASSWORD:-}
+      XDG_DATA_HOME: /fastf1-data
     # Persist FastF1's HTTP cache across one-shot runs. Finished seasons never
     # change, so a warm cache makes re-runs free and keeps cold loads from
-    # re-fetching the same data into FastF1's 500-req/h limit.
+    # re-fetching the same data into FastF1's 500-req/h limit. The F1TV token is
+    # persisted too, so each one-shot run doesn't have to sign in again.
     volumes:
       - fastf1cache:/cache/fastf1
+      - fastf1auth:/fastf1-data
     profiles: ["worker"]
 
 volumes:
   pgdata:
   fastf1cache:
+  fastf1auth:
