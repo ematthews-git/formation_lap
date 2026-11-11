@@ -29,6 +29,8 @@ const HERO_IMAGES: Record<string, Hero> = {
   singapore: { src: '/singapore.webp', tone: 'dark' },
   austin: { src: '/austin.webp', tone: 'dark' },
   abu_dhabi: { src: '/abu-dhabi.webp', tone: 'dark' },
+  las_vegas: { src: '/las_vegas.webp', tone: 'light' },
+  lusail: { src: '/lusail.webp', tone: 'light'}
 }
 
 const HERO_FALLBACK: Hero | null = HERO_IMAGES.silverstone
