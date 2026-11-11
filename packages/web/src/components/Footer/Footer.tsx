@@ -64,8 +64,6 @@ export function Footer() {
           <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">
             Pexels
           </a>
-          . Analytics are cookieless (Vercel Analytics) — no cookies set, no
-          personal data stored.
         </p>
 
         <div className={styles.legal}>
