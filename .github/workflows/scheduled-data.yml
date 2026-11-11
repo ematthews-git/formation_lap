@@ -4,10 +4,13 @@ name: Scheduled data jobs
 # Each job calls the same `formation-data` CLI that the production ECS task runs.
 #
 # The scheduled crons below are DISABLED (see the `if:` on the `run` job): these jobs now run
-# on the VM via systemd timers (scripts/run-data-job.sh + deploy/systemd/), because GitHub's
-# datacenter IPs are blocked by F1's livetiming API while the VM's IP is not. `workflow_dispatch`
-# still works as a manual fallback. Every job calls the same idempotent `formation-data` CLI, so
-# re-runs outside their window are cheap no-ops. To re-enable the crons, drop the `if:` below.
+# on a home MacBook via launchd (scripts/run-data-job.sh + deploy/launchd/), because F1's
+# livetiming CDN returns 403 to datacenter IPs (GitHub's runners and the Oracle VM alike).
+# An F1TV sign-in doesn't get around that, since the CDN blocks before it checks the token,
+# so FastF1 steps fail on these runners regardless. `workflow_dispatch` still works as a manual
+# fallback for jobs that don't need FastF1. Every job calls the same idempotent
+# `formation-data` CLI, so re-runs outside their window are cheap no-ops. To re-enable the
+# crons, drop the `if:` below.
 
 on:
   schedule:
@@ -61,9 +64,6 @@ jobs:
       - name: Dispatch based on schedule
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          # F1TV Access account. FastF1 needs it for F1's timing archive since Oct 2026.
-          F1_USERNAME: ${{ secrets.F1_USERNAME }}
-          F1_PASSWORD: ${{ secrets.F1_PASSWORD }}
         run: |
           # GitHub puts the matched cron into github.event.schedule. Pick the command from
           # there; for workflow_dispatch use the input verbatim.

@@ -528,8 +528,8 @@ def _describe_token(status: f1tv.TokenStatus) -> str:
 
 def _explain(exc: BaseException) -> tuple[str, str] | None:
     """(title, what-to-do) for failures with a known cause, else None."""
-    if isinstance(exc, f1tv.F1TVAuthError):
-        return "FastF1 couldn't sign in to F1TV", str(exc)
+    if isinstance(exc, f1tv.F1AccessError):
+        return exc.summary, str(exc)
     if isinstance(exc, fastf1_client.SessionDataUnavailable):
         return "No FastF1 data for this session", str(exc)
     if isinstance(exc, RateLimitExceededError):

@@ -51,9 +51,10 @@ def load_session(year: int, rnd: int, session: str = "R",
     we stop attempting further network loads this run (returning None) instead of
     crashing, so partial builds degrade gracefully.
 
-    Raises :class:`~formation_sim.data.f1tv.F1TVAuthError` when the session came back
-    empty because FastF1 couldn't sign in to F1TV. That's a setup problem that would
-    otherwise silently empty every uncached load, not a missing race.
+    Raises :class:`~formation_sim.data.f1tv.F1AccessError` when the session came back
+    empty because FastF1 can't reach F1's archive from here (no F1TV sign-in, or a
+    blocked IP). That's a setup problem that would otherwise silently empty every
+    uncached load, not a missing race.
     """
     global _RATE_LIMITED
     ensure_cache()
@@ -66,7 +67,7 @@ def load_session(year: int, rnd: int, session: str = "R",
     except Exception:
         return None
     if not has_laps(ses):
-        f1tv.raise_if_auth_problem()
+        f1tv.raise_if_access_problem(year)
         return None
     return ses
 

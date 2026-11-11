@@ -173,7 +173,7 @@ def _load_sessions(season: int, rounds: list[int]) -> list:
                 r,
             )
             raise
-        except fastf1_client.F1TVAuthError:
+        except fastf1_client.F1AccessError:
             raise  # a setup problem: every later round would fail the same way
         except Exception as exc:  # noqa: BLE001 - one bad round shouldn't sink the job
             logger.warning(

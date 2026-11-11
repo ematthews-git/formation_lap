@@ -250,24 +250,30 @@ Copy `.env.example` to `.env` to get started.
   per job, configured from the repo's `.env`). F1's livetiming API blocks datacenter IPs, so
   `.github/workflows/scheduled-data.yml` is now a manual `workflow_dispatch` fallback only.
 
-### F1TV sign-in (FastF1)
+### F1TV sign-in and IP blocking (FastF1)
 
-Since mid-October 2026 F1's timing archive (`livetiming.formula1.com/static`) returns
-**401** unless the request carries an F1TV token, so FastF1 (>= 3.9) needs an **F1TV
-Access (or higher)** account. Tokens last about four days.
+Two separate gates sit in front of F1's timing archive (`livetiming.formula1.com/static`):
+
+1. **IP block:** F1's CDN returns **403** to datacenter and cloud IP ranges (GitHub
+   Actions, the Oracle VM) before it checks any token, so signing in can't get around it.
+   FastF1 jobs have to run from a residential connection, which is why they run on the
+   MacBook.
+2. **F1TV token:** since mid-October 2026 everything else returns **401** without an
+   F1TV token, so FastF1 (>= 3.9) needs an **F1TV Access (or higher)** account. Tokens
+   last about four days.
 
 - **Locally:** `uv run --package formation-data formation-data f1tv login` prompts for
   the account and stores a token. Check it with `formation-data f1tv status`.
-- **Unattended jobs:** set `F1_USERNAME` and `F1_PASSWORD` (in `.env` for
-  `run-data-job.sh`, as repo secrets for the dispatch workflow) and FastF1 signs in again
-  on its own whenever the token runs out. `run-data-job.sh` keeps the token in
-  `fastf1_auth/` (gitignored) so each container reuses it; `run-data-job.sh f1tv-login`
-  signs in interactively instead.
+- **Unattended jobs:** put `F1_USERNAME` and `F1_PASSWORD` in the MacBook's `.env`, and
+  FastF1 signs in again on its own whenever the token runs out. `run-data-job.sh` keeps
+  the token in `fastf1_auth/` (gitignored) so each container reuses it;
+  `run-data-job.sh f1tv-login` signs in interactively instead.
 
-If FastF1 can't sign in, jobs stop with an `F1TV sign-in required` error instead of
-reporting the race as unpublished. `run-post-race` still saves results and standings
-(they come from Jolpica) and fetches the missing FastF1 data (lap records, laps, race
-traces) on the next run after signing in.
+When a FastF1 load comes back empty, the jobs check which gate failed. They stop with
+`FastF1 couldn't sign in to F1TV` or `F1 is blocking this machine's IP address` rather
+than reporting the race as unpublished. `run-post-race` still saves results and
+standings (they come from Jolpica), and fetches the missing FastF1 data (lap records,
+laps, race traces) on a later run once the problem is fixed.
 
 ## Development
 

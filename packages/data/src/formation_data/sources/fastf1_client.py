@@ -18,11 +18,11 @@ from functools import lru_cache
 import pandas as pd
 from formation_sim.data import f1tv
 from formation_sim.data.collector import has_laps
-from formation_sim.data.f1tv import F1TVAuthError
+from formation_sim.data.f1tv import F1AccessError, F1BlockedIPError, F1TVAuthError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["F1TVAuthError", "SessionDataUnavailable"]
+__all__ = ["F1AccessError", "F1BlockedIPError", "F1TVAuthError", "SessionDataUnavailable"]
 
 
 class SessionDataUnavailable(Exception):
@@ -58,13 +58,14 @@ def load_session(
     logs warnings and leaves the session empty, so the real problem only shows up
     later as a confusing ``DataNotLoadedError``. This checks straight away instead:
 
-    - F1TVAuthError: no F1TV sign-in. A setup problem, so don't swallow it.
+    - F1AccessError: this machine can't reach F1's archive. Either F1TVAuthError (no
+      sign-in) or F1BlockedIPError (datacenter IP). A setup problem, so don't swallow it.
     - SessionDataUnavailable: signed in, but there's no data for this session yet.
     """
     session = fastf1.get_session(season, round_number, session_name)
     session.load(laps=True, telemetry=telemetry, weather=weather, messages=messages)
     if not has_laps(session):
-        f1tv.raise_if_auth_problem()
+        f1tv.raise_if_access_problem(season)
         event = ""
         try:
             event = str(session.event["EventName"])
@@ -186,7 +187,7 @@ def get_event_sessions(
 def get_race_session(season: int, round_number: int):
     """Return a FastF1 race session, loaded with laps + results + messages.
 
-    Raises F1TVAuthError / SessionDataUnavailable (see `load_session`).
+    Raises F1AccessError / SessionDataUnavailable (see `load_session`).
     """
 
     session = load_session(season, round_number, "R", messages=True)
@@ -233,7 +234,7 @@ def get_session_results(
 
     try:
         session = load_session(season, round_number, session_name)
-    except F1TVAuthError:
+    except F1AccessError:
         raise  # a setup problem, not "not published yet". Retrying won't fix it.
     except SessionDataUnavailable as exc:
         logger.info("get_session_results: %s", exc)

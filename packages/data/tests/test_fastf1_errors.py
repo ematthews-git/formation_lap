@@ -18,8 +18,9 @@ from formation_data.sources import fastf1_client
 
 _NO_CREDS = "No F1 account credentials available. Set F1_USERNAME and F1_PASSWORD."
 
-# Captured at import, before conftest's autouse fixture stubs it for each test.
+# Captured at import, before conftest's autouse fixture stubs them for each test.
 _real_auth_problem = f1tv.auth_problem
+_real_probe_archive = f1tv.probe_archive
 
 
 class _EmptySession:
@@ -72,6 +73,53 @@ def test_load_session_signed_in_but_no_data_is_unavailable(empty_session):
     assert "2026 R18 R (United States Grand Prix)" in str(err.value)
 
 
+def test_blocked_ip_reported_even_when_signed_in(monkeypatch, empty_session):
+    # Datacenter IPs get a CDN 403 before the token is checked. Without the probe this
+    # would be misreported as "not published yet".
+    monkeypatch.setattr(f1tv, "probe_archive", lambda season: 403)
+    with pytest.raises(fastf1_client.F1BlockedIPError) as err:
+        fastf1_client.load_session(2026, 18, "R")
+    assert isinstance(err.value, fastf1_client.F1AccessError)
+    assert "residential connection" in str(err.value)
+
+
+def test_token_rejected_by_archive_is_an_auth_error(monkeypatch, empty_session):
+    monkeypatch.setattr(f1tv, "probe_archive", lambda season: 401)
+    with pytest.raises(fastf1_client.F1TVAuthError) as err:
+        fastf1_client.load_session(2026, 18, "R")
+    assert "subscription" in str(err.value)
+
+
+def test_archive_probe_runs_once_per_season(monkeypatch):
+    calls: list[int] = []
+    monkeypatch.setattr(f1tv, "probe_archive", lambda season: calls.append(season) or 200)
+    assert f1tv.access_problem(2026) is None
+    assert f1tv.access_problem(2026) is None
+    assert f1tv.access_problem(2025) is None
+    assert calls == [2026, 2025]
+
+
+def test_probe_archive_sends_token_and_survives_network_errors(monkeypatch):
+    token = SimpleNamespace(authorization_header="Bearer abc")
+    monkeypatch.setattr(f1tv.f1account.token_manager, "get_stored", lambda: token)
+    seen = {}
+
+    def fake_get(url, headers, timeout):
+        seen.update(url=url, headers=headers)
+        return SimpleNamespace(status_code=403, close=lambda: None)
+
+    monkeypatch.setattr(f1tv.requests, "get", fake_get)
+    assert _real_probe_archive(2026) == 403
+    assert seen["url"] == "https://livetiming.formula1.com/static/2026/Index.json"
+    assert seen["headers"] == {"Authorization": "Bearer abc"}
+
+    def broken_get(*_a, **_k):
+        raise f1tv.requests.ConnectionError("offline")
+
+    monkeypatch.setattr(f1tv.requests, "get", broken_get)
+    assert _real_probe_archive(2026) is None
+
+
 def test_get_session_results_reraises_auth_but_not_unavailable(monkeypatch, empty_session):
     schedule = pd.DataFrame(
         [{"EventFormat": "conventional", "Location": "Austin", "RoundNumber": 18,
@@ -99,6 +147,12 @@ def test_lap_records_skips_unpublished_race(empty_session):
 def test_lap_records_propagates_auth_error(monkeypatch, empty_session):
     _signed_out(monkeypatch)
     with pytest.raises(fastf1_client.F1TVAuthError):
+        lap_records.run(None, circuit_id="austin", season=2026, round_number=18)
+
+
+def test_lap_records_propagates_blocked_ip(monkeypatch, empty_session):
+    monkeypatch.setattr(f1tv, "probe_archive", lambda season: 403)
+    with pytest.raises(fastf1_client.F1BlockedIPError):
         lap_records.run(None, circuit_id="austin", season=2026, round_number=18)
 
 
@@ -219,3 +273,21 @@ def test_main_prints_short_message_for_auth_error(monkeypatch, capsys):
     assert "Error: FastF1 couldn't sign in to F1TV" in err
     assert "formation-data f1tv login" in err
     assert "Traceback" not in err
+
+
+def test_main_prints_short_message_for_blocked_ip(monkeypatch, capsys):
+    monkeypatch.setattr(cli.fastf1_client, "enable_cache", lambda: None)
+    monkeypatch.setattr(cli, "_verbose", False)
+
+    def boom():
+        raise fastf1_client.F1BlockedIPError()
+
+    monkeypatch.setattr(cli.orchestrator, "run_post_race_for_last_weekend", boom)
+    monkeypatch.setattr("sys.argv", ["formation-data", "run-post-race"])
+
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main()
+    assert exit_info.value.code == 1
+    err = capsys.readouterr().err
+    assert "Error: F1 is blocking this machine's IP address" in err
+    assert "403 Forbidden" in err

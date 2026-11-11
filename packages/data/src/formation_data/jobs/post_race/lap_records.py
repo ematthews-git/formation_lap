@@ -31,12 +31,13 @@ logger = logging.getLogger(__name__)
 def run(conn: Connection, *, circuit_id: str, season: int, round_number: int) -> None:
     """Update `circuit_id`'s lap record if `season` R`round_number` beat it.
 
-    Raises F1TVAuthError when FastF1 can't sign in. That's a setup problem the caller
-    has to surface, not a per-race hiccup to skip.
+    Raises F1AccessError when FastF1 can't reach F1's archive (not signed in, or the IP
+    is blocked). That's a setup problem the caller has to surface, not a per-race
+    hiccup to skip.
     """
     try:
         session = fastf1_client.get_race_session(season, round_number)
-    except fastf1_client.F1TVAuthError:
+    except fastf1_client.F1AccessError:
         raise
     except fastf1_client.SessionDataUnavailable as exc:
         logger.warning("post_race.lap_records.run: %s Skipping the lap-record check.", exc)

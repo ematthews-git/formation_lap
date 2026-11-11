@@ -37,7 +37,7 @@ from formation_data.jobs.pre_season import (
 )
 from formation_data.jobs.static import circuits as static_circuits
 from formation_data.sources import jolpica_client
-from formation_data.sources.fastf1_client import F1TVAuthError
+from formation_data.sources.fastf1_client import F1AccessError
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +200,8 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
        on what's missing, not on this run's weekends, so a race FastF1 couldn't serve
        last time (unpublished, rate-limited, signed out) is picked up again.
 
-    Raises F1TVAuthError (after stage 1 has committed) if FastF1 can't sign in.
+    Raises F1AccessError (after stage 1 has committed) if FastF1 can't reach F1's
+    archive: not signed in to F1TV, or this machine's IP is blocked.
     """
     today = today or date.today()
     with connection_scope() as conn:
@@ -274,11 +275,12 @@ def _refresh_fastf1_data(season: int) -> None:
     for i, (s, rnd, circuit_id) in enumerate(todo):
         try:
             _refresh_fastf1_race(s, rnd, circuit_id)
-        except F1TVAuthError:
+        except F1AccessError as exc:
             logger.error(
-                "run_post_race: stopped, FastF1 can't sign in to F1TV. Results and "
-                "standings are saved; FastF1 data for %s %s is still missing and will be "
-                "fetched on the next run after signing in.",
+                "run_post_race: stopped (%s). Results and standings are saved; FastF1 data "
+                "for %s %s is still missing and will be fetched on the next run once "
+                "that's fixed.",
+                exc.summary,
                 s,
                 ", ".join(f"R{r}" for _, r, _ in todo[i:]),
             )
@@ -297,7 +299,7 @@ def _refresh_fastf1_race(season: int, rnd: int, circuit_id: str) -> None:
     """Lap record, laps frame and race trace for one race, each in its own transaction.
 
     Every step is best-effort and idempotent, and anything missing is retried next run,
-    except F1TVAuthError, which stops the run because every later race would fail too.
+    except F1AccessError, which stops the run because every later race would fail too.
     """
     from formation_data import artifact_store
     from formation_data.jobs.pre_season import race_traces
@@ -324,7 +326,7 @@ def _refresh_fastf1_race(season: int, rnd: int, circuit_id: str) -> None:
         try:
             with connection_scope() as conn:
                 stored = step(conn)
-        except F1TVAuthError:
+        except F1AccessError:
             raise
         except Exception:
             logger.exception(

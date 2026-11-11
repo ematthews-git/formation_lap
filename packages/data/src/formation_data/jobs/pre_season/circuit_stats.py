@@ -78,7 +78,7 @@ def run(conn: Connection, *, season: int) -> None:
 def _race_or_none(season: int, round_number: int):
     """The race session, or None (logged) when FastF1 has no data for it.
 
-    F1TVAuthError and RateLimitExceededError still propagate, since both stop the run.
+    F1AccessError and RateLimitExceededError still propagate, since both stop the run.
     """
     try:
         return fastf1_client.get_race_session(season, round_number)
