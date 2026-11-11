@@ -61,6 +61,14 @@ jobs:
             set -e
             cd ~/formation_lap
             git pull --ff-only          # refresh docker-compose.prod.yml / config
-            docker compose -f docker-compose.prod.yml pull api
+            # The image is public, so pull it anonymously through a throwaway Docker config.
+            # Otherwise a stale ghcr.io login stored on the VM gets the pull "denied"
+            # (it did, Nov 2026), and the VM's own credentials are left untouched.
+            # Plain `docker pull`, not `compose pull`: an empty DOCKER_CONFIG can hide a
+            # per-user compose plugin. `up -d` then recreates api from the new image.
+            IMAGE=$(docker compose -f docker-compose.prod.yml config --images api)
+            PULL_CONFIG=$(mktemp -d)
+            trap 'rm -rf "$PULL_CONFIG"' EXIT
+            DOCKER_CONFIG="$PULL_CONFIG" docker pull "$IMAGE"
             docker compose -f docker-compose.prod.yml up -d api
             docker image prune -f       # drop dangling images (keeps :sha tags)
