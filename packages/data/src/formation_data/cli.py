@@ -461,9 +461,75 @@ def derived_dump_laps(
 
 
 @db_app.command("upgrade")
-def db_upgrade() -> None:
-    """Apply the schema to DATABASE_URL (idempotent; safe on fresh or existing DBs)."""
-    db.upgrade()
+def db_upgrade(
+    to: str = typer.Option("head", "--to", help="Revision to upgrade to."),
+) -> None:
+    """Apply pending migrations to DATABASE_URL. Safe to re-run.
+
+    A database built before migrations is adopted first: brought to the baseline shape,
+    checked against it, and stamped. If it doesn't match, nothing changes and the
+    differences are listed."""
+    from formation_data import migrate
+
+    before, after = migrate.upgrade(to)
+    if before == after:
+        typer.echo(f"Database already at {after}.")
+    else:
+        typer.echo(f"Database upgraded: {before or 'empty'} -> {after}.")
+
+
+@db_app.command("downgrade")
+def db_downgrade(
+    to: str = typer.Option(..., "--to", help="Revision to step back to, or 'base' to drop every table."),
+) -> None:
+    """Step DATABASE_URL back to an earlier revision. Drops whatever later revisions added."""
+    from formation_data import migrate
+
+    before, after = migrate.downgrade(to)
+    typer.echo(f"Database downgraded: {before} -> {after or 'base'}.")
+
+
+@db_app.command("revision")
+def db_revision(
+    message: str = typer.Option(..., "-m", "--message", help="What the revision changes."),
+    empty: bool = typer.Option(
+        False, "--empty", help="Write an empty revision instead of autogenerating one."
+    ),
+) -> None:
+    """Write a migration for the changes in schema.py, compared against DATABASE_URL.
+
+    DATABASE_URL must be at the newest revision (run `db upgrade` first). Review the file
+    before committing: autogenerate writes a rename as a drop plus an add."""
+    from formation_data import migrate
+
+    path = migrate.revision(message, autogenerate=not empty)
+    typer.echo(f"Wrote {path}")
+
+
+@db_app.command("current")
+def db_current() -> None:
+    """Show which revision DATABASE_URL is at, and the newest one available."""
+    from formation_data import migrate
+
+    with connection_scope() as conn:
+        current = migrate.current_revision(conn)
+    head = migrate.head_revision()
+    state = "up to date" if current == head else "behind; run `formation-data db upgrade`"
+    typer.echo(f"Database at {current or 'none'}, newest is {head} ({state}).")
+
+
+@db_app.command("check")
+def db_check() -> None:
+    """Fail if schema.py has changes that no migration covers yet."""
+    from formation_data import migrate
+
+    diffs = migrate.check()
+    if diffs:
+        typer.echo("schema.py differs from the migrations. Run `formation-data db revision -m ...`:")
+        for d in diffs:
+            typer.echo(f"  {d}")
+        raise typer.Exit(code=1)
+    typer.echo("schema.py and the migrations agree.")
 
 
 # --- F1TV sign-in ---
@@ -530,6 +596,10 @@ def _explain(exc: BaseException) -> tuple[str, str] | None:
     """(title, what-to-do) for failures with a known cause, else None."""
     if isinstance(exc, f1tv.F1AccessError):
         return exc.summary, str(exc)
+    from formation_data.migrate import MigrationError
+
+    if isinstance(exc, MigrationError):
+        return "Database migration stopped", str(exc)
     if isinstance(exc, fastf1_client.SessionDataUnavailable):
         return "No FastF1 data for this session", str(exc)
     if isinstance(exc, RateLimitExceededError):

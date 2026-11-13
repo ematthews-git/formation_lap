@@ -79,7 +79,9 @@ formation-lap/                # uv workspace root
 │   │       ├── cli.py                # Typer CLI — one subcommand per job + orchestrator flows
 │   │       ├── db.py                 # sync engine + connection_scope() context manager
 │   │       ├── domain.py             # Pydantic v2 models (shared with the API)
-│   │       ├── schema.py             # SQLAlchemy Core table defs
+│   │       ├── schema.py             # SQLAlchemy Core table defs (source of truth for the DB shape)
+│   │       ├── migrate.py            # Alembic, driven by `formation-data db ...`
+│   │       ├── migrations/versions/  # one revision per schema change (0001 = baseline)
 │   │       ├── repositories.py       # generic upsert() + per-table read helpers
 │   │       ├── orchestrator.py       # scheduled flows (pre-season / pre-race / post-race / post-session)
 │   │       ├── sources/              # external API adapters (fastf1, jolpica, weather)
@@ -108,7 +110,8 @@ formation-lap/                # uv workspace root
 ## Data model
 
 Seventeen tables, all keyed by a `UniqueConstraint` for upsert conflict resolution. The
-schema lives in `schema.py`, mirrored by the Pydantic models in `domain.py`.
+schema lives in `schema.py`, mirrored by the Pydantic models in `domain.py`, and is applied
+by Alembic migrations (see [Schema changes](#schema-changes)).
 
 | Table | Purpose | Upsert key |
 |---|---|---|
@@ -204,8 +207,8 @@ docker compose up -d db
 # plain `uv sync` does not)
 uv sync --all-packages
 
-# Create tables (Postgres must be running; the engine is created lazily)
-uv run python -c "from formation_data.schema import metadata; from formation_data.db import get_engine; metadata.create_all(get_engine())"
+# Create or update the tables (Postgres must be running). Safe to re-run.
+uv run formation-data db upgrade
 
 # Seed static data + a season (idempotent upserts)
 uv run formation-data circuits seed
@@ -284,6 +287,32 @@ uv sync --all-packages
 uv run ruff check .
 uv run pytest packages/data/tests
 ```
+
+### Schema changes
+
+`schema.py` is the source of truth for the database's shape, and Alembic applies it. Every
+change to `schema.py` ships with a revision in `packages/data/src/formation_data/migrations/versions/`:
+
+```bash
+# 1. edit schema.py (and domain.py)
+# 2. with your local database at the newest revision, autogenerate the revision
+uv run formation-data db upgrade
+uv run formation-data db revision -m "add grid to race_results"
+# 3. read the generated file: autogenerate writes a rename as a drop plus an add, and
+#    never drops a table. Fix it by hand where needed, then apply it locally
+uv run formation-data db upgrade
+uv run formation-data db check        # confirms schema.py and the migrations agree
+```
+
+Other commands: `db current` (which revision a database is at) and `db downgrade --to <rev>`.
+Every command targets `DATABASE_URL`. To migrate production, point it at Supabase for that
+one command, e.g. `uv run --env-file .env formation-data db upgrade`.
+
+Databases built before migrations (by `create_all`) have no `alembic_version` table. Their
+first `db upgrade` adopts them: it applies the last of the old fix-ups (missing tables, the
+`strategies` sim columns, and dropping ten `circuit_stats` columns the simulator replaced),
+checks the result matches revision `0001` exactly, and stamps it. If anything else differs,
+it changes nothing and lists the differences.
 
 ## External data sources
 

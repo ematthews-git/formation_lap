@@ -2,6 +2,11 @@
 
 Domain types live in `formation_data.domain` (Pydantic). Repositories in
 `formation_data.repositories`.
+
+This module is the source of truth for the database's shape. Changing it needs a
+matching Alembic revision in `formation_data/migrations/versions/`: generate one with
+`formation-data db revision -m "..."` and review it before committing. The migration
+test fails while the two disagree.
 """
 
 from __future__ import annotations
@@ -18,12 +23,27 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    Text,
     UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
-metadata = MetaData()
+# Postgres's own default constraint names, made explicit. Migrations drop and alter
+# constraints by name, so the names have to be predictable rather than left to the
+# database. These match what Postgres chose for every constraint `create_all` built
+# before Alembic was adopted, so existing databases already carry these names.
+# Postgres truncates names over 63 characters differently from SQLAlchemy; pass an
+# explicit `name=` for a constraint that long.
+NAMING_CONVENTION = {
+    "pk": "%(table_name)s_pkey",
+    "fk": "%(table_name)s_%(column_0_N_name)s_fkey",
+    "uq": "%(table_name)s_%(column_0_N_name)s_key",
+    "ix": "%(table_name)s_%(column_0_N_name)s_idx",
+    "ck": "%(table_name)s_%(constraint_name)s_check",
+}
+
+metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 circuits = Table(
@@ -51,7 +71,7 @@ circuits = Table(
     # SVG path (viewBox 0 0 400 248) of the circuit outline, generated from
     # FastF1 fastest-lap telemetry by jobs.pre_season.track_maps. Nullable:
     # new venues without prior telemetry stay null until backfilled.
-    Column("track_outline", String, nullable=True),
+    Column("track_outline", Text, nullable=True),
 )
 
 
