@@ -13,11 +13,13 @@ from __future__ import annotations
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     LargeBinary,
     MetaData,
@@ -82,7 +84,7 @@ lap_records = Table(
     Column(
         "circuit_id", ForeignKey("circuits.circuit_id"), nullable=False, unique=True
     ),
-    Column("driver", String, nullable=False),
+    Column("driver_id", ForeignKey("drivers.driver_id"), nullable=False),
     Column("year", Integer, nullable=False),
     Column("lap_time_seconds", Float, nullable=False),
 )
@@ -106,16 +108,67 @@ circuit_stats = Table(
 )
 
 
+# A team's lineage across rebrands: the entry that was Toro Rosso, AlphaTauri, RB and is
+# now Racing Bulls is one team. `team_id` is our own key, named after the current entry,
+# and it names the frontend's colour token (`--team-<team_id>`).
+teams = Table(
+    "teams",
+    metadata,
+    Column("team_id", String(30), primary_key=True),
+    Column("name", String, nullable=False),  # current name, e.g. "Racing Bulls"
+)
+
+
+# What a team was called in one season, and the key each source uses for it then, the
+# same pattern as circuits' jolpica_id / fastf1_location. Ingest resolves a source's team
+# through these keys, and an unknown key is an error to fix in the teams seed
+# (jobs.static.teams), not a new spelling. fastf1_name is NULL where FastF1's name for
+# that season isn't on file (2020, which no stored race trace covers).
+team_seasons = Table(
+    "team_seasons",
+    metadata,
+    Column("team_id", ForeignKey("teams.team_id"), primary_key=True),
+    Column("season", Integer, primary_key=True),
+    Column("name", String, nullable=False),  # that season's name, e.g. "AlphaTauri"
+    Column("jolpica_id", String(50), nullable=False),  # Jolpica constructorId
+    Column("fastf1_name", String, nullable=True),  # FastF1 TeamName
+    UniqueConstraint("season", "jolpica_id"),
+    UniqueConstraint("season", "fastf1_name"),
+)
+
+
+# One row per person. driver_id is Jolpica's driverId ("max_verstappen", "leclerc"): it's
+# stable, already unique across every season (Mick and Michael Schumacher are
+# "mick_schumacher" and "michael_schumacher"), and every Jolpica payload carries it, so
+# ingest can add a driver it hasn't seen without curating anything. FastF1 identifies
+# drivers by `code`, which is only unique within a season (both Schumachers are MSC).
 drivers = Table(
     "drivers",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("driver_id", String(10), nullable=False),
-    Column("full_name", String, nullable=False),
-    Column("nationality", String, nullable=False),
-    Column("team", String, nullable=False),
+    Column("driver_id", String(50), primary_key=True),
+    Column("given_name", String, nullable=False),
+    Column("family_name", String, nullable=False),
+    Column("code", String(3), nullable=True),
+    Column("nationality", String, nullable=True),
+)
+
+
+# Who is entered for which team: the season's grid, as announced (jobs.static.drivers).
+# Dated so a mid-season swap is two rows, and dates rather than rounds so a calendar
+# renumber can't move a seat. valid_to NULL = to the end of the season. Who actually
+# drove in each race, substitutes included, is in race_results.
+seats = Table(
+    "seats",
+    metadata,
+    Column("driver_id", ForeignKey("drivers.driver_id"), primary_key=True),
+    Column("valid_from", Date, primary_key=True),
+    Column("valid_to", Date, nullable=True),
+    Column("team_id", String(30), nullable=False),
     Column("season", Integer, nullable=False),
-    UniqueConstraint("driver_id", "season"),
+    ForeignKeyConstraint(
+        ["team_id", "season"], ["team_seasons.team_id", "team_seasons.season"]
+    ),
+    CheckConstraint("valid_to > valid_from", name="valid_range"),
 )
 
 
@@ -139,9 +192,9 @@ race_weekends = Table(
     Column("soft_compound", String(5), nullable=True),
     Column("medium_compound", String(5), nullable=True),
     Column("hard_compound", String(5), nullable=True),
-    # Every race from 2020 on, not just the current calendar: race_results, race_traces and
-    # race_overtakes reference these rows, so season, round and circuit live only here and
-    # a mid-season renumber (calendar_sync) changes one row.
+    # Every race from 2020 on, not just the current calendar: race results, standings, race
+    # traces and overtakes reference these rows, so season, round and circuit live only
+    # here and a mid-season renumber (calendar_sync) changes one row.
     # Keyed on (season, round_number), not (circuit_id, season): double-header
     # seasons (2020: Red Bull Ring, Silverstone, Bahrain ×2) visit a circuit twice.
     UniqueConstraint("season", "round_number"),
@@ -341,30 +394,39 @@ race_overtakes = Table(
 
 
 # Official finishing order (Jolpica, the Monday after the race). Season, round and circuit
-# come from the race weekend.
+# come from the race weekend. team_id is the team the driver raced for in that race; its
+# name that season is in team_seasons.
 race_results = Table(
     "race_results",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
     Column("position", Integer, nullable=False),
-    Column("driver_id", String, nullable=False),
-    Column("team", String, nullable=False),
+    Column("driver_id", ForeignKey("drivers.driver_id"), nullable=False),
+    Column("team_id", ForeignKey("teams.team_id"), nullable=False),
     UniqueConstraint("race_weekend_id", "position"),
+    UniqueConstraint("race_weekend_id", "driver_id"),
 )
 
 
-standings = Table(
-    "standings",
+# Championship standings after a race, one table per championship.
+driver_standings = Table(
+    "driver_standings",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("season", Integer, nullable=False),
-    Column("after_round", Integer, nullable=False),
-    Column("type", String(15), nullable=False),
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), primary_key=True),
+    Column("driver_id", ForeignKey("drivers.driver_id"), primary_key=True),
     Column("position", Integer, nullable=False),
-    Column("name", String, nullable=False),
     Column("points", Float, nullable=False),
-    UniqueConstraint("season", "after_round", "type", "position"),
+)
+
+
+constructor_standings = Table(
+    "constructor_standings",
+    metadata,
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), primary_key=True),
+    Column("team_id", ForeignKey("teams.team_id"), primary_key=True),
+    Column("position", Integer, nullable=False),
+    Column("points", Float, nullable=False),
 )
 
 
@@ -400,7 +462,10 @@ __all__ = [
     "circuits",
     "lap_records",
     "circuit_stats",
+    "teams",
+    "team_seasons",
     "drivers",
+    "seats",
     "race_weekends",
     "sessions",
     "weather_forecasts",
@@ -411,6 +476,7 @@ __all__ = [
     "session_results",
     "race_traces",
     "race_results",
-    "standings",
+    "driver_standings",
+    "constructor_standings",
     "derived_artifacts",
 ]

@@ -51,23 +51,29 @@ export interface Session {
   top_finishers: SessionFinisher[]
 }
 
-export interface Driver {
-  id: number | null
-  driver_id: string
+/** A driver on a season's grid, with the seat they hold. */
+export interface GridDriver {
+  driver_id: string // Jolpica's driverId, e.g. "max_verstappen"
+  given_name: string
+  family_name: string
   full_name: string
-  nationality: string
-  team: string
+  code: string | null
+  nationality: string | null
+  team_id: string // lineage key, e.g. "racing_bulls"; see teamColor
+  team: string // the team's name that season
   season: number
 }
 
 export interface Standing {
-  id: number | null
+  race_weekend_id: number
   season: number
   after_round: number
   type: 'driver' | 'constructor'
   position: number
-  name: string
+  name: string // driver's full name, or the team's name that season
   points: number
+  driver_id: string | null // drivers' championship
+  team_id: string | null // constructors' championship
 }
 
 export interface RaceResult {
@@ -78,7 +84,11 @@ export interface RaceResult {
   round_number: number
   position: number
   driver_id: string
-  team: string
+  given_name: string
+  family_name: string
+  code: string | null
+  team_id: string
+  team: string // the team's name that season
 }
 
 export interface CircuitStats {
@@ -143,7 +153,9 @@ export interface CircuitRaceStats {
 export interface LapRecord {
   id: number | null
   circuit_id: string
-  driver: string
+  driver_id: string
+  given_name: string
+  family_name: string
   year: number
   lap_time_seconds: number
 }
@@ -165,6 +177,8 @@ export interface RaceTraceDriver {
   code: string
   /** Team the driver raced for in THAT event — a period-correct snapshot. */
   team: string
+  /** That team's lineage key, added by the API; null if the name isn't on file. */
+  team_id: string | null
   second_car: boolean
   finish_pos: number
   classified: boolean

@@ -174,12 +174,9 @@ def plan_calendar(existing: list[RaceWeekend], desired: list[RaceWeekend]) -> Ca
 # Tables still keyed on the *official* round number at write time, as (table, season col,
 # round col). If a weekend's round changes while rows already exist under its old round, those
 # rows would silently describe a different race afterwards — so reconcile refuses rather than
-# guess. race_results, race_traces and race_overtakes reference the weekend's id instead, so a
-# renumber carries them along.
-_ROUND_KEYED = (
-    ("standings", "season", "after_round"),
-    ("derived_artifacts", "year", "round_number"),
-)
+# guess. Race results, standings, traces and overtakes reference the weekend's id instead, so
+# a renumber carries them along.
+_ROUND_KEYED = (("derived_artifacts", "year", "round_number"),)
 
 
 def _round_keyed_data(conn: Connection, season: int, round_number: int) -> list[str]:
@@ -214,7 +211,7 @@ def reconcile_calendar(
     written. Returns the plan either way.
 
     Raises `CalendarConflict` — before writing anything — if a renumbered weekend already
-    has round-keyed data (results, standings, traces, ...) stored under its old round.
+    has round-keyed data (the simulator's derived artifacts) stored under its old round.
     """
     existing = repositories.list_race_weekends(conn, season)
     plan = plan_calendar(existing, desired)

@@ -1,26 +1,26 @@
-"""Static job — seed the Driver table for a season from a hand-curated grid.
+"""Static job: seed a season's grid, the drivers entered and the seat each holds.
 
-Cadence: rare. Re-run when a seat changes hands. This is the v1 hand-written
-counterpart to pre_season/drivers.py, which will pull the grid from Jolpica once
-that source client is implemented.
+Cadence: once a season, when the lineups are announced, and whenever a seat changes
+hands. Run `teams seed` first: each seat names a team's row for that season.
 
-Data is hand written and reflects the 2026 grid as best known at build time.
-VERIFY before relying on it — several seats were unsettled and are flagged inline:
-  - Red Bull second seat (Tsunoda here)
-  - Racing Bulls pairing (Hadjar / Lawson here)
-  - Alpine second seat (Colapinto here)
+Drivers who race are also added from Jolpica's results as they load, so this list only
+has to cover the announced grid (which the site shows before round 1). A one-off
+substitute needs no seat; race_results records who drove each race.
 
-driver_id is a short lowercase surname (the column is String(10); Jolpica's
-"max_verstappen"-style ids would overflow). It's our own stable key, not Jolpica's.
+A mid-season swap is two seats: end the first with `valid_to` and start the next on the
+same date.
+
+Upsert keys: drivers (driver_id), seats (driver_id, valid_from).
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from sqlalchemy import Connection
 
-from formation_data.domain import Driver
+from formation_data.domain import Driver, Seat
 
 logger = logging.getLogger(__name__)
 
@@ -28,68 +28,89 @@ logger = logging.getLogger(__name__)
 def run(conn: Connection, *, season: int) -> None:
     from formation_data import repositories, schema
 
-    grid = _GRID_BY_SEASON.get(season)
-    if grid is None:
+    seats = [s for s in SEATS if s.season == season]
+    if not seats:
         logger.warning(
-            "static.drivers.run season=%s has no hand-curated grid (have: %s)",
+            "static.drivers.run season=%s has no seats on file (have: %s)",
             season,
-            sorted(_GRID_BY_SEASON),
+            sorted({s.season for s in SEATS}),
         )
         return
+    entered = {s.driver_id for s in seats}
+    repositories.upsert_drivers(conn, [d for d in DRIVERS if d.driver_id in entered])
+    repositories.upsert(conn, schema.seats, seats, ["driver_id", "valid_from"])
+    logger.info("static.drivers.run season=%s seats=%d", season, len(seats))
 
-    repositories.upsert(
-        conn, table=schema.drivers, items=grid, conflict_cols=["driver_id", "season"]
-    )
-    logger.info("static.drivers.run season=%s drivers=%d", season, len(grid))
 
-
-def _driver(driver_id: str, full_name: str, nationality: str, team: str) -> Driver:
-    # season is bound when the grid is materialised, below.
+def _driver(driver_id: str, given: str, family: str, code: str, nationality: str) -> Driver:
     return Driver(
         driver_id=driver_id,
-        full_name=full_name,
+        given_name=given,
+        family_name=family,
+        code=code,
         nationality=nationality,
-        team=team,
-        season=_SEASON,
     )
 
 
-_SEASON = 2026
-
-_DRIVERS_2026 = [
-    # McLaren
-    _driver("norris", "Lando Norris", "British", "McLaren"),
-    _driver("piastri", "Oscar Piastri", "Australian", "McLaren"),
-    # Ferrari
-    _driver("leclerc", "Charles Leclerc", "Monégasque", "Ferrari"),
-    _driver("hamilton", "Lewis Hamilton", "British", "Ferrari"),
-    # Mercedes
-    _driver("russell", "George Russell", "British", "Mercedes"),
-    _driver("antonelli", "Kimi Antonelli", "Italian", "Mercedes"),
-    # Red Bull Racing
-    _driver("verstappen", "Max Verstappen", "Dutch", "Red Bull Racing"),
-    _driver("hadjar", "Isack Hadjar", "French", "Red Bull Racing"),
-    # Aston Martin
-    _driver("alonso", "Fernando Alonso", "Spanish", "Aston Martin"),
-    _driver("stroll", "Lance Stroll", "Canadian", "Aston Martin"),
-    # Alpine
-    _driver("gasly", "Pierre Gasly", "French", "Alpine"),
-    _driver("colapinto", "Franco Colapinto", "Argentine", "Alpine"),
-    # Williams
-    _driver("albon", "Alexander Albon", "Thai", "Williams"),
-    _driver("sainz", "Carlos Sainz", "Spanish", "Williams"),
-    # Racing Bulls
-    _driver("lindblad", "Arvid Lindblad", "British", "Racing Bulls"),
-    _driver("lawson", "Liam Lawson", "New Zealander", "Racing Bulls"),
-    # Haas
-    _driver("ocon", "Esteban Ocon", "French", "Haas"),
-    _driver("bearman", "Oliver Bearman", "British", "Haas"),
-    # Audi (formerly Kick Sauber)
-    _driver("hulkenberg", "Nico Hülkenberg", "German", "Audi"),
-    _driver("bortoleto", "Gabriel Bortoleto", "Brazilian", "Audi"),
-    # Cadillac (new entry)
-    _driver("perez", "Sergio Pérez", "Mexican", "Cadillac"),
-    _driver("bottas", "Valtteri Bottas", "Finnish", "Cadillac"),
+# Names, codes and nationalities as Jolpica has them; driver_id is Jolpica's driverId.
+DRIVERS = [
+    _driver("norris", "Lando", "Norris", "NOR", "British"),
+    _driver("piastri", "Oscar", "Piastri", "PIA", "Australian"),
+    _driver("leclerc", "Charles", "Leclerc", "LEC", "Monegasque"),
+    _driver("hamilton", "Lewis", "Hamilton", "HAM", "British"),
+    _driver("russell", "George", "Russell", "RUS", "British"),
+    _driver("antonelli", "Andrea Kimi", "Antonelli", "ANT", "Italian"),
+    _driver("max_verstappen", "Max", "Verstappen", "VER", "Dutch"),
+    _driver("hadjar", "Isack", "Hadjar", "HAD", "French"),
+    _driver("alonso", "Fernando", "Alonso", "ALO", "Spanish"),
+    _driver("stroll", "Lance", "Stroll", "STR", "Canadian"),
+    _driver("gasly", "Pierre", "Gasly", "GAS", "French"),
+    _driver("colapinto", "Franco", "Colapinto", "COL", "Argentine"),
+    _driver("albon", "Alexander", "Albon", "ALB", "Thai"),
+    _driver("sainz", "Carlos", "Sainz", "SAI", "Spanish"),
+    _driver("arvid_lindblad", "Arvid", "Lindblad", "LIN", "British"),
+    _driver("lawson", "Liam", "Lawson", "LAW", "New Zealander"),
+    _driver("ocon", "Esteban", "Ocon", "OCO", "French"),
+    _driver("bearman", "Oliver", "Bearman", "BEA", "British"),
+    _driver("hulkenberg", "Nico", "Hülkenberg", "HUL", "German"),
+    _driver("bortoleto", "Gabriel", "Bortoleto", "BOR", "Brazilian"),
+    _driver("perez", "Sergio", "Pérez", "PER", "Mexican"),
+    _driver("bottas", "Valtteri", "Bottas", "BOT", "Finnish"),
 ]
 
-_GRID_BY_SEASON = {2026: _DRIVERS_2026}
+
+def _seats(season: int, pairs: list[tuple[str, str]]) -> list[Seat]:
+    start = date(season, 1, 1)
+    return [
+        Seat(driver_id=driver_id, team_id=team_id, season=season, valid_from=start)
+        for team_id, driver_id in pairs
+    ]
+
+
+SEATS = _seats(
+    2026,
+    [
+        ("mclaren", "norris"),
+        ("mclaren", "piastri"),
+        ("ferrari", "leclerc"),
+        ("ferrari", "hamilton"),
+        ("mercedes", "russell"),
+        ("mercedes", "antonelli"),
+        ("red_bull", "max_verstappen"),
+        ("red_bull", "hadjar"),
+        ("aston_martin", "alonso"),
+        ("aston_martin", "stroll"),
+        ("alpine", "gasly"),
+        ("alpine", "colapinto"),
+        ("williams", "albon"),
+        ("williams", "sainz"),
+        ("racing_bulls", "arvid_lindblad"),
+        ("racing_bulls", "lawson"),
+        ("haas", "ocon"),
+        ("haas", "bearman"),
+        ("audi", "hulkenberg"),
+        ("audi", "bortoleto"),
+        ("cadillac", "perez"),
+        ("cadillac", "bottas"),
+    ],
+)

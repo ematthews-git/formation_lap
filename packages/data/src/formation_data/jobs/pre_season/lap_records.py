@@ -10,6 +10,9 @@ Safety: a circuit with no fastest-lap data (new venue, or pre-2004 only) or a
 failed / rate-limited Jolpica call is logged and skipped, so one bad circuit
 doesn't sink the batch.
 
+The record holder is stored by Jolpica's driverId, and added to `drivers` if they
+aren't there yet (most records predate the seasons the site covers).
+
 Upsert key: LapRecord.circuit_id is unique.
 """
 
@@ -28,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 def run(conn: Connection) -> None:
     items: list[domain.LapRecord] = []
+    holders: list[domain.Driver] = []
     for circuit in repositories.list_circuits(conn):
         try:
             rows = jolpica_client.get_race_fastest_laps(circuit.jolpica_id)
@@ -53,10 +57,14 @@ def run(conn: Connection) -> None:
             )
             continue
 
+        holder = jolpica_client.to_driver(record["driver"])
+        holders.append(holder)
         items.append(
             domain.LapRecord(
                 circuit_id=circuit.circuit_id,
-                driver=record["driver"],
+                driver_id=holder.driver_id,
+                given_name=holder.given_name,
+                family_name=holder.family_name,
                 year=record["season"],
                 lap_time_seconds=record["seconds"],
             )
@@ -65,10 +73,11 @@ def run(conn: Connection) -> None:
             "pre_season.lap_records: %s record %.3fs %s (%s)",
             circuit.circuit_id,
             record["seconds"],
-            record["driver"],
+            holder.family_name,
             record["season"],
         )
 
+    repositories.upsert_drivers(conn, holders)
     repositories.upsert(conn, schema.lap_records, items, ["circuit_id"])
     logger.info("pre_season.lap_records.run circuits=%d", len(items))
 

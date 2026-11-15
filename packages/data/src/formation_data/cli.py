@@ -21,17 +21,12 @@ from sqlalchemy.engine import url as sa_url
 
 from formation_data import calendar_sync, db, orchestrator, repositories
 from formation_data.db import connection_scope
-from formation_data.jobs.post_race import (
-    lap_records as post_race_lap_records,
-    race_results,
-    standings,
-)
+from formation_data.jobs.post_race import race_results, standings
 from formation_data.jobs.post_session import session_results as post_session_results
 from formation_data.jobs.pre_race import sim_strategies, strategies, weather
 from formation_data.jobs.pre_season import (
     circuit_race_stats,
     circuit_stats,
-    drivers,
     lap_records as pre_season_lap_records,
     race_overtakes,
     race_traces,
@@ -43,12 +38,14 @@ from formation_data.jobs.static import (
     circuits as static_circuits,
     drivers as static_drivers,
     race_weekends as static_weekends,
+    teams as static_teams,
 )
 from formation_data.sources import fastf1_client
 
 app = typer.Typer(help="Formation Lap data loader.")
 circuits_app = typer.Typer(help="Static circuit seed.")
-drivers_app = typer.Typer(help="Driver lineup per season.")
+teams_app = typer.Typer(help="Teams and their names and source keys per season.")
+drivers_app = typer.Typer(help="Each season's grid: drivers and their seats.")
 weekends_app = typer.Typer(help="Season calendar.")
 sessions_app = typer.Typer(help="Weekend session timetable.")
 lap_records_app = typer.Typer(help="All-time race lap records.")
@@ -67,6 +64,7 @@ db_app = typer.Typer(help="Database schema management.")
 f1tv_app = typer.Typer(help="F1TV sign-in, which FastF1 needs to fetch F1 timing data.")
 
 app.add_typer(circuits_app, name="circuits")
+app.add_typer(teams_app, name="teams")
 app.add_typer(drivers_app, name="drivers")
 app.add_typer(weekends_app, name="weekends")
 app.add_typer(sessions_app, name="sessions")
@@ -121,17 +119,18 @@ def circuits_trackmap(
         track_maps.run(conn, season=season, circuit_id=circuit)
 
 
+@teams_app.command("seed")
+def teams_seed() -> None:
+    """Load the teams seed: every team and what it was called each season."""
+    with connection_scope() as conn:
+        static_teams.run(conn)
+
+
 @drivers_app.command("seed")
 def drivers_seed(season: int = typer.Option(2026)) -> None:
-    """Hand-curated grid (v1). Use `refresh` to pull from Jolpica instead."""
+    """Load a season's announced grid. Needs that season's teams (`teams seed`)."""
     with connection_scope() as conn:
         static_drivers.run(conn, season=season)
-
-
-@drivers_app.command("refresh")
-def drivers_refresh(season: int = typer.Option(...)) -> None:
-    with connection_scope() as conn:
-        drivers.run(conn, season=season)
 
 
 _DRY_RUN_OPT = typer.Option(
@@ -327,9 +326,6 @@ def standings_refresh(
 ) -> None:
     with connection_scope() as conn:
         standings.run(conn, season=season, round_number=round)
-        # post_race.lap_records is also part of T+1, expose it via the orchestrator command;
-        # standings alone is a fine manual operation.
-        _ = post_race_lap_records  # silence unused
 
 
 @standings_app.command("backfill")
@@ -607,6 +603,10 @@ def _explain(exc: BaseException) -> tuple[str, str] | None:
         return "Database migration stopped", str(exc)
     if isinstance(exc, repositories.RaceWeekendNotFound):
         return "That race isn't in the stored calendar", str(exc)
+    if isinstance(exc, repositories.TeamNotFound):
+        return "A source named a team that isn't on file", str(exc)
+    if isinstance(exc, repositories.DriverNotFound):
+        return "A driver couldn't be identified", str(exc)
     if isinstance(exc, fastf1_client.SessionDataUnavailable):
         return "No FastF1 data for this session", str(exc)
     if isinstance(exc, RateLimitExceededError):

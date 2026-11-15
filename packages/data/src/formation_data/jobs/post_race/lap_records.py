@@ -8,8 +8,9 @@ faster, so a slow (wet / safety-car-heavy) race never overwrites a genuine recor
 
 The caller passes our ``circuit_id`` (the record's key) alongside the *official* F1
 season + round — FastF1 is addressed by the real round, which our compacted seed round
-can't provide. Driver is stored as the surname, matching the pre-season lap-record
-convention so the two sources agree.
+can't provide. FastF1 names the driver by their three-letter code, which is resolved to
+a driver who raced that season (repositories.driver_for_code), so it runs after the
+race's results have loaded.
 
 Upsert key: LapRecord.circuit_id is unique.
 """
@@ -83,14 +84,16 @@ def run(conn: Connection, *, circuit_id: str, season: int, round_number: int) ->
         )
         return
 
-    driver = _driver_surname(session, fastest["Driver"])
+    driver = repositories.driver_for_code(conn, str(fastest["Driver"]), season)
     repositories.upsert(
         conn,
         schema.lap_records,
         [
             domain.LapRecord(
                 circuit_id=circuit_id,
-                driver=driver,
+                driver_id=driver.driver_id,
+                given_name=driver.given_name,
+                family_name=driver.family_name,
                 year=season,
                 lap_time_seconds=new_seconds,
             )
@@ -101,17 +104,6 @@ def run(conn: Connection, *, circuit_id: str, season: int, round_number: int) ->
         "post_race.lap_records.run: new record at %s — %.3fs %s (%s)",
         circuit_id,
         new_seconds,
-        driver,
+        driver.family_name,
         season,
     )
-
-
-def _driver_surname(session, abbreviation: str) -> str:
-    """Resolve a FastF1 driver abbreviation to a surname (pre-season record convention).
-
-    Falls back to the abbreviation if FastF1 has no driver entry for it.
-    """
-    try:
-        return str(session.get_driver(abbreviation)["LastName"])
-    except Exception:  # noqa: BLE001 - the abbreviation is a fine fallback label
-        return str(abbreviation)

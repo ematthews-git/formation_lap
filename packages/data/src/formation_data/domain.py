@@ -40,9 +40,14 @@ class Circuit(_Base):
 
 
 class LapRecord(_Base):
+    """A circuit's race lap record. The holder's names are read from `drivers` and
+    ignored on write."""
+
     id: int | None = None
     circuit_id: str
-    driver: str
+    driver_id: str
+    given_name: str
+    family_name: str
     year: int
     lap_time_seconds: float
 
@@ -56,11 +61,54 @@ class CircuitStats(_Base):
     updated_at: datetime | None = None
 
 
+class Team(_Base):
+    """A team's lineage across rebrands; `team_id` also names its colour token."""
+
+    team_id: str
+    name: str
+
+
+class TeamSeason(_Base):
+    """What a team was called in one season, and each source's key for it then."""
+
+    team_id: str
+    season: int
+    name: str
+    jolpica_id: str
+    fastf1_name: str | None = None
+
+
 class Driver(_Base):
-    id: int | None = None
+    """One person. `driver_id` is Jolpica's driverId."""
+
     driver_id: str
+    given_name: str
+    family_name: str
+    code: str | None = None
+    nationality: str | None = None
+
+
+class Seat(_Base):
+    """A driver's entry for a team, from `valid_from` until `valid_to` (None = the end of
+    the season)."""
+
+    driver_id: str
+    team_id: str
+    season: int
+    valid_from: date
+    valid_to: date | None = None
+
+
+class GridDriver(_Base):
+    """A driver on a season's grid with the seat they hold — API read shape."""
+
+    driver_id: str
+    given_name: str
+    family_name: str
     full_name: str
-    nationality: str
+    code: str | None = None
+    nationality: str | None = None
+    team_id: str
     team: str
     season: int
 
@@ -208,7 +256,8 @@ class RaceTrace(_Base):
     `trace` carries per-lap track-status / weather / excitement / overtakes arrays plus
     every starter's lap times, pit laps and the team they drove for in that race (a
     snapshot, so lookbacks never show a driver's current team). Built by
-    formation_data.race_trace. One per race weekend; `circuit_id`, `season` and
+    formation_data.race_trace; each driver's `team_id` is added on read from the FastF1
+    team name it was built with (see repositories.list_race_traces_for_circuit). One per race weekend; `circuit_id`, `season` and
     `round_number` are read from the weekend.
     """
 
@@ -242,8 +291,12 @@ class RaceOvertakes(_Base):
 
 
 class RaceResult(_Base):
-    """One finishing position. Stored against `race_weekend_id`; `circuit_id`, `season`
-    and `round_number` are read from the weekend and ignored on write."""
+    """One finishing position, stored as (race_weekend_id, position, driver_id, team_id).
+
+    The rest is joined in on read and ignored on write: `circuit_id`, `season` and
+    `round_number` from the weekend, the driver's names from `drivers`, and `team`, the
+    team's name that season, from `team_seasons`.
+    """
 
     id: int | None = None
     race_weekend_id: int
@@ -252,17 +305,43 @@ class RaceResult(_Base):
     round_number: int
     position: int
     driver_id: str
+    given_name: str
+    family_name: str
+    code: str | None = None
+    team_id: str
     team: str
 
 
+class DriverStanding(_Base):
+    race_weekend_id: int
+    driver_id: str
+    position: int
+    points: float
+
+
+class ConstructorStanding(_Base):
+    race_weekend_id: int
+    team_id: str
+    position: int
+    points: float
+
+
 class Standing(_Base):
-    id: int | None = None
+    """One championship position after a race — API read shape for both championships.
+
+    `name` is the driver's full name or the team's name that season. `driver_id` is set
+    for the drivers' championship and `team_id` for the constructors'.
+    """
+
+    race_weekend_id: int
     season: int
     after_round: int
-    type: str
+    type: str  # "driver" | "constructor"
     position: int
     name: str
     points: float
+    driver_id: str | None = None
+    team_id: str | None = None
 
 
 class DerivedArtifact(_Base):
@@ -285,7 +364,11 @@ __all__ = [
     "Circuit",
     "LapRecord",
     "CircuitStats",
+    "Team",
+    "TeamSeason",
     "Driver",
+    "Seat",
+    "GridDriver",
     "RaceWeekend",
     "Session",
     "SessionFinisher",
@@ -300,6 +383,8 @@ __all__ = [
     "RaceTrace",
     "RaceOvertakes",
     "RaceResult",
+    "DriverStanding",
+    "ConstructorStanding",
     "Standing",
     "DerivedArtifact",
 ]

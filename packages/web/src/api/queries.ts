@@ -4,7 +4,7 @@ import type {
   Circuit,
   CircuitRaceStats,
   CircuitStats,
-  Driver,
+  GridDriver,
   LapRecord,
   RaceResult,
   RaceTrace,
@@ -37,7 +37,7 @@ export function useCircuit(circuitId: string | undefined) {
 export function useDrivers(season: number) {
   return useQuery({
     queryKey: ['drivers', season],
-    queryFn: () => api.get<Driver[]>(`/drivers/?season=${season}`),
+    queryFn: () => api.get<GridDriver[]>(`/drivers/?season=${season}`),
   })
 }
 

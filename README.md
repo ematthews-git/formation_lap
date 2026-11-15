@@ -108,6 +108,7 @@ uv run formation-data db upgrade       # create or update the tables
 
 # reference data and a season's calendar
 uv run formation-data circuits seed
+uv run formation-data teams seed
 uv run formation-data drivers seed --season 2026
 uv run formation-data weekends refresh --season 2026
 uv run formation-data sessions refresh --season 2026
@@ -181,16 +182,23 @@ migrations apply it.
 
 | Area | Tables |
 |---|---|
-| Reference | `circuits`, `lap_records`, `drivers` |
+| Reference | `circuits`, `lap_records`, `teams`, `team_seasons`, `drivers`, `seats` |
 | Calendar | `race_weekends` (every race from 2020), `sessions`, `weather_forecasts` |
-| Results and history | `race_results`, `standings`, `session_results`, `race_traces`, `race_overtakes` |
+| Results and history | `race_results`, `driver_standings`, `constructor_standings`, `session_results`, `race_traces`, `race_overtakes` |
 | Circuit analytics | `circuit_stats`, `circuit_race_stats` |
 | Strategy | `strategies`, `strategy_stints`, `sim_race_stats` |
 | Simulator cache | `derived_artifacts` (cleaned lap frames as Parquet) |
 
 A circuit is identified by `circuit_id`, never by an event name, since event names change
 between seasons. Race history references its `race_weekends` row, so a calendar renumber
-updates one row. Derived feeds whose shape is still evolving (race traces, overtakes, circuit
+updates one row.
+
+Drivers are keyed on Jolpica's `driverId`, and teams on a lineage id that stays the same
+through rebrands (`racing_bulls` covers AlphaTauri, RB and Racing Bulls). `team_seasons`
+holds each team's name and source keys per season, so results, standings and race traces
+resolve the team a source names through it, and a team that isn't there stops the load.
+A new season needs its teams added to `jobs/static/teams.py` before its first results
+load, and its announced grid to `jobs/static/drivers.py`. Derived feeds whose shape is still evolving (race traces, overtakes, circuit
 analytics, simulator output) are stored as JSONB.
 
 To change the schema, edit `schema.py`, then generate and review a migration:

@@ -9,8 +9,10 @@ the round only telling a double-header's two visits apart, so a result never lan
 wrong race if the stored calendar and Jolpica briefly disagree on numbering. Races at a
 circuit we don't seed (no `circuits` row, so no weekend) are skipped.
 
-driver_id is stored as the accent-stripped lowercase surname, matching the
-drivers seed convention so results join cleanly to drivers.
+Each result's driver is stored by Jolpica's driverId (a driver seen for the first time
+is added to `drivers`), and its team by resolving Jolpica's constructorId through
+team_seasons. A constructor that isn't on file for the season stops the load with
+TeamNotFound, rather than storing a team nothing else recognises.
 
 Upsert key: race_results (race_weekend_id, position).
 """
@@ -18,10 +20,9 @@ Upsert key: race_results (race_weekend_id, position).
 from __future__ import annotations
 
 import logging
-import unicodedata
 
 import httpx
-from sqlalchemy import Connection
+from sqlalchemy import Connection, delete
 
 from formation_data import domain, repositories, schema
 from formation_data.sources import jolpica_client
@@ -157,19 +158,39 @@ def _race_for_weekend(
 
 
 def _persist_race(conn: Connection, weekend: domain.RaceWeekend, race: dict) -> int:
-    """Upsert a race's finishing order against its weekend; returns the number of rows."""
-    items = [
-        domain.RaceResult(
-            race_weekend_id=weekend.id,
-            circuit_id=weekend.circuit_id,
-            season=weekend.season,
-            round_number=weekend.round_number,
-            position=int(r["position"]),
-            driver_id=_surname_key(r["Driver"]["familyName"]),
-            team=r["Constructor"]["name"],
+    """Upsert a race's finishing order against its weekend; returns the number of rows.
+
+    Raises TeamNotFound if Jolpica names a constructor that isn't on file for the season.
+    """
+    drivers = [jolpica_client.to_driver(r["Driver"]) for r in race["Results"]]
+    teams = {
+        cid: repositories.team_for_jolpica(conn, weekend.season, cid)
+        for cid in {r["Constructor"]["constructorId"] for r in race["Results"]}
+    }
+    repositories.upsert_drivers(conn, drivers)
+    items = []
+    for r, driver in zip(race["Results"], drivers, strict=True):
+        team = teams[r["Constructor"]["constructorId"]]
+        items.append(
+            domain.RaceResult(
+                race_weekend_id=weekend.id,
+                circuit_id=weekend.circuit_id,
+                season=weekend.season,
+                round_number=weekend.round_number,
+                position=int(r["position"]),
+                driver_id=driver.driver_id,
+                given_name=driver.given_name,
+                family_name=driver.family_name,
+                code=driver.code,
+                team_id=team.team_id,
+                team=team.name,
+            )
         )
-        for r in race["Results"]
-    ]
+    # A corrected classification can move drivers between positions; clear the race first
+    # so neither unique key (position, driver) trips over the old order.
+    conn.execute(
+        delete(schema.race_results).where(schema.race_results.c.race_weekend_id == weekend.id)
+    )
     repositories.upsert(conn, schema.race_results, items, ["race_weekend_id", "position"])
     return len(items)
 
@@ -181,10 +202,3 @@ def _circuit_id_for(conn: Connection, jolpica_id: str) -> str | None:
             return circuit.circuit_id
     return None
 
-
-def _surname_key(family_name: str) -> str:
-    """Accent-stripped lowercase surname, matching the drivers seed driver_id."""
-    stripped = "".join(
-        c for c in unicodedata.normalize("NFKD", family_name) if not unicodedata.combining(c)
-    )
-    return stripped.lower()

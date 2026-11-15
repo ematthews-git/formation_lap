@@ -3,7 +3,7 @@ import type { RaceTrace as ApiRaceTrace } from '../../api/types'
 import { Panel } from '../common/Panel'
 import { PanelHeader } from '../common/PanelHeader'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
-import { prettifyCircuit, teamColorVar } from '../../lib/format'
+import { prettifyCircuit, teamColor } from '../../lib/format'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { useElementWidth } from '../../lib/useElementWidth'
 import { useTween } from '../../lib/useTween'
@@ -66,7 +66,7 @@ const toneColor = (tone: TraceLine['tone']): string =>
   tone === 'top' ? 'var(--text-num)' : 'var(--text-muted)'
 
 const lineColor = (line: TraceLine): string =>
-  line.team ? teamColorVar(line.team) : toneColor(line.tone)
+  line.tone ? toneColor(line.tone) : teamColor(line.teamId)
 
 interface Props {
   circuitId: string | undefined
@@ -492,7 +492,8 @@ function Legend({ view, expanded }: { view: RaceTraceView; expanded: boolean }) 
       )
     : []
   const sawRain = race ? race.weather.some((w) => w !== 'dry') : false
-  const teams = race ? [...new Set(race.drivers.map((d) => d.team))] : []
+  // name → team_id, one entry per team in this race, in finishing order
+  const teams = race ? [...new Map(race.drivers.map((d) => [d.team, d.teamId])).entries()] : []
 
   return (
     <div className={styles.legend}>
@@ -510,10 +511,10 @@ function Legend({ view, expanded }: { view: RaceTraceView; expanded: boolean }) 
       )}
       {race && view.mode === 'race' && view.scope === 'all' && (
         <>
-          {teams.map((t) => (
-            <span key={t} className={styles.legendItem}>
-              <span className={styles.swatchDot} style={{ background: teamColorVar(t) }} />
-              {t.toUpperCase()}
+          {teams.map(([name, teamId]) => (
+            <span key={name} className={styles.legendItem}>
+              <span className={styles.swatchDot} style={{ background: teamColor(teamId) }} />
+              {name.toUpperCase()}
             </span>
           ))}
           <span className={styles.legendItem}>2ND CAR DASHED</span>
@@ -574,7 +575,7 @@ function Legend({ view, expanded }: { view: RaceTraceView; expanded: boolean }) 
 function DriverChip({ driver }: { driver: DriverTrace }) {
   return (
     <span className={styles.legendItem}>
-      <span className={styles.swatchDot} style={{ background: teamColorVar(driver.team) }} />
+      <span className={styles.swatchDot} style={{ background: teamColor(driver.teamId) }} />
       {driver.code}
     </span>
   )
@@ -643,7 +644,7 @@ function Tooltip({
     const t = d.lapTimes[lap - 1]
     return (
       <div key={d.code} className={styles.tipRow}>
-        <span className={styles.swatchDot} style={{ background: teamColorVar(d.team) }} />
+        <span className={styles.swatchDot} style={{ background: teamColor(d.teamId) }} />
         <span className={styles.tipCode}>{d.code}</span>
         <span className={styles.tipTime}>{t != null ? formatLapTime(t) : '—'}</span>
         {d.pitLaps.includes(lap) && <span className={styles.tipPit}>PIT</span>}

@@ -1,7 +1,7 @@
 import type { RaceResult } from '../../api/types'
 import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
-import { prettifyCircuit, teamColorVar } from '../../lib/format'
+import { prettifyCircuit, teamColor } from '../../lib/format'
 import styles from './PastResults.module.css'
 
 interface RaceGroup {
@@ -22,10 +22,6 @@ function groupRaces(results: RaceResult[]): RaceGroup[] {
     }
   }
   return groups
-}
-
-function surname(driverId: string): string {
-  return driverId.charAt(0).toUpperCase() + driverId.slice(1)
 }
 
 interface Props {
@@ -56,11 +52,11 @@ export function PastResults({ circuitId, podiums, loading, error }: Props) {
                 <div className={styles.season}>’{String(race.season).slice(-2)}</div>
                 <div className={styles.content}>
                   <div className={styles.winnerRow}>
-                    <span className={styles.winner}>{surname(winner.driver_id)}</span>
+                    <span className={styles.winner}>{winner.family_name}</span>
                     <span className={styles.team}>
                       <span
                         className={styles.teamDot}
-                        style={{ background: teamColorVar(winner.team) }}
+                        style={{ background: teamColor(winner.team_id) }}
                       />
                       {winner.team}
                     </span>
@@ -68,7 +64,7 @@ export function PastResults({ circuitId, podiums, loading, error }: Props) {
                   {runners.length > 0 && (
                     <div className={styles.runners}>
                       {runners
-                        .map((r) => `${r.position}. ${surname(r.driver_id)}`)
+                        .map((r) => `${r.position}. ${r.family_name}`)
                         .join(', ')}
                     </div>
                   )}

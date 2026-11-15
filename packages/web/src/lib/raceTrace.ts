@@ -30,8 +30,10 @@ export type WeatherState = 'dry' | 'damp' | 'wet'
 export interface DriverTrace {
   /** Three-letter driver code, e.g. "NOR". */
   code: string
-  /** Team name — feeds teamColorVar for the line colour. */
+  /** Team name that season, for the legend. */
   team: string
+  /** Team lineage key — feeds teamColor for the line colour. */
+  teamId: string | null
   /** The team's second entry — rendered dashed in the all-drivers view. */
   secondCar?: boolean
   finishPos: number
@@ -100,6 +102,7 @@ export function raceFromApi(blob: RaceTraceBlob): RaceTraceData {
     .map((d) => ({
       code: d.code,
       team: d.team,
+      teamId: d.team_id,
       secondCar: d.second_car,
       finishPos: d.finish_pos,
       lapTimes: d.lap_times,
@@ -252,9 +255,9 @@ export interface PathSegment {
 export interface TraceLine {
   /** Driver code, or "TOP 3" / "BOT 3" for the average view's mean lines. */
   id: string
-  /** Team for the line colour; null = neutral (average view). */
-  team: string | null
-  /** Which band a neutral line belongs to — picks the neutral shade. */
+  /** Team for the line colour (see teamColor); null = no team on file. */
+  teamId: string | null
+  /** Which band a neutral line belongs to — picks the neutral shade (average view). */
   tone: 'top' | 'bottom' | null
   secondCar: boolean
   segments: PathSegment[]
@@ -495,7 +498,7 @@ export function buildRaceTrace(
   /* ---- pace series to draw ---- */
   interface Row {
     id: string
-    team: string | null
+    teamId: string | null
     tone: 'top' | 'bottom' | null
     secondCar: boolean
     series: number[]
@@ -510,7 +513,7 @@ export function buildRaceTrace(
       const c = cleanPace(d, view.race.trackStatus, laps)
       return {
         id: d.code,
-        team: d.team,
+        teamId: d.teamId,
         tone: null,
         secondCar: d.secondCar ?? false,
         series: rollingMean(c.series, PACE_SMOOTH),
@@ -534,9 +537,9 @@ export function buildRaceTrace(
     const bandRows = (tone: 'top' | 'bottom', id: string, b: BandAverageSeries): Row[] => [
       // Only the mean is drawn as a line; upper/lower feed the envelope and
       // the y-domain.
-      { id, team: null, tone, secondCar: false, series: rollingMean(b.mean, PACE_SMOOTH), interp: noInterp, pitLaps: [] },
-      { id: `${id}·hi`, team: null, tone, secondCar: false, series: rollingMean(b.upper, PACE_SMOOTH), interp: noInterp, pitLaps: [] },
-      { id: `${id}·lo`, team: null, tone, secondCar: false, series: rollingMean(b.lower, PACE_SMOOTH), interp: noInterp, pitLaps: [] },
+      { id, teamId: null, tone, secondCar: false, series: rollingMean(b.mean, PACE_SMOOTH), interp: noInterp, pitLaps: [] },
+      { id: `${id}·hi`, teamId: null, tone, secondCar: false, series: rollingMean(b.upper, PACE_SMOOTH), interp: noInterp, pitLaps: [] },
+      { id: `${id}·lo`, teamId: null, tone, secondCar: false, series: rollingMean(b.lower, PACE_SMOOTH), interp: noInterp, pitLaps: [] },
     ]
     const top = bandRows('top', 'TOP 3', view.average.top3)
     const bottom = bandRows('bottom', 'BOT 3', view.average.bottom3)
@@ -597,7 +600,7 @@ export function buildRaceTrace(
     const pts = r.series.map((t, k) => ({ x: lapX(k + 1), y: paceY(t) }))
     return {
       id: r.id,
-      team: r.team,
+      teamId: r.teamId,
       tone: r.tone,
       secondCar: r.secondCar,
       segments: toSegments(pts, r.interp),

@@ -1,12 +1,12 @@
-import type { Driver, RaceResult, Standing } from '../../api/types'
+import type { GridDriver, RaceResult, Standing } from '../../api/types'
 import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
-import { teamColorVar } from '../../lib/format'
+import { teamColor } from '../../lib/format'
 import { Sparkline } from './Sparkline'
 import styles from './DriverForm.module.css'
 
 interface Props {
-  drivers: Driver[] | undefined
+  drivers: GridDriver[] | undefined
   driversLoading: boolean
   driversError: boolean
   standings: Standing[] | undefined
@@ -16,6 +16,7 @@ interface Props {
 interface Row {
   name: string
   team: string
+  teamId: string
   points: number | null
   last5: number[] // most-recent-last finishing positions
   lastFinish: number | null
@@ -34,32 +35,30 @@ function formByDriver(results: RaceResult[] | undefined): Map<string, number[]> 
   return map
 }
 
-/** WDC points by driver surname (standings.name is a full name). */
-function pointsBySurname(standings: Standing[] | undefined): Map<string, number> {
+/** WDC points by driver_id. */
+function pointsByDriver(standings: Standing[] | undefined): Map<string, number> {
   const map = new Map<string, number>()
-  if (!standings) return map
-  for (const s of standings.filter((x) => x.type === 'driver')) {
-    const surname = s.name.toLowerCase().split(' ').slice(-1)[0]
-    map.set(surname, s.points)
+  for (const s of standings ?? []) {
+    if (s.type === 'driver' && s.driver_id) map.set(s.driver_id, s.points)
   }
   return map
 }
 
 function buildRows(
-  drivers: Driver[],
+  drivers: GridDriver[],
   standings: Standing[] | undefined,
   results: RaceResult[] | undefined,
 ): Row[] {
-  const points = pointsBySurname(standings)
+  const points = pointsByDriver(standings)
   const form = formByDriver(results)
 
   const rows: Row[] = drivers.map((d) => {
-    const surname = d.full_name.toLowerCase().split(' ').slice(-1)[0]
     const finishes = form.get(d.driver_id) ?? []
     return {
       name: d.full_name,
       team: d.team,
-      points: points.get(surname) ?? null,
+      teamId: d.team_id,
+      points: points.get(d.driver_id) ?? null,
       last5: finishes.slice(-5),
       lastFinish: finishes.length ? finishes[finishes.length - 1] : null,
     }
@@ -103,13 +102,13 @@ export function DriverForm({
       ) : drivers && drivers.length > 0 ? (
         buildRows(drivers, standings, raceResults).map((row, i) => (
           <div key={row.name} className={styles.row}>
-            <span className={styles.accentBar} style={{ background: teamColorVar(row.team) }} />
+            <span className={styles.accentBar} style={{ background: teamColor(row.teamId) }} />
             <span className={styles.pos}>{String(i + 1).padStart(2, '0')}</span>
             <span className={styles.name}>{row.name}</span>
             <span className={styles.team}>{row.team}</span>
             <span className={styles.center}>
               {row.last5.length > 0 ? (
-                <Sparkline form={row.last5} color={teamColorVar(row.team)} />
+                <Sparkline form={row.last5} color={teamColor(row.teamId)} />
               ) : (
                 <span className={styles.placeholder}>—</span>
               )}

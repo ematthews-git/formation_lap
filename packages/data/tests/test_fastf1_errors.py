@@ -203,8 +203,8 @@ def test_post_race_commits_results_before_fastf1_and_surfaces_auth(monkeypatch):
 
     monkeypatch.setattr(orchestrator.race_results, "load_for_weekend", load_for_weekend)
     monkeypatch.setattr(
-        orchestrator.standings, "run",
-        lambda conn, season, round_number: committed.append(f"standings R{round_number}"),
+        orchestrator.standings, "load_for_weekend",
+        lambda conn, rw, official_round: committed.append(f"standings R{official_round}"),
     )
     monkeypatch.setattr(
         orchestrator.repositories,

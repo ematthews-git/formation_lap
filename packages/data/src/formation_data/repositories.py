@@ -1,7 +1,8 @@
 """Repository layer — generic upsert + table-specific reads.
 
 Every job writes rows the same way: build a list of domain models, then upsert
-keyed on a unique constraint. The single `upsert()` helper covers all 9 tables.
+keyed on a unique constraint. The single `upsert()` helper covers most tables;
+`upsert_drivers` and `replace_standings` add the two rules it can't express.
 
 Reads with real logic (filter by date, lookup by composite key) get their own
 small functions below — there are only a handful, so keeping them here beats
@@ -18,7 +19,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel
-from sqlalchemy import Connection, Table, and_, delete, exists, func, select
+from sqlalchemy import Connection, Table, and_, delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 
 from formation_data import domain, flexibility, schema
@@ -308,12 +309,123 @@ def upsert_session_results(
     conn.execute(stmt)
 
 
+def upsert_drivers(conn: Connection, drivers: Iterable[domain.Driver]) -> None:
+    """Add or update people, keyed on driver_id (Jolpica's driverId).
+
+    A missing code or nationality never blanks a stored one: Jolpica omits both for some
+    drivers it lists, so a later payload without them keeps what's already known.
+    """
+    payload = {d.driver_id: d.model_dump() for d in drivers}  # a race lists each once
+    if not payload:
+        return
+    table = schema.drivers
+    stmt = insert(table).values(list(payload.values()))
+    conn.execute(
+        stmt.on_conflict_do_update(
+            index_elements=["driver_id"],
+            set_={
+                "given_name": stmt.excluded.given_name,
+                "family_name": stmt.excluded.family_name,
+                "code": func.coalesce(stmt.excluded.code, table.c.code),
+                "nationality": func.coalesce(stmt.excluded.nationality, table.c.nationality),
+            },
+        )
+    )
+
+
+def replace_standings(
+    conn: Connection,
+    race_weekend_id: int,
+    drivers: list[domain.DriverStanding],
+    constructors: list[domain.ConstructorStanding],
+) -> None:
+    """Store the standings after one race, replacing whatever that race had before, so a
+    driver dropped from a corrected table doesn't linger."""
+    for table, items, key in (
+        (schema.driver_standings, drivers, "driver_id"),
+        (schema.constructor_standings, constructors, "team_id"),
+    ):
+        conn.execute(delete(table).where(table.c.race_weekend_id == race_weekend_id))
+        upsert(conn, table, items, ["race_weekend_id", key])
+
+
 # --- read ---
+
+
+class TeamNotFound(LookupError):
+    """A source named a team that isn't in team_seasons for that season."""
+
+
+class DriverNotFound(LookupError):
+    """A source named a driver that can't be matched to exactly one person."""
+
+
+def team_for_jolpica(conn: Connection, season: int, constructor_id: str) -> domain.TeamSeason:
+    """The team Jolpica's constructorId means in `season`.
+
+    Raises TeamNotFound when the teams seed has no such row: a new team, a rebrand, or a
+    season whose teams haven't been added yet."""
+    ts = schema.team_seasons
+    row = conn.execute(
+        select(ts).where(ts.c.season == season, ts.c.jolpica_id == constructor_id)
+    ).first()
+    if row is None:
+        raise TeamNotFound(
+            f"Jolpica's constructor {constructor_id!r} isn't a {season} team on file. Add "
+            f"it to TEAM_SEASONS in formation_data/jobs/static/teams.py and run "
+            "`formation-data teams seed`."
+        )
+    return domain.TeamSeason.model_validate(row._mapping)
+
+
+def fastf1_team_ids(conn: Connection, seasons: Iterable[int]) -> dict[tuple[int, str], str]:
+    """(season, FastF1 TeamName) -> team_id for the given seasons."""
+    ts = schema.team_seasons
+    rows = conn.execute(
+        select(ts.c.season, ts.c.fastf1_name, ts.c.team_id).where(
+            ts.c.season.in_(set(seasons)), ts.c.fastf1_name.is_not(None)
+        )
+    ).all()
+    return {(r.season, r.fastf1_name): r.team_id for r in rows}
+
+
+def require_fastf1_teams(conn: Connection, season: int, names: Iterable[str]) -> None:
+    """Raise TeamNotFound unless every FastF1 team name is on file for `season`."""
+    known = fastf1_team_ids(conn, [season])
+    missing = sorted({n for n in names if (season, n) not in known})
+    if missing:
+        raise TeamNotFound(
+            f"FastF1 names {season} teams that aren't on file: {', '.join(missing)}. Set "
+            "their fastf1_name in formation_data/jobs/static/teams.py and run "
+            "`formation-data teams seed`."
+        )
+
+
+def driver_for_code(conn: Connection, code: str, season: int) -> domain.Driver:
+    """The driver FastF1's three-letter code means in `season`.
+
+    Codes are only unique within a season (both Schumachers are MSC), so the match is
+    limited to drivers with a race result or a seat that season. Raises DriverNotFound
+    when there's no such driver, or more than one."""
+    d, rr, rw, st = schema.drivers, schema.race_results, schema.race_weekends, schema.seats
+    raced = exists().where(
+        rr.c.driver_id == d.c.driver_id, rw.c.id == rr.c.race_weekend_id, rw.c.season == season
+    )
+    seated = exists().where(st.c.driver_id == d.c.driver_id, st.c.season == season)
+    rows = conn.execute(select(d).where(d.c.code == code, raced | seated)).all()
+    if len(rows) != 1:
+        found = "no driver" if not rows else f"{len(rows)} drivers"
+        raise DriverNotFound(
+            f"{found} with code {code!r} raced or holds a seat in {season}. Load that "
+            "season's results (`formation-data results backfill`) or its grid "
+            "(`formation-data drivers seed`) first."
+        )
+    return domain.Driver.model_validate(rows[0]._mapping)
 
 
 def _with_weekend(table: Table):
     """SELECT every column of a race-history table plus its weekend's circuit_id, season
-    and round_number, which the read models (RaceResult, RaceTrace, RaceOvertakes) carry."""
+    and round_number, which the read models (RaceTrace, RaceOvertakes) carry."""
     rw = schema.race_weekends
     return select(table, rw.c.circuit_id, rw.c.season, rw.c.round_number).join(
         rw, rw.c.id == table.c.race_weekend_id
@@ -435,14 +547,40 @@ def get_race_weekend_by_id(
     return domain.RaceWeekend.model_validate(row._mapping) if row else None
 
 
-def list_drivers(conn: Connection, season: int) -> list[domain.Driver]:
-    """All drivers for a season, ordered by name."""
+def list_season_grid(
+    conn: Connection, season: int, today: date | None = None
+) -> list[domain.GridDriver]:
+    """The drivers holding a seat in a season, with that seat, ordered by name.
+
+    The grid as of `today`, kept within the season: its last day once it's over, and the
+    first seats' start date before it begins. So a mid-season swap shows the seat held
+    at the time, and a driver whose seat ended without another is off the grid.
+    """
+    st, d, ts = schema.seats, schema.drivers, schema.team_seasons
+    first = conn.execute(
+        select(func.min(st.c.valid_from)).where(st.c.season == season)
+    ).scalar()
+    if first is None:
+        return []
+    as_of = max(min(today or date.today(), date(season, 12, 31)), first)
     rows = conn.execute(
-        select(schema.drivers)
-        .where(schema.drivers.c.season == season)
-        .order_by(schema.drivers.c.full_name)
+        select(
+            d,
+            (d.c.given_name + " " + d.c.family_name).label("full_name"),
+            st.c.team_id,
+            ts.c.name.label("team"),
+            st.c.season,
+        )
+        .join(st, st.c.driver_id == d.c.driver_id)
+        .join(ts, and_(ts.c.team_id == st.c.team_id, ts.c.season == st.c.season))
+        .where(
+            st.c.season == season,
+            st.c.valid_from <= as_of,
+            or_(st.c.valid_to.is_(None), st.c.valid_to > as_of),
+        )
+        .order_by(d.c.given_name, d.c.family_name)
     ).all()
-    return [domain.Driver.model_validate(row._mapping) for row in rows]
+    return [domain.GridDriver.model_validate(row._mapping) for row in rows]
 
 
 def list_standings(
@@ -453,28 +591,73 @@ def list_standings(
 ) -> list[domain.Standing]:
     """Championship standings for a season and type ("driver"/"constructor").
 
-    When `after_round` is omitted, returns the most recent round available for
-    that season+type. Results are ordered by championship position.
+    When `after_round` is omitted, returns the standings after the latest race that has
+    them. Results are ordered by championship position.
     """
-    table = schema.standings
+    rw = schema.race_weekends
+    if type == "driver":
+        table, d = schema.driver_standings, schema.drivers
+        cols = (
+            (d.c.given_name + " " + d.c.family_name).label("name"),
+            table.c.driver_id,
+        )
+        joined = table.join(rw, rw.c.id == table.c.race_weekend_id).join(
+            d, d.c.driver_id == table.c.driver_id
+        )
+    else:
+        table, ts = schema.constructor_standings, schema.team_seasons
+        cols = (ts.c.name, table.c.team_id)
+        joined = table.join(rw, rw.c.id == table.c.race_weekend_id).join(
+            ts, and_(ts.c.team_id == table.c.team_id, ts.c.season == rw.c.season)
+        )
     if after_round is None:
         after_round = conn.execute(
-            select(func.max(table.c.after_round)).where(
-                table.c.season == season, table.c.type == type
-            )
+            select(func.max(rw.c.round_number))
+            .select_from(table.join(rw, rw.c.id == table.c.race_weekend_id))
+            .where(rw.c.season == season)
         ).scalar()
         if after_round is None:
             return []
     rows = conn.execute(
-        select(table)
-        .where(
-            table.c.season == season,
-            table.c.type == type,
-            table.c.after_round == after_round,
+        select(
+            table.c.race_weekend_id,
+            rw.c.season,
+            rw.c.round_number.label("after_round"),
+            table.c.position,
+            table.c.points,
+            *cols,
         )
+        .select_from(joined)
+        .where(rw.c.season == season, rw.c.round_number == after_round)
         .order_by(table.c.position)
     ).all()
-    return [domain.Standing.model_validate(row._mapping) for row in rows]
+    return [domain.Standing.model_validate({**row._mapping, "type": type}) for row in rows]
+
+
+def _race_results_with_names():
+    """SELECT race results with the weekend's circuit, season and round, the driver's
+    names, and the team's name that season — the RaceResult read shape."""
+    rr, rw, d, ts = (
+        schema.race_results,
+        schema.race_weekends,
+        schema.drivers,
+        schema.team_seasons,
+    )
+    return (
+        select(
+            rr,
+            rw.c.circuit_id,
+            rw.c.season,
+            rw.c.round_number,
+            d.c.given_name,
+            d.c.family_name,
+            d.c.code,
+            ts.c.name.label("team"),
+        )
+        .join(rw, rw.c.id == rr.c.race_weekend_id)
+        .join(d, d.c.driver_id == rr.c.driver_id)
+        .join(ts, and_(ts.c.team_id == rr.c.team_id, ts.c.season == rw.c.season))
+    )
 
 
 def list_circuit_podiums(
@@ -503,7 +686,7 @@ def list_circuit_podiums(
     if not weekend_ids:
         return []
     rows = conn.execute(
-        _with_weekend(rr)
+        _race_results_with_names()
         .where(rr.c.race_weekend_id.in_(weekend_ids), rr.c.position <= 3)
         .order_by(rw.c.season.desc(), rw.c.round_number.desc(), rr.c.position.asc())
     ).all()
@@ -514,7 +697,7 @@ def list_race_results(conn: Connection, season: int) -> list[domain.RaceResult]:
     """All race results for a season, ordered by round then finishing position."""
     rr, rw = schema.race_results, schema.race_weekends
     rows = conn.execute(
-        _with_weekend(rr)
+        _race_results_with_names()
         .where(rw.c.season == season)
         .order_by(rw.c.round_number, rr.c.position)
     ).all()
@@ -703,11 +886,12 @@ def session_results_due(conn: Connection, now: datetime) -> list[domain.Session]
 def get_lap_record_for_circuit(
     conn: Connection, circuit_id: str
 ) -> domain.LapRecord | None:
-    """Fetch the lap record for a circuit, or None if not set."""
+    """Fetch the lap record for a circuit, with the holder's names, or None if not set."""
+    lr, d = schema.lap_records, schema.drivers
     row = conn.execute(
-        select(schema.lap_records).where(
-            schema.lap_records.c.circuit_id == circuit_id
-        )
+        select(lr, d.c.given_name, d.c.family_name)
+        .join(d, d.c.driver_id == lr.c.driver_id)
+        .where(lr.c.circuit_id == circuit_id)
     ).first()
     return domain.LapRecord.model_validate(row._mapping) if row else None
 
@@ -865,7 +1049,12 @@ def get_circuit_race_stats(
 def list_race_traces_for_circuit(
     conn: Connection, circuit_id: str, limit: int = 5
 ) -> list[domain.RaceTrace]:
-    """The most recent race traces for a circuit, newest first."""
+    """The most recent race traces for a circuit, newest first.
+
+    Each driver in a trace carries the FastF1 team name it was built with; `team_id` is
+    added here from team_seasons (None for a name that isn't on file), so the frontend
+    colours by team without matching names.
+    """
     rw = schema.race_weekends
     rows = conn.execute(
         _with_weekend(schema.race_traces)
@@ -873,7 +1062,12 @@ def list_race_traces_for_circuit(
         .order_by(rw.c.season.desc(), rw.c.round_number.desc())
         .limit(limit)
     ).all()
-    return [domain.RaceTrace.model_validate(row._mapping) for row in rows]
+    traces = [domain.RaceTrace.model_validate(row._mapping) for row in rows]
+    team_ids = fastf1_team_ids(conn, {t.season for t in traces})
+    for t in traces:
+        for driver in t.trace.get("drivers") or []:
+            driver["team_id"] = team_ids.get((t.season, driver.get("team")))
+    return traces
 
 
 def get_race_overtakes(

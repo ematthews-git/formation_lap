@@ -38,7 +38,8 @@ def run_single(
     produced from one load and are guaranteed to agree.
 
     Raises RaceWeekendNotFound, before loading anything, if the race isn't in the
-    stored calendar.
+    stored calendar, and TeamNotFound, before writing anything, if FastF1 names a team
+    that isn't on file for the season (the frontend colours each line by team).
     """
     from formation_sim.data import collector
 
@@ -67,7 +68,6 @@ def run_single(
     )
     overtakes = None
     if ot_blob is not None:
-        repositories.upsert_race_overtakes(conn, weekend.id, ot_blob)
         overtakes = {i + 1: n for i, n in enumerate(ot_blob["by_lap"]) if n}
     blob = race_trace.build_trace(
         laps,
@@ -79,6 +79,10 @@ def run_single(
         status=status,
         overtakes_by_lap=overtakes,
     )
+    if blob is not None:
+        repositories.require_fastf1_teams(conn, season, {d["team"] for d in blob["drivers"]})
+    if ot_blob is not None:
+        repositories.upsert_race_overtakes(conn, weekend.id, ot_blob)
     if blob is None:
         return False
     repositories.upsert_race_trace(conn, weekend.id, blob)

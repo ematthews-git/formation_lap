@@ -30,12 +30,15 @@ from formation_data.jobs.post_session import session_results
 from formation_data.jobs.pre_race import sim_strategies, weather
 from formation_data.jobs.pre_season import (
     circuit_stats,
-    drivers,
     lap_records as pre_season_lap_records,
     race_weekends,
     sessions,
 )
-from formation_data.jobs.static import circuits as static_circuits
+from formation_data.jobs.static import (
+    circuits as static_circuits,
+    drivers as static_drivers,
+    teams as static_teams,
+)
 from formation_data.sources.fastf1_client import F1AccessError
 
 logger = logging.getLogger(__name__)
@@ -53,13 +56,15 @@ PRELIM_WINDOW = timedelta(days=7)
 def run_pre_season(season: int) -> None:
     """Once a year. Loads everything that should be ready before round 1.
 
-    Order matters: race_weekends + drivers depend on Circuit being seeded;
-    circuit_stats depends on prior post_race data already being in the DB.
+    Order matters: race_weekends depends on Circuit being seeded, the grid's seats on
+    that season's teams; circuit_stats depends on prior post_race data already being in
+    the DB.
     """
     logger.info("orchestrator.run_pre_season season=%s", season)
     with connection_scope() as conn:
         static_circuits.run(conn)  # cheap no-op if already seeded
-        drivers.run(conn, season=season)
+        static_teams.run(conn)
+        static_drivers.run(conn, season=season)
         race_weekends.run(conn, season=season)
         sessions.run(conn, season=season)  # needs race_weekends in place
         pre_season_lap_records.run(conn)
@@ -241,7 +246,7 @@ def _load_results_and_standings(conn, rw) -> None:
             rw.round_number,
         )
         return
-    standings.run(conn, season=rw.season, round_number=official_round)
+    standings.load_for_weekend(conn, rw, official_round)
 
 
 def _refresh_fastf1_data(season: int) -> None:

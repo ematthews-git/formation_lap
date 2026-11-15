@@ -16,9 +16,9 @@ import re
 
 import pytest
 from alembic.script import ScriptDirectory
-from sqlalchemy import inspect, make_url
+from sqlalchemy import inspect
 
-from formation_data import db, migrate, schema
+from formation_data import migrate, schema
 
 TEST_URL = os.environ.get("FORMATION_TEST_DATABASE_URL")
 needs_db = pytest.mark.skipif(not TEST_URL, reason="FORMATION_TEST_DATABASE_URL not set")
@@ -32,19 +32,6 @@ def test_revisions_form_one_line_with_ids_matching_filenames():
         assert rev.revision == f"{n:04d}"
         assert re.match(rf"{rev.revision}_\w+\.py$", os.path.basename(rev.path))
     assert revisions[-1].revision == migrate.BASELINE_REVISION
-
-
-@pytest.fixture
-def engine(monkeypatch):
-    database = make_url(TEST_URL).database or ""
-    assert "test" in database, f"refusing to wipe {database!r}: its name must contain 'test'"
-    monkeypatch.setenv("DATABASE_URL", TEST_URL)
-    monkeypatch.setattr(db, "_engine", None)
-    eng = db.get_engine()
-    with eng.begin() as conn:
-        conn.exec_driver_sql("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
-    yield eng
-    eng.dispose()
 
 
 def _tables(eng) -> set[str]:
@@ -198,3 +185,119 @@ def test_resolve_race_weekend(engine):
             resolve("silverstone", 2020, 6)
         with pytest.raises(repositories.RaceWeekendNotFound, match="--season 2021"):
             resolve("monza", 2021, 14)
+
+
+# --- 0004: drivers and teams --------------------------------------------------------
+
+
+def _0004():
+    """The 0004 revision module, for its frozen copy of the seeds."""
+    script = ScriptDirectory.from_config(migrate.config())
+    return script.get_revision("0004").module
+
+
+def test_0004_snapshot_matches_the_seeds():
+    """0004 inserts a frozen copy of the teams and drivers seeds; for the seasons it
+    covers, the seeds must still say the same thing, or a fresh database and a seeded
+    one would disagree."""
+    from formation_data.jobs.static import drivers as static_drivers
+    from formation_data.jobs.static import teams as static_teams
+
+    m = _0004()
+    assert {(t.team_id, t.name) for t in static_teams.TEAMS} >= set(m._TEAMS)
+    seeded = {
+        (t.team_id, t.season, t.name, t.jolpica_id, t.fastf1_name)
+        for t in static_teams.TEAM_SEASONS
+        if t.season <= 2026
+    }
+    assert seeded == set(m._TEAM_SEASONS)
+    frozen = {d[0]: (d[2], d[3], d[4], d[5]) for d in m._DRIVERS}
+    for d in static_drivers.DRIVERS:
+        assert frozen.get(d.driver_id) == (d.given_name, d.family_name, d.code, d.nationality)
+
+
+@needs_db
+def test_0004_points_names_at_drivers_and_teams(engine):
+    migrate.upgrade("0003")
+    _exec(
+        engine,
+        _circuit("shanghai"),
+        _circuit("spa"),
+        _weekend("spa", 2020, 7),
+        _weekend("spa", 2026, 13),
+        "INSERT INTO race_results (race_weekend_id, position, driver_id, team) "
+        "SELECT id, 1, 'verstappen', 'Red Bull' FROM race_weekends WHERE season = 2020",
+        "INSERT INTO race_results (race_weekend_id, position, driver_id, team) "
+        "SELECT id, 2, 'gasly', 'AlphaTauri' FROM race_weekends WHERE season = 2020",
+        "INSERT INTO race_results (race_weekend_id, position, driver_id, team) "
+        "SELECT id, 1, 'lindblad', 'RB F1 Team' FROM race_weekends WHERE season = 2026",
+        "INSERT INTO standings (season, after_round, type, position, name, points) VALUES "
+        "(2026, 13, 'driver', 1, 'Arvid Lindblad', 25), "
+        "(2026, 13, 'constructor', 1, 'RB F1 Team', 25)",
+        "INSERT INTO lap_records (circuit_id, driver, year, lap_time_seconds) VALUES "
+        "('shanghai', 'Schumacher', 2004, 92.238), ('spa', 'Perez', 2024, 104.701)",
+        "INSERT INTO drivers (driver_id, full_name, nationality, team, season) VALUES "
+        "('lindblad', 'Arvid Lindblad', 'British', 'Racing Bulls', 2026)",
+    )
+    migrate.upgrade()
+    assert migrate.check() == []
+
+    def rows(sql):
+        with engine.connect() as conn:
+            return [tuple(r) for r in conn.exec_driver_sql(sql).all()]
+
+    assert rows(
+        "SELECT rw.season, rr.position, rr.driver_id, rr.team_id FROM race_results rr "
+        "JOIN race_weekends rw ON rw.id = rr.race_weekend_id ORDER BY 1, 2"
+    ) == [
+        (2020, 1, "max_verstappen", "red_bull"),
+        (2020, 2, "gasly", "racing_bulls"),
+        (2026, 1, "arvid_lindblad", "racing_bulls"),
+    ]
+    assert rows("SELECT driver_id, position, points FROM driver_standings") == [
+        ("arvid_lindblad", 1, 25.0)
+    ]
+    assert rows("SELECT team_id, position FROM constructor_standings") == [("racing_bulls", 1)]
+    assert rows("SELECT circuit_id, driver_id FROM lap_records ORDER BY 1") == [
+        ("shanghai", "michael_schumacher"),
+        ("spa", "perez"),
+    ]
+    assert rows("SELECT driver_id, team_id, season, valid_from::text FROM seats") == [
+        ("arvid_lindblad", "racing_bulls", 2026, "2026-01-01")
+    ]
+
+    # ...and back: names come back from the rows each reference points at.
+    migrate.downgrade("0003")
+    assert rows(
+        "SELECT driver_id, team FROM race_results ORDER BY race_weekend_id, position"
+    ) == [("verstappen", "Red Bull Racing"), ("gasly", "AlphaTauri"), ("lindblad", "Racing Bulls")]
+    assert rows("SELECT type, name FROM standings ORDER BY 1") == [
+        ("constructor", "Racing Bulls"),
+        ("driver", "Arvid Lindblad"),
+    ]
+    assert rows("SELECT driver FROM lap_records ORDER BY circuit_id") == [
+        ("Schumacher",),
+        ("Pérez",),
+    ]
+    assert rows("SELECT driver_id, team, season FROM drivers") == [
+        ("lindblad", "Racing Bulls", 2026)
+    ]
+    migrate.upgrade()
+    assert migrate.check() == []
+
+
+@needs_db
+def test_0004_refuses_names_it_does_not_know(engine):
+    migrate.upgrade("0003")
+    _exec(
+        engine,
+        _circuit("monza"),
+        _weekend("monza", 2020, 8),
+        "INSERT INTO race_results (race_weekend_id, position, driver_id, team) "
+        "SELECT id, 1, 'button', 'Brawn' FROM race_weekends",
+    )
+    with pytest.raises(migrate.MigrationError) as err:
+        migrate.upgrade()
+    assert "driver 'button'" in str(err.value) and "team 'Brawn'" in str(err.value)
+    assert _version(engine) == "0003"
+    assert "team" in {c["name"] for c in inspect(engine).get_columns("race_results")}

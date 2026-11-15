@@ -127,7 +127,7 @@ export function CircuitProfile({
                       {formatLapTime(lapRecord.lap_time_seconds)}
                     </span>
                     <span className={styles.lapDriver}>
-                      {lapRecord.driver} ’{String(lapRecord.year).slice(-2)}
+                      {lapRecord.family_name} ’{String(lapRecord.year).slice(-2)}
                     </span>
                   </div>
                 ) : (

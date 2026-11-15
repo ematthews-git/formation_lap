@@ -1,7 +1,7 @@
 import type { Standing } from '../../api/types'
 import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
-import { constructorKey, teamColorVar } from '../../lib/format'
+import { teamColor } from '../../lib/format'
 import styles from './ConstructorStandings.module.css'
 
 interface Props {
@@ -10,11 +10,6 @@ interface Props {
   lastSeason: Standing[] | undefined
   loading: boolean
   error: boolean
-}
-
-/** Trim the verbose entrant suffix ("Alpine F1 Team" → "Alpine") to fit the column. */
-function shortTeam(name: string): string {
-  return name.replace(/\s+F1\s+Team$/i, '').replace(/\s+Team$/i, '')
 }
 
 export function ConstructorStandings({
@@ -28,12 +23,12 @@ export function ConstructorStandings({
     .sort((a, b) => a.position - b.position)
   const afterRound = rows[0]?.after_round
 
-  // Last season's finishing position, keyed by team lineage so a rebranded team
+  // Last season's finishing position, by team_id: a lineage key, so a rebranded team
   // (e.g. Sauber → Audi) still lines up; a new entrant has no prior finish.
-  const lastFinishByKey = new Map<string, number>()
+  const lastFinishByTeam = new Map<string, number>()
   for (const s of lastSeason ?? []) {
-    if (s.type === 'constructor') {
-      lastFinishByKey.set(constructorKey(s.name), s.position)
+    if (s.type === 'constructor' && s.team_id) {
+      lastFinishByTeam.set(s.team_id, s.position)
     }
   }
 
@@ -55,17 +50,17 @@ export function ConstructorStandings({
         <LoadingState label="LOADING STANDINGS" />
       ) : rows.length > 0 ? (
         rows.map((s) => {
-          const lastYr = lastFinishByKey.get(constructorKey(s.name)) ?? null
+          const lastYr = s.team_id ? (lastFinishByTeam.get(s.team_id) ?? null) : null
           return (
             <div key={s.name} className={styles.row}>
               <span
                 className={styles.accentBar}
-                style={{ background: teamColorVar(s.name) }}
+                style={{ background: teamColor(s.team_id) }}
               />
               <span className={styles.pos}>
                 {String(s.position).padStart(2, '0')}
               </span>
-              <span className={styles.team}>{shortTeam(s.name)}</span>
+              <span className={styles.team}>{s.name}</span>
               <span className={`${styles.right} ${styles.lastYr}`}>
                 {lastYr != null ? `P${lastYr}` : '—'}
               </span>

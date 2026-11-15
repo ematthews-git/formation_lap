@@ -4,11 +4,15 @@ Base URL: https://api.jolpi.ca/ergast/f1
 All endpoints documented at https://github.com/jolpica/jolpica-f1.
 
 Used by:
-- jobs.pre_season.drivers          GET /f1/{season}/drivers.json
 - jobs.pre_season.race_weekends    GET /f1/{season}.json            (round_number, date, circuit)
 - jobs.post_race.race_results      GET /f1/{season}/{round}/results.json
+                                   GET /f1/{season}/circuits/{circuit}/results.json
 - jobs.post_race.standings         GET /f1/{season}/{round}/driverStandings.json
                                    GET /f1/{season}/{round}/constructorStandings.json
+- jobs.pre_season.lap_records      GET /f1/circuits/{circuit}/fastest/1/results.json
+
+Every payload that names a driver carries Jolpica's whole Driver object; `to_driver`
+turns one into the row `drivers` stores, keyed on its driverId.
 """
 
 from __future__ import annotations
@@ -17,6 +21,8 @@ import logging
 import time
 
 import httpx
+
+from formation_data.domain import Driver
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +70,16 @@ def _get_json(path: str, params: dict | None = None) -> dict:
     return resp.json()
 
 
-def get_drivers(season: int):
-    # TODO: httpx.get(f"{BASE_URL}/{season}/drivers.json").json()["MRData"]["DriverTable"]["Drivers"]
-    logger.info("jolpica.get_drivers season=%s (skeleton)", season)
-    return []
+def to_driver(payload: dict) -> Driver:
+    """A Jolpica Driver object as a `drivers` row. Jolpica omits the code and nationality
+    for some drivers it lists."""
+    return Driver(
+        driver_id=payload["driverId"],
+        given_name=payload["givenName"],
+        family_name=payload["familyName"],
+        code=payload.get("code"),
+        nationality=payload.get("nationality"),
+    )
 
 
 def get_schedule(season: int) -> list[dict]:
@@ -154,7 +166,7 @@ def get_race_fastest_laps(circuit_id: str) -> list[dict]:
 
     Uses the `fastest/1/results` filter, so each race contributes the single
     result whose driver set that race's fastest lap. Each row:
-    {season:int, race:str, driver:str, best_time:str}. Rows with no fastest-lap
+    {season:int, race:str, driver:dict (Jolpica's Driver object), best_time:str}. Rows with no fastest-lap
     time (pre-2004 races predate the data) are skipped. Raises httpx.HTTPError
     on a network/HTTP failure (incl. 429 rate limiting).
     """
@@ -181,7 +193,7 @@ def get_race_fastest_laps(circuit_id: str) -> list[dict]:
                     {
                         "season": int(race["season"]),
                         "race": race["raceName"],
-                        "driver": result["Driver"]["familyName"],
+                        "driver": result["Driver"],
                         "best_time": best_time,
                     }
                 )
