@@ -145,7 +145,7 @@ job can be run on its own, and flows chain them for each point in a race weekend
 
 | Flow | Does |
 |---|---|
-| `run-pre-season --season YYYY` | Circuits, calendar, session timetable, lap records and circuit statistics for a season |
+| `run-pre-season --season YYYY` | Circuits, teams, the announced grid, calendar, session timetable and lap records for a season |
 | `run-weather` | Refreshes the forecast once the next race is within ten days |
 | `run-prelim` | Runs the pre-qualifying strategy simulation in race week |
 | `run-post-session` | Saves each session's results after it ends, and runs the post-qualifying simulation once qualifying is done |
@@ -185,13 +185,21 @@ migrations apply it.
 | Reference | `circuits`, `lap_records`, `teams`, `team_seasons`, `drivers`, `seats` |
 | Calendar | `race_weekends` (every race from 2020), `sessions`, `weather_forecasts` |
 | Results and history | `race_results`, `driver_standings`, `constructor_standings`, `session_results`, `race_traces`, `race_overtakes` |
-| Circuit analytics | `circuit_stats`, `circuit_race_stats` |
+| Circuit analytics | `circuit_race_stats` |
 | Strategy | `strategy_runs` (one row per generation), `strategies`, `strategy_stints`; the `current_strategy_runs` view picks the latest run per weekend and source |
 | Simulator cache | `derived_artifacts` (cleaned lap frames as Parquet) |
 
 A circuit is identified by `circuit_id`, never by an event name, since event names change
 between seasons. Race history references its `race_weekends` row, so a calendar renumber
-updates one row.
+updates one row. Each circuit carries its IANA time zone: the weather forecast is stored
+per local day and the API matches each session to its day, so a sprint weekend's sessions
+label themselves. Code keys sessions on `kind` (`fp1` to `race`) rather than on FastF1's
+name for them, which changes between seasons.
+
+Deleting a race weekend that never raced takes its sessions, weather and strategy runs with
+it; one with results can't be deleted. Status columns (session kind, weather condition,
+tyre and Pirelli compounds, strategy tier) are limited to known values by CHECK
+constraints, so a new value needs a migration.
 
 Drivers are keyed on Jolpica's `driverId`, and teams on a lineage id that stays the same
 through rebrands (`racing_bulls` covers AlphaTauri, RB and Racing Bulls). `team_seasons`

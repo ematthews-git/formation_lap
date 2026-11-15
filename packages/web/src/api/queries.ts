@@ -3,7 +3,6 @@ import { api } from './client'
 import type {
   Circuit,
   CircuitRaceStats,
-  CircuitStats,
   GridDriver,
   LapRecord,
   RaceResult,
@@ -53,21 +52,6 @@ export function useRaceResults(season: number) {
   return useQuery({
     queryKey: ['race-results', season],
     queryFn: () => api.get<RaceResult[]>(`/race-results/?season=${season}`),
-  })
-}
-
-export function useCircuitStats(
-  circuitId: string | undefined,
-  season: number,
-) {
-  return useQuery({
-    queryKey: ['circuit-stats', circuitId, season],
-    enabled: !!circuitId,
-    // 404 (no stats yet) → null, an expected empty state.
-    queryFn: () =>
-      api.getOptional<CircuitStats>(
-        `/circuits/${circuitId}/stats?season=${season}`,
-      ),
   })
 }
 

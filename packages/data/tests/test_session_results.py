@@ -10,7 +10,7 @@ from datetime import date, datetime, timezone
 
 import pandas as pd
 
-from formation_data import repositories
+from formation_data import repositories, schema
 from formation_data.sources import fastf1_client
 
 
@@ -20,25 +20,21 @@ from formation_data.sources import fastf1_client
 def test_results_due_at_uses_session_duration_plus_delay():
     start = datetime(2026, 7, 5, 14, 0, tzinfo=timezone.utc)
     # Race = 120 min running + 45 min delay = 165 min after start.
-    assert repositories.results_due_at("Race", start) == datetime(
+    assert repositories.results_due_at("race", start) == datetime(
         2026, 7, 5, 16, 45, tzinfo=timezone.utc
     )
     # Practice = 60 + 45 = 105 min.
-    assert repositories.results_due_at("Practice 1", start) == datetime(
+    assert repositories.results_due_at("fp1", start) == datetime(
         2026, 7, 5, 15, 45, tzinfo=timezone.utc
     )
-    # Sprint Qualifying = 45 + 45 = 90 min.
-    assert repositories.results_due_at("Sprint Qualifying", start) == datetime(
+    # Sprint qualifying = 45 + 45 = 90 min.
+    assert repositories.results_due_at("sprint_quali", start) == datetime(
         2026, 7, 5, 15, 30, tzinfo=timezone.utc
     )
 
 
-def test_results_due_at_unknown_name_falls_back_to_default_duration():
-    start = datetime(2026, 7, 5, 14, 0, tzinfo=timezone.utc)
-    # Unknown name → 60 min default + 45 delay = 105 min.
-    assert repositories.results_due_at("Mystery Session", start) == datetime(
-        2026, 7, 5, 15, 45, tzinfo=timezone.utc
-    )
+def test_every_session_kind_has_a_duration():
+    assert set(repositories.SESSION_DURATION_MIN) == set(schema.SESSION_KINDS)
 
 
 # --- fastf1_client pure formatters ---

@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 from sqlalchemy import Connection, Table, and_, delete, exists, func, or_, select
@@ -31,22 +32,20 @@ logger = logging.getLogger(__name__)
 POSTQUALI_DELAY_MIN = 150
 
 # Session results become due this many minutes after a session *ends*. Sessions store
-# only a start time, so the end is estimated as start + SESSION_DURATION_MIN[name].
+# only a start time, so the end is estimated as start + SESSION_DURATION_MIN[kind].
 SESSION_RESULT_DELAY_MIN = 45
-# Estimated running length per session (FastF1 session names, as stored in sessions.name).
-# Only used to place the "results due" cutoff; red-flag overruns are absorbed by the
-# idempotent retry (a not-yet-available session just lands on a later poll).
+# Estimated running length per session kind. Only used to place the "results due" cutoff;
+# red-flag overruns are absorbed by the idempotent retry (a not-yet-available session just
+# lands on a later poll).
 SESSION_DURATION_MIN = {
-    "Practice 1": 60,
-    "Practice 2": 60,
-    "Practice 3": 60,
-    "Qualifying": 60,
-    "Sprint Qualifying": 45,
-    "Sprint Shootout": 45,
-    "Sprint": 60,
-    "Race": 120,
+    "fp1": 60,
+    "fp2": 60,
+    "fp3": 60,
+    "quali": 60,
+    "sprint_quali": 45,
+    "sprint": 60,
+    "race": 120,
 }
-_DEFAULT_SESSION_DURATION_MIN = 60
 # Don't rescan the whole season on every poll: a session with no results after this long
 # is stale (FastF1 would have had data), so we stop retrying it. Wide enough to catch up a
 # full weekend after a missed cron run.
@@ -198,24 +197,24 @@ def upsert_derived_artifact(
     conn: Connection,
     *,
     kind: str,
-    year: int,
+    season: int,
     round_number: int,
     data: bytes,
     data_format: str = "parquet",
 ) -> None:
-    """Upsert one serialized per-race derived table (one row per kind+year+round).
+    """Upsert one serialized per-race derived table (one row per kind+season+round).
 
     Re-dumping a race replaces its blob — the frame is regenerated wholesale, nothing to merge.
     """
     stmt = insert(schema.derived_artifacts).values(
         kind=kind,
-        year=year,
+        season=season,
         round_number=round_number,
         data=data,
         data_format=data_format,
     )
     stmt = stmt.on_conflict_do_update(
-        index_elements=["kind", "year", "round_number"],
+        index_elements=["kind", "season", "round_number"],
         set_={
             "data": stmt.excluded.data,
             "data_format": stmt.excluded.data_format,
@@ -226,13 +225,13 @@ def upsert_derived_artifact(
 
 
 def get_derived_artifact(
-    conn: Connection, *, kind: str, year: int, round_number: int
+    conn: Connection, *, kind: str, season: int, round_number: int
 ) -> domain.DerivedArtifact | None:
-    """The serialized derived table for (kind, year, round), or None if not stored."""
+    """The serialized derived table for (kind, season, round), or None if not stored."""
     row = conn.execute(
         select(schema.derived_artifacts).where(
             schema.derived_artifacts.c.kind == kind,
-            schema.derived_artifacts.c.year == year,
+            schema.derived_artifacts.c.season == season,
             schema.derived_artifacts.c.round_number == round_number,
         )
     ).first()
@@ -709,7 +708,7 @@ def races_missing_fastf1_data(conn: Connection, season: int) -> list[tuple[int, 
     has_trace = exists().where(rt.c.race_weekend_id == rw.c.id)
     has_laps = exists().where(
         da.c.kind == "laps",
-        da.c.year == rw.c.season,
+        da.c.season == rw.c.season,
         da.c.round_number == rw.c.round_number,
     )
     rows = conn.execute(
@@ -769,8 +768,8 @@ def weekends_postquali_due(
     )
     rows = conn.execute(
         select(rw)
-        .join(quali, and_(quali.c.race_weekend_id == rw.c.id, quali.c.name == "Qualifying"))
-        .join(race, and_(race.c.race_weekend_id == rw.c.id, race.c.name == "Race"))
+        .join(quali, and_(quali.c.race_weekend_id == rw.c.id, quali.c.kind == "quali"))
+        .join(race, and_(race.c.race_weekend_id == rw.c.id, race.c.kind == "race"))
         .where(quali.c.start_time <= cutoff, race.c.start_time > now, ~postquali_done)
         .order_by(rw.c.race_date.asc())
     ).all()
@@ -785,33 +784,33 @@ def get_session(conn: Connection, session_id: int) -> domain.Session | None:
     return domain.Session.model_validate(row._mapping) if row else None
 
 
-def get_session_by_name(
-    conn: Connection, race_weekend_id: int, name: str
+def get_session_by_kind(
+    conn: Connection, race_weekend_id: int, kind: str
 ) -> domain.Session | None:
-    """Fetch a weekend's session by its (FastF1) name, or None. For manual saves."""
+    """Fetch a weekend's session of `kind` ("quali", "race", ...), or None. For manual saves."""
     row = conn.execute(
         select(schema.sessions).where(
             schema.sessions.c.race_weekend_id == race_weekend_id,
-            schema.sessions.c.name == name,
+            schema.sessions.c.kind == kind,
         )
     ).first()
     return domain.Session.model_validate(row._mapping) if row else None
 
 
-def results_due_at(session_name: str, start_time: datetime) -> datetime:
+def results_due_at(kind: str, start_time: datetime) -> datetime:
     """The instant a session's results become due to save.
 
-    Estimated as start + running length (SESSION_DURATION_MIN, keyed on the FastF1
-    session name) + SESSION_RESULT_DELAY_MIN, since sessions store only a start time.
+    Estimated as start + running length (SESSION_DURATION_MIN[kind]) +
+    SESSION_RESULT_DELAY_MIN, since sessions store only a start time.
     """
-    duration = SESSION_DURATION_MIN.get(session_name, _DEFAULT_SESSION_DURATION_MIN)
+    duration = SESSION_DURATION_MIN[kind]
     return start_time + timedelta(minutes=duration + SESSION_RESULT_DELAY_MIN)
 
 
 def session_results_due(conn: Connection, now: datetime) -> list[domain.Session]:
     """Sessions whose results are due to be saved but haven't been yet.
 
-    Due = `results_due_at(name, start) <= now` and no session_results row exists yet.
+    Due = `results_due_at(kind, start) <= now` and no session_results row exists yet.
     `now` must be timezone-aware (UTC), to compare against the timestamptz start times.
     Bounded to the last SESSION_RESULTS_LOOKBACK so the poll doesn't rescan the season.
     Drives the idempotent catch-up flow: a session drops out once its results land.
@@ -831,7 +830,7 @@ def session_results_due(conn: Connection, now: datetime) -> list[domain.Session]
     due: list[domain.Session] = []
     for row in rows:
         sess = domain.Session.model_validate(row._mapping)
-        if results_due_at(sess.name, sess.start_time) <= now:
+        if results_due_at(sess.kind, sess.start_time) <= now:
             due.append(sess)
     return due
 
@@ -952,36 +951,44 @@ def _top_finishers(results: list[dict], n: int = 3) -> list[domain.SessionFinish
 
 def list_weather_for_weekend(
     conn: Connection, season: int, round_number: int
-) -> list[domain.WeatherForecast]:
-    """Per-session weather forecast for a race weekend, in chronological order.
+) -> list[domain.SessionWeather]:
+    """Each of a weekend's sessions with the forecast for its day, in running order.
 
-    Returns `[]` when the weekend doesn't exist or has no forecast loaded yet.
+    A session's day is its local day at the circuit (circuits.timezone), which is how the
+    daily forecast is stored. Sessions with no forecast for their day yet (too far out)
+    are left out, so this is `[]` until the forecast lands, and also when the weekend
+    doesn't exist or its timetable isn't loaded.
     """
     rw = get_race_weekend(conn, season, round_number)
     if rw is None:
         return []
-    rows = conn.execute(
-        select(schema.weather_forecasts)
-        .where(schema.weather_forecasts.c.race_weekend_id == rw.id)
-        .order_by(
-            schema.weather_forecasts.c.session_date,
-            schema.weather_forecasts.c.id,
+    circuit = get_circuit(conn, rw.circuit_id)
+    tz = ZoneInfo(circuit.timezone)
+    wf, s = schema.weather_forecasts, schema.sessions
+    by_day = {
+        row.forecast_date: row
+        for row in conn.execute(select(wf).where(wf.c.race_weekend_id == rw.id)).all()
+    }
+    out: list[domain.SessionWeather] = []
+    for session in conn.execute(
+        select(s).where(s.c.race_weekend_id == rw.id).order_by(s.c.session_order)
+    ).all():
+        day = by_day.get(session.start_time.astimezone(tz).date())
+        if day is None:
+            continue
+        out.append(
+            domain.SessionWeather(
+                session_kind=session.kind,
+                session_name=session.name,
+                start_time=session.start_time,
+                **{
+                    k: v
+                    for k, v in day._mapping.items()
+                    if k not in ("id", "race_weekend_id")
+                },
+            )
         )
-    ).all()
-    return [domain.WeatherForecast.model_validate(row._mapping) for row in rows]
-
-
-def get_circuit_stats(
-    conn: Connection, circuit_id: str, season: int
-) -> domain.CircuitStats | None:
-    """Fetch the stats row for a circuit in a given season, or None."""
-    row = conn.execute(
-        select(schema.circuit_stats).where(
-            schema.circuit_stats.c.circuit_id == circuit_id,
-            schema.circuit_stats.c.season == season,
-        )
-    ).first()
-    return domain.CircuitStats.model_validate(row._mapping) if row else None
+    return out
 
 
 def get_circuit_race_stats(

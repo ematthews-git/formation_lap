@@ -29,7 +29,6 @@ from formation_data.jobs.post_race import (
 from formation_data.jobs.post_session import session_results
 from formation_data.jobs.pre_race import sim_strategies, weather
 from formation_data.jobs.pre_season import (
-    circuit_stats,
     lap_records as pre_season_lap_records,
     race_weekends,
     sessions,
@@ -57,8 +56,7 @@ def run_pre_season(season: int) -> None:
     """Once a year. Loads everything that should be ready before round 1.
 
     Order matters: race_weekends depends on Circuit being seeded, the grid's seats on
-    that season's teams; circuit_stats depends on prior post_race data already being in
-    the DB.
+    that season's teams, and sessions on race_weekends.
     """
     logger.info("orchestrator.run_pre_season season=%s", season)
     with connection_scope() as conn:
@@ -68,7 +66,6 @@ def run_pre_season(season: int) -> None:
         race_weekends.run(conn, season=season)
         sessions.run(conn, season=season)  # needs race_weekends in place
         pre_season_lap_records.run(conn)
-        circuit_stats.run(conn, season=season)
 
 
 def run_weather_refresh(today: date | None = None) -> None:

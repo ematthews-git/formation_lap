@@ -1,14 +1,14 @@
 """Unit tests for the pure helpers in jobs.pre_race.weather.
 
-No database or network — just the session-schedule synthesis and the WMO
-weather-code classifier.
+No database or network — just which days to forecast and the WMO weather-code
+classifier.
 """
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
-from formation_data.domain import RaceWeekend
+from formation_data.domain import Circuit, RaceWeekend, Session
 from formation_data.jobs.pre_race import weather
 
 
@@ -26,28 +26,49 @@ def _weekend(race_date: date, is_sprint: bool) -> RaceWeekend:
     )
 
 
-# --- _session_schedule ---
+# --- _forecast_days ---
 
 
-def test_conventional_weekend_sessions():
-    sessions = weather._session_schedule(_weekend(date(2026, 7, 5), is_sprint=False))
-    assert [name for name, _ in sessions] == ["FP1", "FP2", "FP3", "Qualifying", "Race"]
-    # Fri/Sat/Sun = race-2 / race-1 / race
-    assert dict(sessions)["FP1"] == date(2026, 7, 3)
-    assert dict(sessions)["FP3"] == date(2026, 7, 4)
-    assert dict(sessions)["Race"] == date(2026, 7, 5)
+def _circuit(timezone: str) -> Circuit:
+    return Circuit(
+        circuit_id="las_vegas",
+        country="USA",
+        track_length_km=6.2,
+        num_corners=17,
+        num_laps=50,
+        sm_zones=3,
+        jolpica_id="vegas",
+        fastf1_location="Las Vegas",
+        lat=36.1,
+        lon=-115.2,
+        timezone=timezone,
+    )
 
 
-def test_sprint_weekend_sessions():
-    sessions = weather._session_schedule(_weekend(date(2026, 7, 5), is_sprint=True))
-    assert [name for name, _ in sessions] == [
-        "FP1",
-        "Sprint Qualifying",
-        "Sprint",
-        "Qualifying",
-        "Race",
+def _session(kind: str, start: datetime) -> Session:
+    return Session(race_weekend_id=1, kind=kind, session_order=1, name=kind, start_time=start)
+
+
+def test_forecast_days_are_the_circuits_local_session_days():
+    utc = timezone.utc
+    # Las Vegas runs at night: Thursday-evening FP1 and the Saturday-night race are
+    # Friday and Sunday in UTC, so UTC dates would ask for the wrong days.
+    sessions = [
+        _session("fp1", datetime(2026, 11, 20, 0, 30, tzinfo=utc)),  # Thu 16:30 local
+        _session("quali", datetime(2026, 11, 21, 6, 0, tzinfo=utc)),  # Fri 22:00 local
+        _session("race", datetime(2026, 11, 22, 6, 0, tzinfo=utc)),  # Sat 22:00 local
     ]
-    assert dict(sessions)["Sprint"] == date(2026, 7, 4)
+    days = weather._forecast_days(
+        _weekend(date(2026, 11, 21), is_sprint=False), sessions, _circuit("America/Los_Angeles")
+    )
+    assert days == [date(2026, 11, 19), date(2026, 11, 20), date(2026, 11, 21)]
+
+
+def test_forecast_days_without_a_timetable_are_friday_to_sunday():
+    days = weather._forecast_days(
+        _weekend(date(2026, 7, 5), is_sprint=True), [], _circuit("Europe/London")
+    )
+    assert days == [date(2026, 7, 3), date(2026, 7, 4), date(2026, 7, 5)]
 
 
 # --- _classify ---

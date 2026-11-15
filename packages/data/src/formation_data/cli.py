@@ -26,7 +26,6 @@ from formation_data.jobs.post_session import session_results as post_session_res
 from formation_data.jobs.pre_race import sim_strategies, strategies, weather
 from formation_data.jobs.pre_season import (
     circuit_race_stats,
-    circuit_stats,
     lap_records as pre_season_lap_records,
     race_overtakes,
     race_traces,
@@ -49,7 +48,6 @@ drivers_app = typer.Typer(help="Each season's grid: drivers and their seats.")
 weekends_app = typer.Typer(help="Season calendar.")
 sessions_app = typer.Typer(help="Weekend session timetable.")
 lap_records_app = typer.Typer(help="All-time race lap records.")
-circuit_stats_app = typer.Typer(help="Per-circuit per-season stats.")
 circuit_race_stats_app = typer.Typer(help="Empirical per-circuit race analytics.")
 race_traces_app = typer.Typer(help="Lap-by-lap race traces (RACE_TRACE panel).")
 race_overtakes_app = typer.Typer(help="Classified on-track overtakes, per race.")
@@ -69,7 +67,6 @@ app.add_typer(drivers_app, name="drivers")
 app.add_typer(weekends_app, name="weekends")
 app.add_typer(sessions_app, name="sessions")
 app.add_typer(lap_records_app, name="lap-records")
-app.add_typer(circuit_stats_app, name="circuit-stats")
 app.add_typer(circuit_race_stats_app, name="circuit-race-stats")
 app.add_typer(race_traces_app, name="race-traces")
 app.add_typer(race_overtakes_app, name="overtakes")
@@ -187,12 +184,6 @@ def sessions_refresh(season: int = typer.Option(2026)) -> None:
 def lap_records_refresh() -> None:
     with connection_scope() as conn:
         pre_season_lap_records.run(conn)
-
-
-@circuit_stats_app.command("recompute")
-def circuit_stats_recompute(season: int = typer.Option(...)) -> None:
-    with connection_scope() as conn:
-        circuit_stats.run(conn, season=season)
 
 
 @circuit_race_stats_app.command("recompute")
@@ -346,8 +337,7 @@ def session_results_save(
     session: str = typer.Option(
         ...,
         "--session",
-        help='FastF1 session name as stored in sessions.name, e.g. "Practice 1", '
-        '"Qualifying", "Sprint", "Race".',
+        help="Session kind: fp1, fp2, fp3, sprint_quali, sprint, quali or race.",
     ),
 ) -> None:
     """Fetch + save one session's classification from FastF1 (manual / backfill)."""
@@ -356,9 +346,9 @@ def session_results_save(
         if rw is None:
             typer.echo(f"No race weekend {season} R{round}.")
             raise typer.Exit(code=1)
-        sess = repositories.get_session_by_name(conn, rw.id, session)
+        sess = repositories.get_session_by_kind(conn, rw.id, session)
         if sess is None:
-            typer.echo(f"No session named {session!r} for {season} R{round}.")
+            typer.echo(f"No {session!r} session for {season} R{round}.")
             raise typer.Exit(code=1)
         post_session_results.run(conn, session_id=sess.id)
 

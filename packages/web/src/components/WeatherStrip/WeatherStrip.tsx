@@ -98,13 +98,13 @@ function Forecast({
         {hasSessions ? (
           <div className={styles.bars}>
             {sessions!.map((s) => (
-              <div key={s.id ?? s.session_name} className={styles.barCol}>
+              <div key={s.session_kind} className={styles.barCol}>
                 <span className={styles.barPct}>{s.rain_probability}%</span>
                 <div
                   className={styles.bar}
                   style={{ height: `${Math.max(3, (s.rain_probability / maxRain) * 42)}px` }}
                 />
-                <span className={styles.barName}>{sessionShort(s.session_name)}</span>
+                <span className={styles.barName}>{sessionShort(s.session_kind)}</span>
               </div>
             ))}
           </div>

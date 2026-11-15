@@ -176,7 +176,7 @@ def plan_calendar(existing: list[RaceWeekend], desired: list[RaceWeekend]) -> Ca
 # rows would silently describe a different race afterwards — so reconcile refuses rather than
 # guess. Race results, standings, traces and overtakes reference the weekend's id instead, so
 # a renumber carries them along.
-_ROUND_KEYED = (("derived_artifacts", "year", "round_number"),)
+_ROUND_KEYED = (("derived_artifacts", "season", "round_number"),)
 
 
 def _round_keyed_data(conn: Connection, season: int, round_number: int) -> list[str]:

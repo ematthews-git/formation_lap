@@ -38,7 +38,7 @@ class DbArtifactStore:
         if kind != "laps":
             return None
         row = repositories.get_derived_artifact(
-            self._conn, kind=kind, year=year, round_number=rnd
+            self._conn, kind=kind, season=year, round_number=rnd
         )
         if row is None:
             return None
@@ -65,7 +65,7 @@ def dump_race_laps(
     if df is None or not len(df):
         return False
     repositories.upsert_derived_artifact(
-        conn, kind="laps", year=season, round_number=round_number, data=_to_parquet_bytes(df)
+        conn, kind="laps", season=season, round_number=round_number, data=_to_parquet_bytes(df)
     )
     return True
 
@@ -84,7 +84,7 @@ def dump_all_local_laps(conn: Connection, cfg: dict | None = None) -> int:
         year, rnd = int(m.group(1)), int(m.group(2))
         df = pd.read_pickle(path)
         repositories.upsert_derived_artifact(
-            conn, kind="laps", year=year, round_number=rnd, data=_to_parquet_bytes(df)
+            conn, kind="laps", season=year, round_number=rnd, data=_to_parquet_bytes(df)
         )
         n += 1
     return n

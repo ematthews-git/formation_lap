@@ -2,7 +2,7 @@
  * Thin typed fetch wrapper over the Formation Lap API.
  *
  * `NotFound` is modelled as a resolved `null` rather than a thrown error, so
- * sections backed by not-yet-populated tables (lap-record, circuit-stats, ...)
+ * sections backed by not-yet-populated tables (lap-record, race-stats, ...)
  * surface as clean empty states instead of error states.
  */
 

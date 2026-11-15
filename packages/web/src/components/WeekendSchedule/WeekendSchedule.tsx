@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import type { Session } from '../../api/types'
+import type { Session, SessionKind } from '../../api/types'
 import { CollapsiblePanel } from '../common/CollapsiblePanel'
 import { EmptyState, ErrorState, LoadingState } from '../common/Status'
 import { prettifyCircuit } from '../../lib/format'
-import { circuitTimezone, formatClock, formatDayDate } from '../../lib/circuitTime'
+import { formatClock, formatDayDate } from '../../lib/circuitTime'
 import styles from './WeekendSchedule.module.css'
 
 interface Props {
   circuitId: string | undefined
+  /** The circuit's IANA zone; undefined until the circuit loads. */
+  timezone: string | undefined
   sessions: Session[] | undefined
   loading: boolean
   /** Query failure (network/5xx) — distinct from "no schedule yet". */
@@ -15,33 +17,31 @@ interface Props {
 }
 
 /** Sessions that anchor the weekend get a coloured accent bar. */
-function tone(name: string): 'race' | 'sprint' | undefined {
-  const n = name.toLowerCase()
-  if (n === 'race') return 'race'
-  if (n.includes('sprint')) return 'sprint'
+function tone(kind: SessionKind): 'race' | 'sprint' | undefined {
+  if (kind === 'race') return 'race'
+  if (kind === 'sprint' || kind === 'sprint_quali') return 'sprint'
   return undefined
 }
 
 /** Rough running length per session (minutes), to gauge whether one is live now. */
-const SESSION_MINUTES: Record<string, number> = {
-  'Practice 1': 60,
-  'Practice 2': 60,
-  'Practice 3': 60,
-  Qualifying: 60,
-  'Sprint Qualifying': 45,
-  Sprint: 60,
-  Race: 120,
+const SESSION_MINUTES: Record<SessionKind, number> = {
+  fp1: 60,
+  fp2: 60,
+  fp3: 60,
+  quali: 60,
+  sprint_quali: 45,
+  sprint: 60,
+  race: 120,
 }
 
 function isLive(session: Session, now: number): boolean {
   const start = Date.parse(session.start_time)
   if (Number.isNaN(start)) return false
-  const end = start + (SESSION_MINUTES[session.name] ?? 60) * 60_000
+  const end = start + (SESSION_MINUTES[session.kind] ?? 60) * 60_000
   return now >= start && now < end
 }
 
-export function WeekendSchedule({ circuitId, sessions, loading, error }: Props) {
-  const tz = circuitTimezone(circuitId)
+export function WeekendSchedule({ circuitId, timezone: tz, sessions, loading, error }: Props) {
 
   // Re-tick each minute so the live "NOW" badge appears/clears without a reload.
   const [now, setNow] = useState(() => Date.now())
@@ -67,7 +67,7 @@ export function WeekendSchedule({ circuitId, sessions, loading, error }: Props) 
         <LoadingState label="LOADING SCHEDULE" />
       ) : sessions && sessions.length > 0 ? (
         sessions.map((s) => {
-          const t = tone(s.name)
+          const t = tone(s.kind)
           const live = isLive(s, now)
           const finishers = s.top_finishers ?? []
           return (

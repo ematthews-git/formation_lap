@@ -118,9 +118,9 @@ export default function App() {
     ? Math.max(...weekends.data.map((w) => w.round_number))
     : featured.round_number
 
-  // Real lights-out instant for the countdown/clocks (same name match as
-  // WeekendSchedule's tone()); undefined until the sessions query resolves.
-  const raceStart = sessions.data?.find((s) => s.name === 'Race')?.start_time
+  // Real lights-out instant for the countdown/clocks; undefined until the sessions
+  // query resolves.
+  const raceStart = sessions.data?.find((s) => s.kind === 'race')?.start_time
 
   return (
     <div className={styles.page}>
@@ -214,6 +214,7 @@ export default function App() {
           <SectionBoundary label="WEEKEND_SCHEDULE">
             <WeekendSchedule
               circuitId={featured.circuit_id}
+              timezone={circuit.data?.timezone}
               sessions={sessions.data}
               loading={sessions.isLoading}
               error={sessions.isError}

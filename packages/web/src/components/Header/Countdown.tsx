@@ -1,5 +1,5 @@
 import { useCountdown } from '../../lib/useCountdown'
-import { circuitTimezone, formatClock } from '../../lib/circuitTime'
+import { formatClock } from '../../lib/circuitTime'
 import styles from './Countdown.module.css'
 
 /**
@@ -62,24 +62,24 @@ export function Countdown({
 export function LightsOut({
   raceDate,
   raceStart,
-  circuitId,
+  timezone,
   light,
 }: {
   raceDate: string | undefined
   raceStart: string | undefined
-  circuitId: string | undefined
+  /** The circuit's IANA zone; undefined until the circuit loads. */
+  timezone: string | undefined
   /** Header tone (dark/night photo) — flips the mobile text to white, matching
       the other subheaders when the full-bleed hero sits behind these times. */
   light?: boolean
 }) {
   const target = raceTarget(raceDate, raceStart)
-  const circuitTz = circuitTimezone(circuitId)
 
   return (
     <div className={`${styles.times} ${light ? styles.light : ''}`}>
       <div className={styles.timeRow}>
         <span className={styles.timeLabel}>LIGHTS OUT · CIRCUIT</span>
-        <span className={styles.timeValue}>{formatClock(target, circuitTz)}</span>
+        <span className={styles.timeValue}>{formatClock(target, timezone)}</span>
       </div>
       <div className={styles.timeRow}>
         <span className={styles.timeLabel}>LIGHTS OUT · LOCAL</span>

@@ -1,6 +1,5 @@
 from formation_data.domain import (
     Circuit,
-    CircuitStats,
     Driver,
     GridDriver,
     LapRecord,
@@ -12,12 +11,12 @@ from formation_data.domain import (
     StrategyStint,
     Team,
     TeamSeason,
+    SessionWeather,
     WeatherForecast,
 )
 
 __all__ = [
     "Circuit",
-    "CircuitStats",
     "Driver",
     "GridDriver",
     "LapRecord",
@@ -29,5 +28,6 @@ __all__ = [
     "StrategyStint",
     "Team",
     "TeamSeason",
+    "SessionWeather",
     "WeatherForecast",
 ]

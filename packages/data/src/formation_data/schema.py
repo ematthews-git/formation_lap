@@ -20,6 +20,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     LargeBinary,
     MetaData,
@@ -50,6 +51,34 @@ NAMING_CONVENTION = {
 metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+# The values each status column may hold, enforced with CHECK constraints rather than
+# Postgres enums, which are awkward to change in a migration. Adding a value means a new
+# revision that replaces the constraint.
+SESSION_KINDS = ("fp1", "fp2", "fp3", "sprint_quali", "sprint", "quali", "race")
+WEATHER_CONDITIONS = (
+    "Clear",
+    "Partly Cloudy",
+    "Overcast",
+    "Fog",
+    "Drizzle",
+    "Rain",
+    "Snow",
+    "Showers",
+    "Thunderstorm",
+    "Unknown",
+)
+STRATEGY_TIERS = ("Most likely", "Alternative", "Long-shot")
+TYRE_COMPOUNDS = ("SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET")
+ARTIFACT_KINDS = ("laps", "results", "lap1")  # formation_sim.data.artifacts
+
+
+def _quoted(values: tuple[str, ...]) -> str:
+    return ", ".join(f"'{v}'" for v in values)
+
+
+PIRELLI_COMPOUNDS = _quoted(tuple(f"C{n}" for n in range(7)))  # C0 (hardest) .. C6
+
+
 circuits = Table(
     "circuits",
     metadata,
@@ -69,6 +98,10 @@ circuits = Table(
     Column("fastf1_location", String(50), nullable=False, unique=True),
     Column("lat", Float, nullable=False),
     Column("lon", Float, nullable=False),
+    # IANA zone ("Europe/London"). Session days are the circuit's local days: the weather
+    # forecast is stored per local day and matched to sessions through this, and the
+    # frontend shows session clocks in it.
+    Column("timezone", String(50), nullable=False),
     # First season of the current layout — scopes the lap-record search so laps
     # from a superseded configuration aren't counted. Nullable: null = stable.
     Column("layout_since_year", Integer, nullable=True),
@@ -87,26 +120,14 @@ lap_records = Table(
         "circuit_id", ForeignKey("circuits.circuit_id"), nullable=False, unique=True
     ),
     Column("driver_id", ForeignKey("drivers.driver_id"), nullable=False),
-    Column("year", Integer, nullable=False),
+    Column("year", Integer, nullable=False),  # the season the record was set in
     Column("lap_time_seconds", Float, nullable=False),
-)
-
-
-circuit_stats = Table(
-    "circuit_stats",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
-    Column("season", Integer, nullable=False),
-    Column("sc_probability", Integer, nullable=False),
-    Column("red_flag_probability", Integer, nullable=False),
     Column(
         "updated_at",
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     ),
-    UniqueConstraint("circuit_id", "season"),
 )
 
 
@@ -178,7 +199,7 @@ race_weekends = Table(
     "race_weekends",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
+    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False, index=True),
     Column("season", Integer, nullable=False),
     Column("round_number", Integer, nullable=False),
     # Jolpica's raceName for this round, stored verbatim — the season-specific event
@@ -200,33 +221,52 @@ race_weekends = Table(
     # Keyed on (season, round_number), not (circuit_id, season): double-header
     # seasons (2020: Red Bull Ring, Silverstone, Bahrain ×2) visit a circuit twice.
     UniqueConstraint("season", "round_number"),
+    *(
+        CheckConstraint(f"{c}_compound IN ({PIRELLI_COMPOUNDS})", name=f"{c}_compound")
+        for c in ("soft", "medium", "hard")
+    ),
 )
 
 
+# A weekend's sessions, and what hangs off them (results, weather, strategy runs), belong
+# to the weekend: deleting a weekend that never raced (a cancelled round) takes them with
+# it. Race history (results, standings, traces, overtakes) has no cascade, so a weekend
+# that raced can't be deleted by accident.
 sessions = Table(
     "sessions",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
-    # 1..5 in running order (FP1 → Race). Sprint weekends reuse the same slots
-    # for different session *names* ("Sprint Qualifying", "Sprint"), so the name
-    # carries the format, not the order.
+    Column(
+        "race_weekend_id",
+        ForeignKey("race_weekends.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    # What the session is, whatever FastF1 calls it that season; code keys on this.
+    Column("kind", String(15), nullable=False),
+    # 1..5 in running order (FP1 → Race), for sorting.
     Column("session_order", Integer, nullable=False),
-    Column("name", String, nullable=False),
+    Column("name", String, nullable=False),  # FastF1's name, e.g. "Practice 1"
     # Session start, stored as a UTC instant (timestamptz). The frontend renders
     # it in both the circuit's local zone and the viewer's local zone.
-    Column("start_time", DateTime(timezone=True), nullable=False),
-    UniqueConstraint("race_weekend_id", "session_order"),
+    Column("start_time", DateTime(timezone=True), nullable=False, index=True),
+    UniqueConstraint("race_weekend_id", "kind"),
+    CheckConstraint(f"kind IN ({_quoted(SESSION_KINDS)})", name="kind"),
 )
 
 
+# Open-Meteo's daily forecast for each day of a race weekend, in the circuit's local time.
+# Stored per day, the grain the forecast comes in; the API matches each session to its
+# local day (circuits.timezone), so a sprint weekend's sessions label themselves.
 weather_forecasts = Table(
     "weather_forecasts",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
-    Column("session_name", String, nullable=False),
-    Column("session_date", Date, nullable=False),
+    Column(
+        "race_weekend_id",
+        ForeignKey("race_weekends.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("forecast_date", Date, nullable=False),
     Column("condition", String, nullable=False),
     Column("temp_high_c", Float, nullable=False),
     Column("temp_low_c", Float, nullable=False),
@@ -238,7 +278,8 @@ weather_forecasts = Table(
         nullable=False,
         server_default=func.now(),
     ),
-    UniqueConstraint("race_weekend_id", "session_name"),
+    UniqueConstraint("race_weekend_id", "forecast_date"),
+    CheckConstraint(f"condition IN ({_quoted(WEATHER_CONDITIONS)})", name="condition"),
 )
 
 
@@ -255,7 +296,11 @@ strategy_runs = Table(
     "strategy_runs",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
+    Column(
+        "race_weekend_id",
+        ForeignKey("race_weekends.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
     Column("source", String, nullable=False),
     Column("phase", String, nullable=True),
     Column("stats", JSONB, nullable=True),
@@ -271,6 +316,8 @@ strategy_runs = Table(
         "(source = 'sim' AND phase IS NOT NULL AND phase IN ('prelim', 'postquali'))",
         name="source_phase",
     ),
+    # current_strategy_runs picks the latest per (race_weekend_id, source)
+    Index(None, "race_weekend_id", "source", "generated_at"),
 )
 
 
@@ -296,6 +343,7 @@ strategies = Table(
     Column("plausibility", Float, nullable=True),
     Column("tier", String, nullable=True),
     UniqueConstraint("run_id", "label"),
+    CheckConstraint(f"tier IN ({_quoted(STRATEGY_TIERS)})", name="tier"),
 )
 
 
@@ -311,6 +359,7 @@ strategy_stints = Table(
     Column("pit_lap_window_start", Integer, nullable=False),
     Column("pit_lap_window_end", Integer, nullable=False),
     UniqueConstraint("strategy_id", "stint_order"),
+    CheckConstraint(f"compound IN ({_quoted(TYRE_COMPOUNDS)})", name="compound"),
 )
 
 
@@ -342,12 +391,14 @@ circuit_race_stats = Table(
 # (Q1/Q2/Q3), and a race classification (points, status, time) share almost no columns —
 # so, like a sim run's stats, the whole ordered per-driver list is stored as a single JSONB
 # blob rather than a rigid column-per-field schema. Sourced from FastF1 ~45 min after the
-# session ends (see jobs.post_session.session_results); the frontend renders it later.
+# session ends (see jobs.post_session.session_results). This is the provisional timesheet,
+# shown until the official classification lands; for a race, race_results (Jolpica, the
+# Monday after) is the official result.
 session_results = Table(
     "session_results",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("session_id", ForeignKey("sessions.id"), nullable=False),
+    Column("session_id", ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False),
     Column(
         "updated_at",
         DateTime(timezone=True),
@@ -400,17 +451,24 @@ race_overtakes = Table(
 )
 
 
-# Official finishing order (Jolpica, the Monday after the race). Season, round and circuit
-# come from the race weekend. team_id is the team the driver raced for in that race; its
-# name that season is in team_seasons.
+# Official finishing order (Jolpica, the Monday after the race), which supersedes the
+# provisional FastF1 timesheet in session_results. Season, round and circuit come from the
+# race weekend. team_id is the team the driver raced for in that race; its name that season
+# is in team_seasons.
 race_results = Table(
     "race_results",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
     Column("position", Integer, nullable=False),
-    Column("driver_id", ForeignKey("drivers.driver_id"), nullable=False),
+    Column("driver_id", ForeignKey("drivers.driver_id"), nullable=False, index=True),
     Column("team_id", ForeignKey("teams.team_id"), nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
     UniqueConstraint("race_weekend_id", "position"),
     UniqueConstraint("race_weekend_id", "driver_id"),
 )
@@ -424,6 +482,12 @@ driver_standings = Table(
     Column("driver_id", ForeignKey("drivers.driver_id"), primary_key=True),
     Column("position", Integer, nullable=False),
     Column("points", Float, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
 )
 
 
@@ -434,6 +498,12 @@ constructor_standings = Table(
     Column("team_id", ForeignKey("teams.team_id"), primary_key=True),
     Column("position", Integer, nullable=False),
     Column("points", Float, nullable=False),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
 )
 
 
@@ -441,16 +511,16 @@ constructor_standings = Table(
 # the DB instead of re-fetching ~110 FastF1 sessions (which blows the hourly rate limit). Each
 # row is one DataFrame as Parquet (version-portable, unlike pickle). `kind` = "laps" (cleaned
 # lap frame consumed by the strategy prior + season form) now; "results"/"lap1" reserved for
-# paramset rebuilds. Keyed (kind, year, round_number): one blob per derived file per race.
+# paramset rebuilds. Keyed (kind, season, round_number): one blob per derived file per race.
 # Unlike the race tables above this doesn't reference race_weekends: it's the simulator's
-# cache, addressed in FastF1's (year, round) terms, and it covers races at venues with no
+# cache, addressed in FastF1's (season, round) terms, and it covers races at venues with no
 # `circuits` row that the simulator still learns from.
 derived_artifacts = Table(
     "derived_artifacts",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("kind", String(15), nullable=False),
-    Column("year", Integer, nullable=False),
+    Column("season", Integer, nullable=False),
     Column("round_number", Integer, nullable=False),
     Column("data", LargeBinary, nullable=False),
     Column("data_format", String(15), nullable=False, server_default="parquet"),
@@ -460,7 +530,9 @@ derived_artifacts = Table(
         nullable=False,
         server_default=func.now(),
     ),
-    UniqueConstraint("kind", "year", "round_number"),
+    UniqueConstraint("kind", "season", "round_number"),
+    CheckConstraint(f"kind IN ({_quoted(ARTIFACT_KINDS)})", name="kind"),
+    CheckConstraint("data_format = 'parquet'", name="data_format"),
 )
 
 
@@ -468,7 +540,6 @@ __all__ = [
     "metadata",
     "circuits",
     "lap_records",
-    "circuit_stats",
     "teams",
     "team_seasons",
     "drivers",

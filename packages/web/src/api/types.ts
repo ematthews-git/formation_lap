@@ -19,6 +19,7 @@ export interface Circuit {
   fastf1_location: string
   lat: number
   lon: number
+  timezone: string // IANA zone, e.g. "Europe/London"
   track_outline: string | null
 }
 
@@ -41,9 +42,13 @@ export interface SessionFinisher {
   driver_id: string
 }
 
+/** What a session is, whatever FastF1 names it that season. */
+export type SessionKind = 'fp1' | 'fp2' | 'fp3' | 'sprint_quali' | 'sprint' | 'quali' | 'race'
+
 export interface Session {
   id: number | null
   race_weekend_id: number
+  kind: SessionKind
   session_order: number
   name: string
   start_time: string // ISO datetime (UTC)
@@ -89,15 +94,6 @@ export interface RaceResult {
   code: string | null
   team_id: string
   team: string // the team's name that season
-}
-
-export interface CircuitStats {
-  id: number | null
-  circuit_id: string
-  season: number
-  sc_probability: number
-  red_flag_probability: number
-  updated_at: string | null
 }
 
 /** Empirical per-circuit race analytics over a trailing window (the JSONB `stats` blob).
@@ -160,11 +156,13 @@ export interface LapRecord {
   lap_time_seconds: number
 }
 
+/** A session with the forecast for its day (the circuit's local day). The forecast is
+ * daily, so same-day sessions carry the same numbers. */
 export interface WeatherForecast {
-  id: number | null
-  race_weekend_id: number
+  session_kind: SessionKind
   session_name: string
-  session_date: string
+  start_time: string // ISO datetime (UTC)
+  forecast_date: string
   condition: string
   temp_high_c: number
   temp_low_c: number

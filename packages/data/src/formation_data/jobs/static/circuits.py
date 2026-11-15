@@ -58,6 +58,7 @@ CIRCUITS = [
         jolpica_id="albert_park",
         lat=-37.8497,
         lon=144.968,
+        timezone="Australia/Melbourne",
         layout_since_year=2022,  # Albert Park reprofiled (several corners) for 2022
     ),
     Circuit(
@@ -71,6 +72,7 @@ CIRCUITS = [
         jolpica_id="shanghai",
         lat=31.3389,
         lon=121.22,
+        timezone="Asia/Shanghai",
     ),
     Circuit(
         circuit_id="suzuka",
@@ -83,6 +85,7 @@ CIRCUITS = [
         jolpica_id="suzuka",
         lat=34.8431,
         lon=136.541,
+        timezone="Asia/Tokyo",
     ),
     Circuit(
         circuit_id="miami",
@@ -95,6 +98,7 @@ CIRCUITS = [
         jolpica_id="miami",
         lat=25.9581,
         lon=-80.2389,
+        timezone="America/New_York",
     ),
     Circuit(
         circuit_id="montreal",
@@ -107,6 +111,7 @@ CIRCUITS = [
         jolpica_id="villeneuve",
         lat=45.5,
         lon=-73.5228,
+        timezone="America/Toronto",
     ),
     Circuit(
         circuit_id="monaco",
@@ -119,6 +124,7 @@ CIRCUITS = [
         jolpica_id="monaco",
         lat=43.7347,
         lon=7.42056,
+        timezone="Europe/Monaco",
     ),
     Circuit(
         circuit_id="barcelona",
@@ -131,6 +137,7 @@ CIRCUITS = [
         jolpica_id="catalunya",
         lat=41.57,
         lon=2.26111,
+        timezone="Europe/Madrid",
         layout_since_year=2023,  # final chicane removed for 2023
     ),
     Circuit(
@@ -144,6 +151,7 @@ CIRCUITS = [
         jolpica_id="red_bull_ring",
         lat=47.2197,
         lon=14.7647,
+        timezone="Europe/Vienna",
     ),
     Circuit(
         circuit_id="silverstone",
@@ -156,6 +164,7 @@ CIRCUITS = [
         jolpica_id="silverstone",
         lat=52.0786,
         lon=-1.01694,
+        timezone="Europe/London",
         layout_since_year=2010,  # Arena layout (new infield section) from 2010
     ),
     Circuit(
@@ -169,6 +178,7 @@ CIRCUITS = [
         jolpica_id="spa",
         lat=50.4372,
         lon=5.97139,
+        timezone="Europe/Brussels",
     ),
     Circuit(
         circuit_id="hungaroring",
@@ -181,6 +191,7 @@ CIRCUITS = [
         jolpica_id="hungaroring",
         lat=47.5789,
         lon=19.2486,
+        timezone="Europe/Budapest",
     ),
     Circuit(
         circuit_id="zandvoort",
@@ -193,6 +204,7 @@ CIRCUITS = [
         jolpica_id="zandvoort",
         lat=52.3888,
         lon=4.54092,
+        timezone="Europe/Amsterdam",
     ),
     Circuit(
         circuit_id="monza",
@@ -205,6 +217,7 @@ CIRCUITS = [
         jolpica_id="monza",
         lat=45.6156,
         lon=9.28111,
+        timezone="Europe/Rome",
     ),
     Circuit(
         circuit_id="madrid",
@@ -217,6 +230,7 @@ CIRCUITS = [
         jolpica_id="madring",
         lat=40.46528,
         lon=-3.61528,
+        timezone="Europe/Madrid",
     ),
     Circuit(
         circuit_id="baku",
@@ -229,6 +243,7 @@ CIRCUITS = [
         jolpica_id="baku",
         lat=40.3725,
         lon=49.8533,
+        timezone="Asia/Baku",
     ),
     Circuit(
         circuit_id="sepang",
@@ -241,6 +256,7 @@ CIRCUITS = [
         jolpica_id="sepang",
         lat=2.76083,
         lon=101.738,
+        timezone="Asia/Kuala_Lumpur",
     ),
     Circuit(
         circuit_id="singapore",
@@ -253,6 +269,7 @@ CIRCUITS = [
         jolpica_id="marina_bay",
         lat=1.2914,
         lon=103.864,
+        timezone="Asia/Singapore",
         layout_since_year=2023,  # reconfigured (grandstand section removed) for 2023
     ),
     Circuit(
@@ -266,6 +283,7 @@ CIRCUITS = [
         jolpica_id="americas",
         lat=30.1328,
         lon=-97.6411,
+        timezone="America/Chicago",
     ),
     Circuit(
         circuit_id="mexico_city",
@@ -278,6 +296,7 @@ CIRCUITS = [
         jolpica_id="rodriguez",
         lat=19.4042,
         lon=-99.0907,
+        timezone="America/Mexico_City",
     ),
     Circuit(
         circuit_id="sao_paulo",
@@ -290,6 +309,7 @@ CIRCUITS = [
         jolpica_id="interlagos",
         lat=-23.7036,
         lon=-46.6997,
+        timezone="America/Sao_Paulo",
     ),
     Circuit(
         circuit_id="las_vegas",
@@ -302,6 +322,7 @@ CIRCUITS = [
         jolpica_id="vegas",
         lat=36.1147,
         lon=-115.173,
+        timezone="America/Los_Angeles",
     ),
     Circuit(
         circuit_id="lusail",
@@ -314,6 +335,7 @@ CIRCUITS = [
         jolpica_id="losail",
         lat=25.49,
         lon=51.4542,
+        timezone="Asia/Qatar",
     ),
     Circuit(
         circuit_id="abu_dhabi",
@@ -326,6 +348,7 @@ CIRCUITS = [
         jolpica_id="yas_marina",
         lat=24.4672,
         lon=54.6031,
+        timezone="Asia/Dubai",
         layout_since_year=2021,  # extensively reprofiled for 2021
     ),
 ]

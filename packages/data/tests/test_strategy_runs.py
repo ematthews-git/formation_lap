@@ -25,8 +25,8 @@ def conn(engine):
     with engine.begin() as c:
         c.exec_driver_sql(
             "INSERT INTO circuits (circuit_id, country, track_length_km, num_corners, "
-            "num_laps, sm_zones, jolpica_id, fastf1_location, lat, lon) VALUES "
-            "('spa', 'BE', 7.0, 19, 44, 2, 'spa', 'Spa-Francorchamps', 0, 0)"
+            "num_laps, sm_zones, jolpica_id, fastf1_location, lat, lon, timezone) VALUES "
+            "('spa', 'BE', 7.0, 19, 44, 2, 'spa', 'Spa-Francorchamps', 0, 0, 'Europe/Brussels')"
         )
         yield c
 
@@ -160,16 +160,17 @@ def test_postquali_is_due_until_a_postquali_run_exists(conn):
         [
             domain.Session(
                 race_weekend_id=weekend.id,
+                kind=kind,
                 session_order=order,
                 name=name,
                 start_time=start,
             )
-            for order, name, start in (
-                (4, "Qualifying", now - timedelta(hours=3)),
-                (5, "Race", now + timedelta(hours=20)),
+            for order, kind, name, start in (
+                (4, "quali", "Qualifying", now - timedelta(hours=3)),
+                (5, "race", "Race", now + timedelta(hours=20)),
             )
         ],
-        ["race_weekend_id", "session_order"],
+        ["race_weekend_id", "kind"],
     )
 
     def due():

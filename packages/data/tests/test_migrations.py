@@ -83,11 +83,13 @@ def _exec(eng, *statements: str) -> None:
             conn.exec_driver_sql(sql)
 
 
-def _circuit(circuit_id: str) -> str:
+def _circuit(circuit_id: str, timezone: str | None = None) -> str:
+    """A circuits row; pass `timezone` at 0006 and later, where it's required."""
+    tz_col, tz_val = (", timezone", f", '{timezone}'") if timezone else ("", "")
     return (
         "INSERT INTO circuits (circuit_id, country, track_length_km, num_corners, num_laps, "
-        "sm_zones, jolpica_id, fastf1_location, lat, lon) VALUES "
-        f"('{circuit_id}', 'X', 5.0, 10, 50, 2, '{circuit_id}', '{circuit_id}', 0, 0)"
+        f"sm_zones, jolpica_id, fastf1_location, lat, lon{tz_col}) VALUES "
+        f"('{circuit_id}', 'X', 5.0, 10, 50, 2, '{circuit_id}', '{circuit_id}', 0, 0{tz_val})"
     )
 
 
@@ -119,8 +121,7 @@ def test_0003_points_history_at_the_right_weekend(engine):
         "INSERT INTO race_overtakes (circuit_id, season, round_number, overtakes) "
         "VALUES ('singapore', 2026, 17, '{}')",
     )
-    migrate.upgrade()
-    assert migrate.check() == []
+    migrate.upgrade("0003")
     with engine.connect() as conn:
         winners = dict(
             conn.exec_driver_sql("""
@@ -166,8 +167,8 @@ def test_resolve_race_weekend(engine):
     migrate.upgrade()
     _exec(
         engine,
-        _circuit("silverstone"),
-        _circuit("monza"),
+        _circuit("silverstone", "Europe/London"),
+        _circuit("monza", "Europe/Rome"),
         _weekend("silverstone", 2020, 4),
         _weekend("silverstone", 2020, 5),
         _weekend("monza", 2026, 16),
@@ -412,3 +413,80 @@ def test_current_strategy_runs_view_has_the_tables_columns(engine):
     view = [c["name"] for c in inspect(engine).get_columns("current_strategy_runs")]
     assert view == [c.name for c in schema.strategy_runs.c]
     assert view == [c.name for c in schema.current_strategy_runs.c]
+
+
+# --- 0006: cleanup ---------------------------------------------------------------------
+
+
+@needs_db
+def test_0006_moves_rows_onto_the_new_keys(engine):
+    migrate.upgrade("0005")
+    weekend = "(SELECT id FROM race_weekends WHERE round_number = 11)"
+    _exec(
+        engine,
+        _circuit("silverstone"),
+        "INSERT INTO race_weekends (circuit_id, season, round_number, event_name, race_date, "
+        "is_sprint) VALUES ('silverstone', 2026, 11, 'British GP', '2026-07-05', true)",
+        "INSERT INTO sessions (race_weekend_id, session_order, name, start_time) VALUES "
+        f"({weekend}, 1, 'Practice 1', '2026-07-03 11:30+00'), "
+        f"({weekend}, 2, 'Sprint Qualifying', '2026-07-03 15:30+00'), "
+        f"({weekend}, 5, 'Race', '2026-07-05 14:00+00')",
+        # the old job's guesses: two names for Friday, with one forecast between them
+        "INSERT INTO weather_forecasts (race_weekend_id, session_name, session_date, condition, "
+        "temp_high_c, temp_low_c, rain_probability, wind_speed_kph, updated_at) VALUES "
+        f"({weekend}, 'FP1', '2026-07-03', 'Rain', 18, 11, 80, 20, '2026-07-01'), "
+        f"({weekend}, 'Sprint Qualifying', '2026-07-03', 'Rain', 18, 11, 80, 20, '2026-07-01'), "
+        f"({weekend}, 'Race', '2026-07-05', 'Clear', 24, 14, 5, 9, '2026-07-01')",
+        "INSERT INTO derived_artifacts (kind, year, round_number, data) "
+        "VALUES ('laps', 2026, 11, '\\x00')",
+        "INSERT INTO circuit_stats (circuit_id, season, sc_probability, red_flag_probability) "
+        "VALUES ('silverstone', 2026, 50, 0)",
+    )
+    migrate.upgrade()
+    assert migrate.check() == []
+
+    def rows(sql):
+        with engine.connect() as conn:
+            return [tuple(r) for r in conn.exec_driver_sql(sql).all()]
+
+    assert rows("SELECT timezone FROM circuits") == [("Europe/London",)]
+    assert rows("SELECT name, kind FROM sessions ORDER BY session_order") == [
+        ("Practice 1", "fp1"),
+        ("Sprint Qualifying", "sprint_quali"),
+        ("Race", "race"),
+    ]
+    assert rows(
+        "SELECT forecast_date::text, condition FROM weather_forecasts ORDER BY 1"
+    ) == [("2026-07-03", "Rain"), ("2026-07-05", "Clear")]
+    assert rows("SELECT kind, season, round_number FROM derived_artifacts") == [("laps", 2026, 11)]
+    assert "circuit_stats" not in _tables(engine)
+
+    # ...and back: each day becomes the session rows the old job wrote for it.
+    migrate.downgrade("0005")
+    assert rows(
+        "SELECT session_name, session_date::text FROM weather_forecasts ORDER BY 2, 1"
+    ) == [("FP1", "2026-07-03"), ("Sprint Qualifying", "2026-07-03"), ("Race", "2026-07-05")]
+    assert rows("SELECT year FROM derived_artifacts") == [(2026,)]
+    assert "circuit_stats" in _tables(engine)
+    migrate.upgrade()
+    assert migrate.check() == []
+
+
+@needs_db
+def test_0006_refuses_what_it_cannot_place(engine):
+    migrate.upgrade("0005")
+    _exec(
+        engine,
+        _circuit("nurburgring"),
+        _weekend("nurburgring", 2020, 11),
+        "INSERT INTO sessions (race_weekend_id, session_order, name, start_time) "
+        "SELECT id, 1, 'Sprint Race', '2020-10-09 10:00+00' FROM race_weekends",
+        "UPDATE race_weekends SET soft_compound = 'C9'",
+    )
+    with pytest.raises(migrate.MigrationError) as err:
+        migrate.upgrade()
+    msg = str(err.value)
+    assert "circuits nurburgring: no time zone" in msg
+    assert "no kind for 'Sprint Race'" in msg
+    assert "race_weekends.soft_compound: 'C9'" in msg
+    assert _version(engine) == "0005"

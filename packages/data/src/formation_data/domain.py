@@ -30,6 +30,7 @@ class Circuit(_Base):
     fastf1_location: str
     lat: float
     lon: float
+    timezone: str  # IANA zone; session days and clocks are the circuit's local ones
     # First season of the *current* track layout. Used to scope the lap-record
     # search so laps set on a superseded configuration (e.g. Silverstone pre-2010)
     # aren't counted. None = layout stable across all available data.
@@ -50,15 +51,6 @@ class LapRecord(_Base):
     family_name: str
     year: int
     lap_time_seconds: float
-
-
-class CircuitStats(_Base):
-    id: int | None = None
-    circuit_id: str
-    season: int
-    sc_probability: int
-    red_flag_probability: int
-    updated_at: datetime | None = None
 
 
 class Team(_Base):
@@ -130,6 +122,7 @@ class RaceWeekend(_Base):
 class Session(_Base):
     id: int | None = None
     race_weekend_id: int
+    kind: str  # schema.SESSION_KINDS: fp1 .. race
     session_order: int
     name: str
     # UTC instant; consumers convert to circuit-local / viewer-local time.
@@ -152,6 +145,7 @@ class SessionWithResults(_Base):
 
     id: int | None = None
     race_weekend_id: int
+    kind: str
     session_order: int
     name: str
     start_time: datetime
@@ -159,10 +153,26 @@ class SessionWithResults(_Base):
 
 
 class WeatherForecast(_Base):
+    """One day's forecast for a race weekend, the day being the circuit's local one."""
+
     id: int | None = None
     race_weekend_id: int
+    forecast_date: date
+    condition: str  # schema.WEATHER_CONDITIONS
+    temp_high_c: float
+    temp_low_c: float
+    rain_probability: int
+    wind_speed_kph: float
+    updated_at: datetime | None = None
+
+
+class SessionWeather(_Base):
+    """A session with the forecast for its local day — API read shape."""
+
+    session_kind: str
     session_name: str
-    session_date: date
+    start_time: datetime
+    forecast_date: date
     condition: str
     temp_high_c: float
     temp_low_c: float
@@ -357,7 +367,7 @@ class Standing(_Base):
 
 
 class DerivedArtifact(_Base):
-    """One per-race derived table serialized to bytes (Parquet), keyed (kind, year, round).
+    """One per-race derived table serialized to bytes (Parquet), keyed (kind, season, round).
 
     Lets the sim read cleaned laps from the DB instead of local pkl / live FastF1 in CI.
     `data` is the DataFrame serialized in `data_format`.
@@ -365,7 +375,7 @@ class DerivedArtifact(_Base):
 
     id: int | None = None
     kind: str
-    year: int
+    season: int
     round_number: int
     data: bytes
     data_format: str = "parquet"
@@ -375,7 +385,6 @@ class DerivedArtifact(_Base):
 __all__ = [
     "Circuit",
     "LapRecord",
-    "CircuitStats",
     "Team",
     "TeamSeason",
     "Driver",
@@ -386,6 +395,7 @@ __all__ = [
     "SessionFinisher",
     "SessionWithResults",
     "WeatherForecast",
+    "SessionWeather",
     "Strategy",
     "StrategyStint",
     "StrategyRun",

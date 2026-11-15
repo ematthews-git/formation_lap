@@ -63,7 +63,7 @@ export function Header({ weekend, circuit, totalRounds, raceStart }: HeaderProps
           <LightsOut
             raceDate={weekend.race_date}
             raceStart={raceStart}
-            circuitId={weekend.circuit_id}
+            timezone={circuit?.timezone}
             light={light}
           />
         </div>
