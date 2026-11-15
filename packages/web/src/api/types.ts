@@ -222,6 +222,8 @@ export interface StrategyStint {
 
 export interface StrategyWithStints {
   id: number | null
+  // The run (one generation of the weekend's strategies) this came from.
+  run_id: number
   race_weekend_id: number
   // "historical" (mined) or "sim" (simulated).
   source: string
@@ -233,11 +235,11 @@ export interface StrategyWithStints {
   // Sim only: field-plausibility share (0–1) and coarse tier. null for historical.
   plausibility: number | null
   tier: string | null
-  updated_at: string | null
+  generated_at: string
   stints: StrategyStint[]
 }
 
-/** Race-context numbers from a sim run (the JSONB `stats` blob). */
+/** Race-context numbers from a sim run (the JSONB `stats` blob). `id` is the run's. */
 export interface SimRaceStats {
   id: number | null
   race_weekend_id: number

@@ -171,20 +171,30 @@ class WeatherForecast(_Base):
     updated_at: datetime | None = None
 
 
-class Strategy(_Base):
+class StrategyRun(_Base):
+    """One generation of a weekend's strategies. Every run is kept; the latest per
+    (race_weekend_id, source) is the one shown (the current_strategy_runs view)."""
+
     id: int | None = None
     race_weekend_id: int
-    # "historical" (mined) or "sim" (simulated). Defaults keep pre-sim callers valid.
-    source: str = "historical"
+    # "historical" (mined from the last dry running) or "sim" (simulated).
+    source: str
     # Sim only: "prelim" | "postquali". None for historical.
     phase: str | None = None
+    # Sim only: the race-context blob (meta, circuit_profile, race_stats).
+    stats: dict | None = None
+    generated_at: datetime | None = None
+
+
+class Strategy(_Base):
+    id: int | None = None
+    run_id: int | None = None  # set when the run is stored
     is_base: bool
     num_stops: int
     label: str
     # Sim only: field-plausibility share and coarse tier. None for historical.
     plausibility: float | None = None
     tier: str | None = None
-    updated_at: datetime | None = None
 
 
 class StrategyStint(_Base):
@@ -197,23 +207,25 @@ class StrategyStint(_Base):
 
 
 class StrategyWithStints(_Base):
-    """A strategy plus its ordered stints — API read shape (not a seed/upsert type)."""
+    """A strategy plus its ordered stints and the run it came from — API read shape."""
 
     id: int | None = None
+    run_id: int
     race_weekend_id: int
-    source: str = "historical"
+    source: str
     phase: str | None = None
     is_base: bool
     num_stops: int
     label: str
     plausibility: float | None = None
     tier: str | None = None
-    updated_at: datetime | None = None
+    generated_at: datetime
     stints: list[StrategyStint] = []
 
 
 class SimRaceStats(_Base):
-    """Race-context numbers from a sim run (the JSONB `stats` blob), API read shape."""
+    """Race-context numbers from a sim run (its `stats` blob), API read shape. `id` is
+    the run's id."""
 
     id: int | None = None
     race_weekend_id: int
@@ -376,6 +388,7 @@ __all__ = [
     "WeatherForecast",
     "Strategy",
     "StrategyStint",
+    "StrategyRun",
     "StrategyWithStints",
     "SimRaceStats",
     "CircuitRaceStats",

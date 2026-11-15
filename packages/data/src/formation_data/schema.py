@@ -27,7 +27,9 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    column,
     func,
+    table,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -240,19 +242,52 @@ weather_forecasts = Table(
 )
 
 
+# One row per strategy generation, so a later run adds to the record instead of replacing
+# it (prelim, then postquali, can be compared with each other and with the race).
+# "historical" = mined from the last dry running of the circuit (jobs.pre_race.strategies);
+# "sim" = produced by the strategy simulator (jobs.pre_race.sim_strategies), with `phase`
+# saying which run: "prelim" (pre-weekend, season form) or "postquali" (grid and quali pace
+# known). A sim run also carries the race-context numbers it produced (tyre life, undercut,
+# pit loss, SC/VSC probability, stop-count split, chaos index, ..., plus the circuit
+# profile and run meta) as one JSONB blob, so that feed can evolve without a schema change.
+# Readers that want the strategy currently on show use the current_strategy_runs view.
+strategy_runs = Table(
+    "strategy_runs",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
+    Column("source", String, nullable=False),
+    Column("phase", String, nullable=True),
+    Column("stats", JSONB, nullable=True),
+    Column(
+        "generated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    # A CHECK passes when it evaluates to NULL, hence the explicit IS NOT NULL.
+    CheckConstraint(
+        "(source = 'historical' AND phase IS NULL) OR "
+        "(source = 'sim' AND phase IS NOT NULL AND phase IN ('prelim', 'postquali'))",
+        name="source_phase",
+    ),
+)
+
+
+# The latest run for each (race_weekend_id, source): what the API shows. A view, created
+# by migration 0005, so it isn't part of `metadata`; this mirrors its columns for queries.
+current_strategy_runs = table(
+    "current_strategy_runs", *(column(c.name, c.type) for c in strategy_runs.c)
+)
+
+
 strategies = Table(
     "strategies",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
-    # Provenance. "historical" = mined from the last dry running of the circuit
-    # (jobs.pre_race.strategies); "sim" = produced by the strategy simulator
-    # (jobs.pre_race.sim_strategies). Both coexist per weekend, hence source is
-    # part of the uniqueness key so a shared label doesn't collide across sources.
-    Column("source", String, nullable=False, server_default="historical"),
-    # Sim only: which run produced these rows. "prelim" (pre-weekend, season form)
-    # is superseded by "postquali" (grid + quali pace known). Null for historical.
-    Column("phase", String, nullable=True),
+    Column(
+        "run_id", ForeignKey("strategy_runs.id", ondelete="CASCADE"), nullable=False
+    ),
     Column("is_base", Boolean, nullable=False),
     Column("num_stops", Integer, nullable=False),
     Column("label", String, nullable=False),
@@ -260,15 +295,7 @@ strategies = Table(
     # coarse tier ("Most likely" / "Alternative" / "Long-shot"). Null for historical.
     Column("plausibility", Float, nullable=True),
     Column("tier", String, nullable=True),
-    Column(
-        "updated_at",
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    ),
-    UniqueConstraint(
-        "race_weekend_id", "source", "label", name="uq_strategies_weekend_source_label"
-    ),
+    UniqueConstraint("run_id", "label"),
 )
 
 
@@ -276,7 +303,9 @@ strategy_stints = Table(
     "strategy_stints",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("strategy_id", ForeignKey("strategies.id"), nullable=False),
+    Column(
+        "strategy_id", ForeignKey("strategies.id", ondelete="CASCADE"), nullable=False
+    ),
     Column("stint_order", Integer, nullable=False),
     Column("compound", String(15), nullable=False),
     Column("pit_lap_window_start", Integer, nullable=False),
@@ -285,31 +314,9 @@ strategy_stints = Table(
 )
 
 
-# Race-context numbers a sim run produces (tyre life, undercut power, pit loss, SC/VSC
-# probability, overtaking difficulty, stop-count split, chaos index, degradation rank,
-# pole-to-win, plus the circuit profile and run meta). Stored as a single JSONB blob —
-# the whole derived-stats feed — rather than a column per number, so the fan-facing set
-# can evolve without a schema change. One row per weekend; the latest phase wins.
-sim_race_stats = Table(
-    "sim_race_stats",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
-    Column("phase", String, nullable=False),  # "prelim" | "postquali"
-    Column(
-        "generated_at",
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    ),
-    Column("stats", JSONB, nullable=False),
-    UniqueConstraint("race_weekend_id"),
-)
-
-
 # Empirical per-circuit race analytics, mined from EVERY race (wet included) in the trailing
 # few seasons — the observed-history counterpart to the sim's dry-only, model-derived context
-# numbers. Like sim_race_stats it's a single JSONB blob (incidents, grid/finish, tyres,
+# numbers. Like a sim run's stats it's a single JSONB blob (incidents, grid/finish, tyres,
 # weather, timing … a large, still-evolving set) rather than a column per metric, so the feed
 # can grow without a migration. Keyed (circuit_id, season): one rollup per circuit per season
 # the job is run for, the season fixing the trailing window it was computed over.
@@ -333,7 +340,7 @@ circuit_race_stats = Table(
 # Per-session finishing order / timesheet, one row per session. Session classifications
 # are heterogeneous — a practice timesheet (fastest lap + gap), a qualifying sheet
 # (Q1/Q2/Q3), and a race classification (points, status, time) share almost no columns —
-# so, like sim_race_stats, the whole ordered per-driver list is stored as a single JSONB
+# so, like a sim run's stats, the whole ordered per-driver list is stored as a single JSONB
 # blob rather than a rigid column-per-field schema. Sourced from FastF1 ~45 min after the
 # session ends (see jobs.post_session.session_results); the frontend renders it later.
 session_results = Table(
@@ -469,9 +476,10 @@ __all__ = [
     "race_weekends",
     "sessions",
     "weather_forecasts",
+    "strategy_runs",
+    "current_strategy_runs",
     "strategies",
     "strategy_stints",
-    "sim_race_stats",
     "circuit_race_stats",
     "session_results",
     "race_traces",

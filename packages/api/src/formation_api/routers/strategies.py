@@ -33,9 +33,9 @@ async def list_strategies(season: int, round: int) -> list[StrategyWithStints]:
 async def list_simulated_strategies(season: int, round: int) -> list[StrategyWithStints]:
     """Officially simulated strategy options — the race-level shown-5 from the sim.
 
-    Each carries `phase` (prelim/postquali), `plausibility` and `tier`. The list holds the
-    latest run's output: prelim until quali, then superseded by postquali. Empty list until
-    the first sim has run for the weekend.
+    Each carries its `run_id`, `phase` (prelim/postquali), `plausibility` and `tier`. The
+    list is the latest run's output: prelim until quali, then postquali (earlier runs stay
+    stored). Empty list until the first sim has run for the weekend.
     """
     return await asyncio.to_thread(_list, season, round, "sim")
 
@@ -44,6 +44,7 @@ async def list_simulated_strategies(season: int, round: int) -> list[StrategyWit
 async def simulated_race_stats(season: int, round: int) -> SimRaceStats | None:
     """Race-context numbers from the sim (tyre life, undercut, SC/VSC prob, chaos index, …).
 
-    Returns null until a sim has run for the weekend.
+    From the weekend's latest sim run, whose id is `id`. Returns null until a sim has run
+    for the weekend.
     """
     return await asyncio.to_thread(_sim_stats, season, round)

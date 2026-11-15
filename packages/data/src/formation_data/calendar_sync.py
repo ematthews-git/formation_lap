@@ -2,8 +2,8 @@
 
 Why this exists: `race_weekends` is keyed on (season, round_number), and the round number
 is not just a label. The simulator and the FastF1 session lookups address a weekend by
-FastF1's round number, and `sessions`, `strategies`, `weather_forecasts` and
-`sim_race_stats` all hang off the weekend's surrogate `id`. When a race is added
+FastF1's round number, and `sessions`, `strategy_runs`, `weather_forecasts` and the
+race history tables all hang off the weekend's surrogate `id`. When a race is added
 mid-season (2026: "Bahrain Grand Prix in Malaysia" slotted in as round 16), every later
 round shifts by one. A blind upsert on (season, round_number) would overwrite the old
 round-16 row *in place* — keeping its `id`, so Singapore's sessions and strategies would

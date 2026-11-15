@@ -41,8 +41,8 @@ def test_clamp_orders_lo_le_hi():
 
 
 def test_build_strategy_one_stop_maps_fields():
-    strat, stints = sim_strategies._build_strategy(7, 52, _entry(), mode="prelim")
-    assert (strat.source, strat.phase, strat.is_base) == ("sim", "prelim", True)
+    strat, stints = sim_strategies._build_strategy(52, _entry())
+    assert strat.is_base is True
     assert strat.num_stops == 1
     assert strat.label == "MEDIUM->HARD"
     assert (strat.plausibility, strat.tier) == (0.42, "Most likely")
@@ -54,14 +54,13 @@ def test_build_strategy_one_stop_maps_fields():
 
 
 def test_build_strategy_non_base_when_not_rank_one():
-    strat, _ = sim_strategies._build_strategy(7, 52, _entry(rank=3), mode="postquali")
+    strat, _ = sim_strategies._build_strategy(52, _entry(rank=3))
     assert strat.is_base is False
-    assert strat.phase == "postquali"
 
 
 def test_build_strategy_two_stop_windows_clamped_to_race_laps():
     entry = _entry(compounds=("SOFT", "MEDIUM", "HARD"), windows=((10, 15), (48, 60)))
-    strat, stints = sim_strategies._build_strategy(7, 50, entry, mode="prelim")
+    strat, stints = sim_strategies._build_strategy(50, entry)
     assert strat.num_stops == 2
     assert [s.compound for s in stints] == ["SOFT", "MEDIUM", "HARD"]
     assert (stints[1].pit_lap_window_start, stints[1].pit_lap_window_end) == (48, 50)  # hi clamped

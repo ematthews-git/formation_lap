@@ -17,7 +17,7 @@ interface State {
  * Per-section error boundary: a render error inside one briefing panel
  * degrades that panel to an ErrorState card instead of white-screening the
  * whole page. The riskiest inputs are the loosely-typed JSONB stats blobs
- * (sim_race_stats / circuit race-stats), which are poked via unknown-casts.
+ * (sim run stats / circuit race-stats), which are poked via unknown-casts.
  */
 export class SectionBoundary extends Component<Props, State> {
   state: State = { failed: false }

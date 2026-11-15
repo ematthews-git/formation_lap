@@ -301,3 +301,114 @@ def test_0004_refuses_names_it_does_not_know(engine):
     assert "driver 'button'" in str(err.value) and "team 'Brawn'" in str(err.value)
     assert _version(engine) == "0003"
     assert "team" in {c["name"] for c in inspect(engine).get_columns("race_results")}
+
+
+# --- 0005: strategy runs -------------------------------------------------------------
+
+
+def _strategy_0004(weekend: str, source: str, phase: str | None, label: str, at: str) -> str:
+    """A 0004-shaped strategies row (with one stint) for the weekend matching `weekend`."""
+    phase_sql = f"'{phase}'" if phase else "NULL"
+    return (
+        "WITH s AS (INSERT INTO strategies (race_weekend_id, source, phase, is_base, "
+        "num_stops, label, updated_at) "
+        f"SELECT id, '{source}', {phase_sql}, true, 0, '{label}', '{at}' FROM race_weekends "
+        f"WHERE {weekend} RETURNING id) "
+        "INSERT INTO strategy_stints (strategy_id, stint_order, compound, "
+        "pit_lap_window_start, pit_lap_window_end) SELECT id, 1, 'HARD', 44, 44 FROM s"
+    )
+
+
+@needs_db
+def test_0005_moves_strategies_into_runs(engine):
+    migrate.upgrade("0004")
+    r9, r10 = "round_number = 9", "round_number = 10"
+    _exec(
+        engine,
+        _circuit("spa"),
+        _weekend("spa", 2026, 9),
+        _weekend("spa", 2026, 10),
+        _strategy_0004(r9, "historical", None, "MEDIUM->HARD", "2026-06-30 01:00+00"),
+        _strategy_0004(r9, "historical", None, "SOFT->HARD", "2026-06-30 01:00+00"),
+        _strategy_0004(r9, "sim", "postquali", "HARD->MEDIUM", "2026-07-07 03:00+00"),
+        "INSERT INTO sim_race_stats (race_weekend_id, phase, generated_at, stats) "
+        "SELECT id, 'postquali', '2026-07-07 03:00+00', '{\"x\": 1}' FROM race_weekends "
+        f"WHERE {r9}",
+        # sim strategies whose stats row is missing still make a run
+        _strategy_0004(r10, "sim", "prelim", "MEDIUM->HARD", "2026-07-10 03:00+00"),
+    )
+    migrate.upgrade()
+    assert migrate.check() == []
+
+    def rows(sql):
+        with engine.connect() as conn:
+            return [tuple(r) for r in conn.exec_driver_sql(sql).all()]
+
+    runs = (
+        "SELECT rw.round_number, r.source, r.phase, r.stats->>'x', "
+        "(SELECT count(*) FROM strategies s WHERE s.run_id = r.id) "
+        "FROM {} r JOIN race_weekends rw ON rw.id = r.race_weekend_id ORDER BY 1, 2"
+    )
+    assert rows(runs.format("strategy_runs")) == [
+        (9, "historical", None, None, 2),
+        (9, "sim", "postquali", "1", 1),
+        (10, "sim", "prelim", None, 1),
+    ]
+    assert rows("SELECT count(*) FROM strategy_stints") == [(4,)]
+
+    # A newer run for weekend 9 becomes the current one; the older one stays stored.
+    _exec(
+        engine,
+        "WITH r AS (INSERT INTO strategy_runs (race_weekend_id, source, phase, stats, "
+        f"generated_at) SELECT id, 'sim', 'postquali', '{{\"x\": 2}}', '2026-07-08 00:00+00' "
+        f"FROM race_weekends WHERE {r9} RETURNING id) "
+        "INSERT INTO strategies (run_id, is_base, num_stops, label) "
+        "SELECT id, true, 1, 'SOFT->HARD' FROM r",
+    )
+    assert rows(runs.format("current_strategy_runs")) == [
+        (9, "historical", None, None, 2),
+        (9, "sim", "postquali", "2", 1),
+        (10, "sim", "prelim", None, 1),
+    ]
+
+    # ...and back: each weekend keeps its current run per source.
+    migrate.downgrade("0004")
+    assert rows(
+        "SELECT rw.round_number, s.source, s.phase, s.label FROM strategies s "
+        "JOIN race_weekends rw ON rw.id = s.race_weekend_id ORDER BY 1, 2, 4"
+    ) == [
+        (9, "historical", None, "MEDIUM->HARD"),
+        (9, "historical", None, "SOFT->HARD"),
+        (9, "sim", "postquali", "SOFT->HARD"),
+        (10, "sim", "prelim", "MEDIUM->HARD"),
+    ]
+    assert rows("SELECT phase, stats->>'x' FROM sim_race_stats") == [("postquali", "2")]
+    migrate.upgrade()
+    assert migrate.check() == []
+
+
+@needs_db
+def test_0005_refuses_strategies_from_two_runs(engine):
+    migrate.upgrade("0004")
+    r9 = "round_number = 9"
+    _exec(
+        engine,
+        _circuit("spa"),
+        _weekend("spa", 2026, 9),
+        _strategy_0004(r9, "sim", "prelim", "MEDIUM->HARD", "2026-07-07 03:00+00"),
+        _strategy_0004(r9, "sim", "postquali", "SOFT->HARD", "2026-07-08 03:00+00"),
+    )
+    with pytest.raises(migrate.MigrationError, match="2026 R9: sim rows from more than one run"):
+        migrate.upgrade()
+    assert _version(engine) == "0004"
+    assert "sim_race_stats" in _tables(engine)
+
+
+@needs_db
+def test_current_strategy_runs_view_has_the_tables_columns(engine):
+    """The view lists strategy_runs' columns by name, and schema.py mirrors them; a
+    column added to strategy_runs needs the view recreated in the same revision."""
+    migrate.upgrade()
+    view = [c["name"] for c in inspect(engine).get_columns("current_strategy_runs")]
+    assert view == [c.name for c in schema.strategy_runs.c]
+    assert view == [c.name for c in schema.current_strategy_runs.c]

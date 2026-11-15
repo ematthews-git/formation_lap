@@ -186,7 +186,7 @@ migrations apply it.
 | Calendar | `race_weekends` (every race from 2020), `sessions`, `weather_forecasts` |
 | Results and history | `race_results`, `driver_standings`, `constructor_standings`, `session_results`, `race_traces`, `race_overtakes` |
 | Circuit analytics | `circuit_stats`, `circuit_race_stats` |
-| Strategy | `strategies`, `strategy_stints`, `sim_race_stats` |
+| Strategy | `strategy_runs` (one row per generation), `strategies`, `strategy_stints`; the `current_strategy_runs` view picks the latest run per weekend and source |
 | Simulator cache | `derived_artifacts` (cleaned lap frames as Parquet) |
 
 A circuit is identified by `circuit_id`, never by an event name, since event names change
@@ -198,8 +198,15 @@ through rebrands (`racing_bulls` covers AlphaTauri, RB and Racing Bulls). `team_
 holds each team's name and source keys per season, so results, standings and race traces
 resolve the team a source names through it, and a team that isn't there stops the load.
 A new season needs its teams added to `jobs/static/teams.py` before its first results
-load, and its announced grid to `jobs/static/drivers.py`. Derived feeds whose shape is still evolving (race traces, overtakes, circuit
-analytics, simulator output) are stored as JSONB.
+load, and its announced grid to `jobs/static/drivers.py`.
+
+Every strategy generation is kept as a `strategy_runs` row: each run of the historical
+miner, and each sim run (prelim, then postquali) with the race-context numbers it produced.
+The API shows the latest run per weekend and source through the `current_strategy_runs`
+view, and earlier runs stay stored for comparison.
+
+Derived feeds whose shape is still evolving (race traces, overtakes, circuit analytics,
+simulator output) are stored as JSONB.
 
 To change the schema, edit `schema.py`, then generate and review a migration:
 

@@ -25,9 +25,8 @@ Safety / data-quality guards:
 - **FastF1 rate limit**: re-raised; partial progress is on the on-disk cache so a
   re-run resumes for free (see `sources.fastf1_client`).
 
-Upsert keys:
-- Strategy           UniqueConstraint(race_weekend_id, label)
-- StrategyStint      UniqueConstraint(strategy_id, stint_order)
+Each run is stored as a new ``strategy_runs`` row (``source="historical"``); earlier runs
+are kept and the API shows the latest. The simulator's runs (``source="sim"``) are separate.
 """
 
 from __future__ import annotations
@@ -104,18 +103,23 @@ def run(conn: Connection, *, season: int, round_number: int) -> None:
     if not kept:  # very fragmented field — keep just the single most-used
         kept = ranked[:1]
 
-    repositories.delete_strategies_for_weekend(conn, rw.id)
-    for rank, group in enumerate(kept):
-        strategy, stints = _build_strategy(rw.id, circuit.num_laps, group, is_base=rank == 0)
-        repositories.upsert_strategy_with_stints(conn, strategy, stints)
+    run_id = repositories.insert_strategy_run(
+        conn,
+        domain.StrategyRun(race_weekend_id=rw.id, source="historical"),
+        [
+            _build_strategy(circuit.num_laps, group, is_base=rank == 0)
+            for rank, group in enumerate(kept)
+        ],
+    )
 
     logger.info(
-        "pre_race.strategies.run season=%s round=%s circuit=%s source_season=%s "
+        "pre_race.strategies.run season=%s round=%s circuit=%s source_season=%s run=%s "
         "strategies=%d (base=%s)",
         season,
         round_number,
         circuit.circuit_id,
         source_season,
+        run_id,
         len(kept),
         kept[0]["label"],
     )
@@ -262,14 +266,13 @@ def _driver_strategies(session) -> list[dict]:
 
 
 def _build_strategy(
-    race_weekend_id: int, race_laps: int, group: dict, *, is_base: bool
+    race_laps: int, group: dict, *, is_base: bool
 ) -> tuple[domain.Strategy, list[domain.StrategyStint]]:
     """Turn a ranked strategy group into a Strategy + its StrategyStints."""
     compounds: list[str] = group["compounds"]
     num_stops = len(compounds) - 1
 
     strategy = domain.Strategy(
-        race_weekend_id=race_weekend_id,
         is_base=is_base,
         num_stops=num_stops,
         label=group["label"],
@@ -284,7 +287,7 @@ def _build_strategy(
             start = end = race_laps
         stints.append(
             domain.StrategyStint(
-                strategy_id=0,  # replaced in upsert_strategy_with_stints
+                strategy_id=0,  # set by insert_strategy_run
                 stint_order=order,
                 compound=compound,
                 pit_lap_window_start=start,

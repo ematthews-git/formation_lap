@@ -93,9 +93,8 @@ def test_pit_window_single_observation_collapses():
 
 def test_build_strategy_shapes_stints_and_pins_final():
     group = {"label": "MEDIUM->HARD", "compounds": ["MEDIUM", "HARD"], "drivers": ["A", "B"], "stop_laps": [[20, 22]]}
-    strategy, stints = strategies._build_strategy(7, 52, group, is_base=True)
+    strategy, stints = strategies._build_strategy(52, group, is_base=True)
 
-    assert strategy.race_weekend_id == 7
     assert strategy.is_base is True
     assert strategy.num_stops == 1
     assert strategy.label == "MEDIUM->HARD"

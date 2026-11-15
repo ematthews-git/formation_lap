@@ -9,7 +9,7 @@ session_name). FastF1 is the only source with practice data; its timing can lag 
 
 Rows produced: one session_results row per session, holding the whole ordered per-driver
 list as a JSONB blob (session classifications are too heterogeneous across FP / Q / Sprint
-/ Race for a rigid column schema — same rationale as sim_race_stats).
+/ Race for a rigid column schema — same rationale as a sim run's stats).
 
 Upsert key: session_results UniqueConstraint(session_id).
 """

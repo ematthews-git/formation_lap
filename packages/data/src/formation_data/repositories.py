@@ -8,8 +8,8 @@ Reads with real logic (filter by date, lookup by composite key) get their own
 small functions below — there are only a handful, so keeping them here beats
 spreading them across per-table modules.
 
-The one bundled operation is `upsert_strategy_with_stints`, because a strategy
-row's auto-id has to land before its child stints can be inserted.
+The one bundled write is `insert_strategy_run`, because a run's and each strategy's
+auto-id have to land before the rows beneath them can be inserted.
 """
 
 from __future__ import annotations
@@ -114,82 +114,33 @@ def upsert(
     return conn.execute(stmt).rowcount
 
 
-def upsert_strategy_with_stints(
-    conn: Connection, strategy: domain.Strategy, stints: list[domain.StrategyStint]
+def insert_strategy_run(
+    conn: Connection,
+    run: domain.StrategyRun,
+    strategies: list[tuple[domain.Strategy, list[domain.StrategyStint]]],
 ) -> int:
-    """Upsert a Strategy and its stints atomically; returns the strategy id.
+    """Store one generation of a weekend's strategies, each with its stints, as a new run.
 
-    The strategy row is inserted (or updated, keyed on its unique
-    (race_weekend_id, source, label)) with RETURNING so its auto-id lands before
-    the child stints are written — each stint's `strategy_id` is swapped to the
-    returned id, then the stints upsert keyed on (strategy_id, stint_order).
+    Earlier runs are kept; the current_strategy_runs view decides which one is shown.
+    Returns the new run's id.
     """
-    strat_payload = strategy.model_dump(exclude={"id"} | _SERVER_MANAGED_COLS)
-    strat_stmt = insert(schema.strategies).values(strat_payload)
-    strat_stmt = strat_stmt.on_conflict_do_update(
-        index_elements=["race_weekend_id", "source", "label"],
-        set_={
-            "is_base": strat_stmt.excluded.is_base,
-            "num_stops": strat_stmt.excluded.num_stops,
-            "phase": strat_stmt.excluded.phase,
-            "plausibility": strat_stmt.excluded.plausibility,
-            "tier": strat_stmt.excluded.tier,
-            "updated_at": func.now(),
-        },
-    ).returning(schema.strategies.c.id)
-    strategy_id = conn.execute(strat_stmt).scalar_one()
-
-    for s in stints:
-        s.strategy_id = strategy_id
-    upsert(conn, schema.strategy_stints, stints, ["strategy_id", "stint_order"])
-    return strategy_id
-
-
-def delete_strategies_for_weekend(
-    conn: Connection, race_weekend_id: int, source: str | None = None
-) -> int:
-    """Delete strategies (and their stints) for a race weekend.
-
-    Used before a fresh strategy generation so strategies that are no longer in
-    the current top-N don't linger. Pass `source` to scope the delete to one
-    provenance ("historical" / "sim") so regenerating one doesn't wipe the other.
-    There's no ON DELETE CASCADE on the FK, so the child stints are removed first.
-    Returns the number of strategies deleted.
-    """
-    cond = [schema.strategies.c.race_weekend_id == race_weekend_id]
-    if source is not None:
-        cond.append(schema.strategies.c.source == source)
-    ids = conn.execute(select(schema.strategies.c.id).where(*cond)).scalars().all()
-    if not ids:
-        return 0
-    conn.execute(
-        delete(schema.strategy_stints).where(
-            schema.strategy_stints.c.strategy_id.in_(ids)
-        )
-    )
-    conn.execute(delete(schema.strategies).where(schema.strategies.c.id.in_(ids)))
-    return len(ids)
-
-
-def upsert_sim_race_stats(
-    conn: Connection, race_weekend_id: int, phase: str, stats: dict
-) -> None:
-    """Upsert the race-context stats blob for a weekend (one row per weekend).
-
-    A later phase overwrites an earlier one — postquali supersedes prelim.
-    """
-    stmt = insert(schema.sim_race_stats).values(
-        race_weekend_id=race_weekend_id, phase=phase, stats=stats
-    )
-    stmt = stmt.on_conflict_do_update(
-        index_elements=["race_weekend_id"],
-        set_={
-            "phase": stmt.excluded.phase,
-            "stats": stmt.excluded.stats,
-            "generated_at": func.now(),
-        },
-    )
-    conn.execute(stmt)
+    run_id = conn.execute(
+        insert(schema.strategy_runs)
+        .values(run.model_dump(exclude={"id"}, exclude_none=True))
+        .returning(schema.strategy_runs.c.id)
+    ).scalar_one()
+    for strategy, stints in strategies:
+        strategy_id = conn.execute(
+            insert(schema.strategies)
+            .values(strategy.model_dump(exclude={"id", "run_id"}) | {"run_id": run_id})
+            .returning(schema.strategies.c.id)
+        ).scalar_one()
+        if stints:
+            conn.execute(
+                insert(schema.strategy_stints),
+                [s.model_dump(exclude={"id"}) | {"strategy_id": strategy_id} for s in stints],
+            )
+    return run_id
 
 
 def upsert_circuit_race_stats(
@@ -802,7 +753,7 @@ def weekends_postquali_due(
     """Weekends whose postquali sim is due but not yet produced.
 
     Due = Qualifying started ≥ POSTQUALI_DELAY_MIN ago, the Race hasn't started yet,
-    and no postquali `sim_race_stats` row exists. `now` must be timezone-aware (UTC),
+    and the weekend has no postquali sim run. `now` must be timezone-aware (UTC),
     to compare against the timestamptz session start times. Drives the idempotent
     catch-up flow: safe to call repeatedly — a weekend drops out once its postquali runs.
     """
@@ -810,9 +761,11 @@ def weekends_postquali_due(
     rw = schema.race_weekends
     quali = schema.sessions.alias("quali")
     race = schema.sessions.alias("race")
-    srs = schema.sim_race_stats
+    runs = schema.strategy_runs
     postquali_done = exists().where(
-        and_(srs.c.race_weekend_id == rw.c.id, srs.c.phase == "postquali")
+        runs.c.race_weekend_id == rw.c.id,
+        runs.c.source == "sim",
+        runs.c.phase == "postquali",
     )
     rows = conn.execute(
         select(rw)
@@ -899,35 +852,33 @@ def get_lap_record_for_circuit(
 def list_strategies_for_weekend(
     conn: Connection, season: int, round_number: int, source: str | None = None
 ) -> list[domain.StrategyWithStints]:
-    """Generated strategies (each with its ordered stints) for a race weekend.
+    """The strategies (each with its ordered stints) from a weekend's current run.
 
-    Base strategy first, then by stop count. Pass `source` ("historical" / "sim")
-    to scope to one provenance. Returns `[]` when the weekend doesn't exist or has
-    no matching strategies yet.
+    The current run is the latest per source (current_strategy_runs), so a postquali sim
+    replaces prelim here while both stay stored. Pass `source` ("historical" / "sim") to
+    scope to one; without it, both sources' current runs are returned, base strategy
+    first, then by stop count. Returns `[]` when the weekend doesn't exist or has no run.
     """
     rw = get_race_weekend(conn, season, round_number)
     if rw is None:
         return []
 
-    cond = [schema.strategies.c.race_weekend_id == rw.id]
+    run, st = schema.current_strategy_runs, schema.strategies
+    cond = [run.c.race_weekend_id == rw.id]
     if source is not None:
-        cond.append(schema.strategies.c.source == source)
+        cond.append(run.c.source == source)
     strat_rows = conn.execute(
-        select(schema.strategies)
+        select(st, run.c.race_weekend_id, run.c.source, run.c.phase, run.c.generated_at)
+        .join(run, run.c.id == st.c.run_id)
         .where(*cond)
-        .order_by(
-            schema.strategies.c.is_base.desc(),
-            schema.strategies.c.num_stops,
-            schema.strategies.c.label,
-        )
+        .order_by(run.c.source, st.c.is_base.desc(), st.c.num_stops, st.c.label)
     ).all()
     if not strat_rows:
         return []
 
-    strategy_ids = [row.id for row in strat_rows]
     stint_rows = conn.execute(
         select(schema.strategy_stints)
-        .where(schema.strategy_stints.c.strategy_id.in_(strategy_ids))
+        .where(schema.strategy_stints.c.strategy_id.in_([row.id for row in strat_rows]))
         .order_by(
             schema.strategy_stints.c.strategy_id,
             schema.strategy_stints.c.stint_order,
@@ -1126,9 +1077,9 @@ def calendar_avg_finish_by_grid(conn: Connection, season: int) -> dict[str, floa
 def get_sim_race_stats(
     conn: Connection, season: int, round_number: int
 ) -> domain.SimRaceStats | None:
-    """The race-context stats blob from the latest sim run for a weekend, or None.
+    """The race-context stats blob from a weekend's current sim run, or None.
 
-    One row per weekend; `phase` says whether it came from the prelim or postquali run.
+    `phase` says whether it came from the prelim or postquali run.
     The blob's `race_stats` is enriched at read time with `strategy_flexibility` and
     `chaos` — this weekend's flexibility and chaos ranks across the season's simulated
     circuits (see `strategy_flexibility_rank` / `chaos_rank`) — since those numbers are
@@ -1138,12 +1089,12 @@ def get_sim_race_stats(
     rw = get_race_weekend(conn, season, round_number)
     if rw is None:
         return None
+    run = schema.current_strategy_runs
     row = conn.execute(
-        select(schema.sim_race_stats).where(
-            schema.sim_race_stats.c.race_weekend_id == rw.id
-        )
+        select(run.c.id, run.c.race_weekend_id, run.c.phase, run.c.generated_at, run.c.stats)
+        .where(run.c.race_weekend_id == rw.id, run.c.source == "sim")
     ).first()
-    if row is None:
+    if row is None or row.stats is None:
         return None
     stats = domain.SimRaceStats.model_validate(row._mapping)
     flex = strategy_flexibility_rank(conn, season, round_number)
@@ -1157,6 +1108,16 @@ def get_sim_race_stats(
     return stats
 
 
+def _current_sim_runs(conn: Connection, season: int) -> list:
+    """(id, round_number, stats) of the current sim run for each of a season's weekends."""
+    run, rw = schema.current_strategy_runs, schema.race_weekends
+    return conn.execute(
+        select(run.c.id, rw.c.round_number, run.c.stats)
+        .join(rw, rw.c.id == run.c.race_weekend_id)
+        .where(rw.c.season == season, run.c.source == "sim", run.c.stats.is_not(None))
+    ).all()
+
+
 def strategy_flexibility_rank(
     conn: Connection, season: int, round_number: int
 ) -> dict | None:
@@ -1164,32 +1125,25 @@ def strategy_flexibility_rank(
     weekends (rank 1 = most flexible), as `{"score", "rank", "of"}`; None when the weekend
     has no sim on record or the field can't be scored.
 
-    Flexibility blends how spread the stop-count distribution (from each weekend's
-    `sim_race_stats` blob) and the shown-strategy plausibilities (from its `source="sim"`
-    strategies) are — see `formation_data.flexibility`. Ranked at read time over whatever
+    Flexibility blends how spread the stop-count distribution (from each weekend's current
+    sim run's stats blob) and the shown-strategy plausibilities (that run's strategies)
+    are — see `formation_data.flexibility`. Ranked at read time over whatever
     circuits are currently simulated, so the value tracks the live calendar the same way
     the degradation rank tracks all known circuit profiles.
     """
-    rw = schema.race_weekends
-    srs = schema.sim_race_stats
-    stat_rows = conn.execute(
-        select(rw.c.id, rw.c.round_number, srs.c.stats)
-        .join(srs, srs.c.race_weekend_id == rw.c.id)
-        .where(rw.c.season == season)
-    ).all()
+    stat_rows = _current_sim_runs(conn, season)
     if not stat_rows:
         return None
 
     st = schema.strategies
-    plaus_by_weekend: dict[int, list[float]] = {}
-    for wid, plausibility in conn.execute(
-        select(st.c.race_weekend_id, st.c.plausibility).where(
-            st.c.race_weekend_id.in_([r.id for r in stat_rows]),
-            st.c.source == "sim",
+    plaus_by_run: dict[int, list[float]] = {}
+    for run_id, plausibility in conn.execute(
+        select(st.c.run_id, st.c.plausibility).where(
+            st.c.run_id.in_([r.id for r in stat_rows]),
             st.c.plausibility.is_not(None),
         )
     ).all():
-        plaus_by_weekend.setdefault(wid, []).append(float(plausibility))
+        plaus_by_run.setdefault(run_id, []).append(float(plausibility))
 
     scores: dict[int, float] = {}
     target_id: int | None = None
@@ -1199,7 +1153,7 @@ def strategy_flexibility_rank(
         race_stats = (r.stats or {}).get("race_stats") or {}
         score = flexibility.flexibility_score(
             race_stats.get("stop_count_distribution"),
-            plaus_by_weekend.get(r.id, []),
+            plaus_by_run.get(r.id, []),
         )
         if score is not None:
             scores[r.id] = score
@@ -1214,18 +1168,12 @@ def chaos_rank(conn: Connection, season: int, round_number: int) -> dict | None:
     (rank 1 = most chaotic), as `{"score", "rank", "of"}`; None when the weekend has no
     sim on record or no chaos index was scored.
 
-    The raw `chaos_index_0to100` is baked into each weekend's `sim_race_stats` blob, but
+    The raw `chaos_index_0to100` is baked into each sim run's stats blob, but
     it's an absolute figure — this ranks it across whatever circuits are currently
     simulated, mirroring `strategy_flexibility_rank` so chaos tracks the live calendar
     the same way flexibility does.
     """
-    rw = schema.race_weekends
-    srs = schema.sim_race_stats
-    stat_rows = conn.execute(
-        select(rw.c.round_number, srs.c.stats)
-        .join(srs, srs.c.race_weekend_id == rw.c.id)
-        .where(rw.c.season == season)
-    ).all()
+    stat_rows = _current_sim_runs(conn, season)
     if not stat_rows:
         return None
 

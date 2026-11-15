@@ -9,17 +9,11 @@ Two modes:
 - **postquali** — grid + quali pace known. Generated ~2h30 after Qualifying starts,
                   superseding the prelim projection.
 
-Sim rows are tagged ``source="sim"``; the historical miner's rows (``source="historical"``,
-see ``jobs.pre_race.strategies``) are left untouched, so both remain available. The
-race-context numbers land in ``sim_race_stats`` as a single JSONB blob.
-
-Because each run replaces the weekend's sim rows, the ``strategies`` table always holds the
-latest phase; the ``phase`` column records which run produced it.
-
-Upsert keys:
-- Strategy       UniqueConstraint(race_weekend_id, source, label)
-- StrategyStint  UniqueConstraint(strategy_id, stint_order)
-- SimRaceStats   UniqueConstraint(race_weekend_id)
+Each run is stored as a new ``strategy_runs`` row (``source="sim"``, ``phase=mode``) with
+its strategies and stints beneath it and the race-context numbers in its JSONB ``stats``.
+Earlier runs are kept, so prelim can be compared with postquali and with the race; the
+API shows the latest run per weekend (the ``current_strategy_runs`` view). The historical
+miner's runs (``source="historical"``, see ``jobs.pre_race.strategies``) are separate.
 """
 
 from __future__ import annotations
@@ -101,29 +95,29 @@ def run(
         )
         return
 
-    repositories.delete_strategies_for_weekend(conn, rw.id, source="sim")
-    for entry in shown:
-        strategy, stints = _build_strategy(rw.id, circuit.num_laps, entry, mode)
-        repositories.upsert_strategy_with_stints(conn, strategy, stints)
-
-    repositories.upsert_sim_race_stats(
+    run_id = repositories.insert_strategy_run(
         conn,
-        rw.id,
-        phase=mode,
-        stats={
-            "meta": result["meta"],
-            "circuit_profile": result["circuit_profile"],
-            "race_stats": result["race_stats"],
-        },
+        domain.StrategyRun(
+            race_weekend_id=rw.id,
+            source="sim",
+            phase=mode,
+            stats={
+                "meta": result["meta"],
+                "circuit_profile": result["circuit_profile"],
+                "race_stats": result["race_stats"],
+            },
+        ),
+        [_build_strategy(circuit.num_laps, entry) for entry in shown],
     )
 
     logger.info(
-        "pre_race.sim_strategies.run season=%s round=%s circuit=%s mode=%s "
+        "pre_race.sim_strategies.run season=%s round=%s circuit=%s mode=%s run=%s "
         "strategies=%d (base=%s)",
         season,
         round_number,
         circuit.circuit_id,
         mode,
+        run_id,
         len(shown),
         "->".join(shown[0]["compounds"]),
     )
@@ -133,7 +127,7 @@ def run(
 
 
 def _build_strategy(
-    race_weekend_id: int, race_laps: int, entry: dict, mode: str
+    race_laps: int, entry: dict
 ) -> tuple[domain.Strategy, list[domain.StrategyStint]]:
     """Turn one shown sim strategy into a Strategy + its StrategyStints."""
     compounds: list[str] = entry["compounds"]
@@ -141,9 +135,6 @@ def _build_strategy(
     windows = entry.get("pit_windows") or []
 
     strategy = domain.Strategy(
-        race_weekend_id=race_weekend_id,
-        source="sim",
-        phase=mode,
         is_base=entry["rank"]
         == 1,  # field_display's top-q strategy = the recommendation
         num_stops=num_stops,
@@ -163,7 +154,7 @@ def _build_strategy(
             start = end = race_laps
         stints.append(
             domain.StrategyStint(
-                strategy_id=0,  # replaced in upsert_strategy_with_stints
+                strategy_id=0,  # set by insert_strategy_run
                 stint_order=order,
                 compound=compound,
                 pit_lap_window_start=start,
