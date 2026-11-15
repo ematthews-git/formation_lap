@@ -96,16 +96,17 @@ def get_race(season: int, round_number: int) -> dict | None:
     return races[0] if races else None
 
 
-def get_circuit_race(season: int, jolpica_circuit_id: str) -> dict | None:
-    """The race (Circuit + Results) held at a circuit in a season, or None.
+def get_circuit_races(season: int, jolpica_circuit_id: str) -> list[dict]:
+    """Every race at a circuit in a season that has results, in round order.
 
-    Lets callers backfill a circuit's history without knowing each season's
-    round number.
+    Usually one; two for a double-header (2020 visited the Red Bull Ring, Silverstone
+    and Bahrain twice). Lets callers find a stored weekend's results without trusting
+    its round number to match Jolpica's.
     """
-    races = _get_json(f"/{season}/circuits/{jolpica_circuit_id}/results.json")[
-        "MRData"
-    ]["RaceTable"]["Races"]
-    return races[0] if races else None
+    return _get_json(
+        f"/{season}/circuits/{jolpica_circuit_id}/results.json",
+        params={"limit": _PAGE_SIZE},
+    )["MRData"]["RaceTable"]["Races"]
 
 
 def get_driver_standings(season: int, round_number: int) -> list[dict]:

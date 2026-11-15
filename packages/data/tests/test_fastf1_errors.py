@@ -197,21 +197,11 @@ def test_post_race_commits_results_before_fastf1_and_surfaces_auth(monkeypatch):
         "most_recent_race_weekend_before",
         lambda conn, today: _weekend(19, "mexico"),
     )
-    monkeypatch.setattr(
-        orchestrator.repositories,
-        "get_circuit",
-        lambda conn, cid: SimpleNamespace(circuit_id=cid, jolpica_id=cid),
-    )
-    rounds = {"austin": "18", "mexico": "19"}
-    monkeypatch.setattr(
-        orchestrator.jolpica_client,
-        "get_circuit_race",
-        lambda season, jid: {"round": rounds[jid], "Results": [{}]},
-    )
-    monkeypatch.setattr(
-        orchestrator.race_results, "run",
-        lambda conn, season, round_number: committed.append(f"results R{round_number}"),
-    )
+    def load_for_weekend(conn, rw):
+        committed.append(f"results R{rw.round_number}")
+        return rw.round_number
+
+    monkeypatch.setattr(orchestrator.race_results, "load_for_weekend", load_for_weekend)
     monkeypatch.setattr(
         orchestrator.standings, "run",
         lambda conn, season, round_number: committed.append(f"standings R{round_number}"),

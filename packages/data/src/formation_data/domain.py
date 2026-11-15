@@ -73,9 +73,10 @@ class RaceWeekend(_Base):
     event_name: str
     race_date: date
     is_sprint: bool
-    soft_compound: str
-    medium_compound: str
-    hard_compound: str
+    # None when a past season has no Pirelli nomination on file (see schema.race_weekends).
+    soft_compound: str | None = None
+    medium_compound: str | None = None
+    hard_compound: str | None = None
 
 
 class Session(_Base):
@@ -207,10 +208,12 @@ class RaceTrace(_Base):
     `trace` carries per-lap track-status / weather / excitement / overtakes arrays plus
     every starter's lap times, pit laps and the team they drove for in that race (a
     snapshot, so lookbacks never show a driver's current team). Built by
-    formation_data.race_trace; keyed (season, official round), like race_results.
+    formation_data.race_trace. One per race weekend; `circuit_id`, `season` and
+    `round_number` are read from the weekend.
     """
 
     id: int | None = None
+    race_weekend_id: int
     circuit_id: str
     season: int
     round_number: int
@@ -225,10 +228,12 @@ class RaceOvertakes(_Base):
     plus a broadcast-comparable `gross` and the full per-kind breakdown), a per-lap array
     of racing passes, a per-corner histogram, and the individual `events` with the two
     drivers, the lap, the corner and why the position changed. Built by
-    formation_data.overtakes; keyed (season, official round), like race_traces.
+    formation_data.overtakes. One per race weekend; `circuit_id`, `season` and
+    `round_number` are read from the weekend.
     """
 
     id: int | None = None
+    race_weekend_id: int
     circuit_id: str
     season: int
     round_number: int
@@ -237,7 +242,11 @@ class RaceOvertakes(_Base):
 
 
 class RaceResult(_Base):
+    """One finishing position. Stored against `race_weekend_id`; `circuit_id`, `season`
+    and `round_number` are read from the weekend and ignored on write."""
+
     id: int | None = None
+    race_weekend_id: int
     circuit_id: str
     season: int
     round_number: int

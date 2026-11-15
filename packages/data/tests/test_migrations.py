@@ -79,53 +79,122 @@ def test_upgrade_is_a_no_op_when_current(engine):
     assert migrate.upgrade() == (head, head)
 
 
-def _build_pre_alembic_database(eng, *extra_sql: str) -> None:
-    """A database as the old `db upgrade` left it, before the strategies patch."""
-    schema.metadata.create_all(eng)
+@needs_db
+def test_refuses_a_database_built_before_migrations(engine):
+    schema.metadata.create_all(engine)
+    with pytest.raises(migrate.MigrationError, match="before migrations"):
+        migrate.upgrade()
+    assert _version(engine) is None
+
+
+# --- 0003: race history references race_weekends -------------------------------------
+
+
+def _exec(eng, *statements: str) -> None:
     with eng.begin() as conn:
-        conn.exec_driver_sql("DROP TABLE race_overtakes")
-        conn.exec_driver_sql(
-            "ALTER TABLE strategies DROP CONSTRAINT uq_strategies_weekend_source_label, "
-            "DROP COLUMN source, DROP COLUMN phase, DROP COLUMN plausibility, "
-            "DROP COLUMN tier, ADD CONSTRAINT strategies_race_weekend_id_label_key "
-            "UNIQUE (race_weekend_id, label)"
-        )
-        conn.exec_driver_sql(
-            "ALTER TABLE circuit_stats ADD COLUMN pit_loss_normal float NOT NULL, "
-            "ADD COLUMN undercut_strength float NOT NULL"
-        )
-        conn.exec_driver_sql("ALTER TABLE circuits ALTER COLUMN track_outline TYPE varchar")
-        for sql in extra_sql:
+        for sql in statements:
             conn.exec_driver_sql(sql)
 
 
-def _circuit_stats_columns(eng) -> set[str]:
-    with eng.connect() as conn:
-        return {c["name"] for c in inspect(conn).get_columns("circuit_stats")}
+def _circuit(circuit_id: str) -> str:
+    return (
+        "INSERT INTO circuits (circuit_id, country, track_length_km, num_corners, num_laps, "
+        "sm_zones, jolpica_id, fastf1_location, lat, lon) VALUES "
+        f"('{circuit_id}', 'X', 5.0, 10, 50, 2, '{circuit_id}', '{circuit_id}', 0, 0)"
+    )
 
 
-adoption = pytest.mark.skipif(
-    migrate.head_revision() != migrate.BASELINE_REVISION,
-    reason="adopting pre-Alembic databases is only supported until the first revision after 0001",
-)
+def _weekend(circuit_id: str, season: int, rnd: int) -> str:
+    return (
+        "INSERT INTO race_weekends (circuit_id, season, round_number, event_name, race_date, "
+        f"is_sprint) VALUES ('{circuit_id}', {season}, {rnd}, 'GP', '{season}-07-0{rnd % 9 + 1}', false)"
+    )
 
 
 @needs_db
-@adoption
-def test_adopts_a_pre_alembic_database(engine):
-    _build_pre_alembic_database(engine)
+def test_0003_points_history_at_the_right_weekend(engine):
+    migrate.upgrade("0002")
+    _exec(
+        engine,
+        _circuit("spielberg"),
+        _circuit("singapore"),
+        # a 2020 double-header, and a 2026 calendar whose stored round (16) lags the
+        # official one the results were written under (17)
+        _weekend("spielberg", 2020, 1),
+        _weekend("spielberg", 2020, 2),
+        _weekend("singapore", 2026, 16),
+        "INSERT INTO race_results (circuit_id, season, round_number, position, driver_id, team) "
+        "VALUES ('spielberg', 2020, 2, 1, 'hamilton', 'Mercedes'), "
+        "('spielberg', 2020, 1, 1, 'bottas', 'Mercedes'), "
+        "('singapore', 2026, 17, 1, 'norris', 'McLaren')",
+        "INSERT INTO race_traces (circuit_id, season, round_number, trace) "
+        "VALUES ('spielberg', 2020, 2, '{}')",
+        "INSERT INTO race_overtakes (circuit_id, season, round_number, overtakes) "
+        "VALUES ('singapore', 2026, 17, '{}')",
+    )
     migrate.upgrade()
-    assert _version(engine) == migrate.BASELINE_REVISION
     assert migrate.check() == []
-    assert "pit_loss_normal" not in _circuit_stats_columns(engine)
+    with engine.connect() as conn:
+        winners = dict(
+            conn.exec_driver_sql("""
+                SELECT rw.season || ' R' || rw.round_number, rr.driver_id
+                FROM race_results rr JOIN race_weekends rw ON rw.id = rr.race_weekend_id
+            """).all()
+        )
+    assert winners == {"2020 R1": "bottas", "2020 R2": "hamilton", "2026 R16": "norris"}
+
+    # ...and back: the copies come back from the weekend each row points at.
+    migrate.downgrade("0002")
+    with engine.connect() as conn:
+        rows = conn.exec_driver_sql(
+            "SELECT season, round_number, circuit_id, driver_id FROM race_results ORDER BY 1, 2"
+        ).all()
+    assert [tuple(r) for r in rows] == [
+        (2020, 1, "spielberg", "bottas"),
+        (2020, 2, "spielberg", "hamilton"),
+        (2026, 16, "singapore", "norris"),
+    ]
 
 
 @needs_db
-@adoption
-def test_refuses_and_rolls_back_a_drifted_database(engine):
-    _build_pre_alembic_database(engine, "ALTER TABLE race_results ADD COLUMN grid int")
-    with pytest.raises(migrate.MigrationError, match="race_results"):
+def test_0003_refuses_history_with_no_weekend(engine):
+    migrate.upgrade("0002")
+    _exec(
+        engine,
+        _circuit("monza"),
+        _weekend("monza", 2026, 16),
+        "INSERT INTO race_results (circuit_id, season, round_number, position, driver_id, team) "
+        "VALUES ('monza', 2020, 8, 1, 'gasly', 'AlphaTauri')",
+    )
+    with pytest.raises(migrate.MigrationError, match="weekends refresh --season 2020"):
         migrate.upgrade()
-    assert _version(engine) is None
-    assert "race_overtakes" not in _tables(engine)  # the fix-ups were rolled back too
-    assert "pit_loss_normal" in _circuit_stats_columns(engine)
+    assert _version(engine) == "0002"
+    assert "season" in {c["name"] for c in inspect(engine).get_columns("race_results")}
+
+
+@needs_db
+def test_resolve_race_weekend(engine):
+    from formation_data import repositories
+
+    migrate.upgrade()
+    _exec(
+        engine,
+        _circuit("silverstone"),
+        _circuit("monza"),
+        _weekend("silverstone", 2020, 4),
+        _weekend("silverstone", 2020, 5),
+        _weekend("monza", 2026, 16),
+    )
+    with engine.connect() as conn:
+
+        def resolve(circuit_id, season, rnd):
+            return repositories.resolve_race_weekend(
+                conn, season=season, circuit_id=circuit_id, round_number=rnd
+            ).round_number
+
+        assert resolve("silverstone", 2020, 5) == 5  # double-header: the round decides
+        assert resolve("monza", 2026, 17) == 16  # one visit: a lagging round still matches
+        with pytest.raises(repositories.RaceWeekendNotFound, match="none is round 6"):
+            resolve("silverstone", 2020, 6)
+        with pytest.raises(repositories.RaceWeekendNotFound, match="--season 2021"):
+            resolve("monza", 2021, 14)

@@ -73,9 +73,14 @@ def run_single(
     """Build + upsert one race's overtake blob; returns it so callers can reuse it.
 
     Pass ``ses`` when the caller already holds a loaded session (telemetry + messages).
+    Raises RaceWeekendNotFound, before loading anything, if the race isn't in the
+    stored calendar.
     """
     from formation_sim.data import collector
 
+    weekend = repositories.resolve_race_weekend(
+        conn, season=season, circuit_id=circuit_id, round_number=round_number
+    )
     if ses is None:
         ses = collector.load_session(
             season, round_number, "R", weather=True, messages=True, telemetry=True
@@ -85,7 +90,7 @@ def run_single(
     blob = build_for_session(ses)
     if blob is None:
         return None
-    repositories.upsert_race_overtakes(conn, circuit_id, season, round_number, blob)
+    repositories.upsert_race_overtakes(conn, weekend.id, blob)
     return blob
 
 

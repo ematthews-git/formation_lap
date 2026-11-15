@@ -30,9 +30,10 @@ export interface RaceWeekend {
   event_name: string
   race_date: string // ISO date (YYYY-MM-DD)
   is_sprint: boolean
-  soft_compound: string
-  medium_compound: string
-  hard_compound: string
+  // null for a past season with no Pirelli nomination on file
+  soft_compound: string | null
+  medium_compound: string | null
+  hard_compound: string | null
 }
 
 export interface SessionFinisher {
@@ -71,6 +72,7 @@ export interface Standing {
 
 export interface RaceResult {
   id: number | null
+  race_weekend_id: number
   circuit_id: string
   season: number
   round_number: number
@@ -187,6 +189,7 @@ export interface RaceTraceBlob {
 
 export interface RaceTrace {
   id: number | null
+  race_weekend_id: number
   circuit_id: string
   season: number
   round_number: number

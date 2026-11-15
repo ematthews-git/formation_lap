@@ -133,12 +133,17 @@ race_weekends = Table(
     Column("event_name", String, nullable=False),
     Column("race_date", Date, nullable=False),
     Column("is_sprint", Boolean, nullable=False),
-    Column("soft_compound", String(5), nullable=False),
-    Column("medium_compound", String(5), nullable=False),
-    Column("hard_compound", String(5), nullable=False),
+    # Pirelli's allocation ("C1".."C6"), from the shared nomination table. NULL when a past
+    # season has no nomination on file (the table starts in 2021); current and future
+    # seasons fall back to a default instead, so a new venue stays usable.
+    Column("soft_compound", String(5), nullable=True),
+    Column("medium_compound", String(5), nullable=True),
+    Column("hard_compound", String(5), nullable=True),
+    # Every race from 2020 on, not just the current calendar: race_results, race_traces and
+    # race_overtakes reference these rows, so season, round and circuit live only here and
+    # a mid-season renumber (calendar_sync) changes one row.
     # Keyed on (season, round_number), not (circuit_id, season): double-header
-    # seasons (2020: Red Bull Ring, Silverstone, Bahrain ×2) visit a circuit twice,
-    # and circuit_stats backfills historical seasons.
+    # seasons (2020: Red Bull Ring, Silverstone, Bahrain ×2) visit a circuit twice.
     UniqueConstraint("season", "round_number"),
 )
 
@@ -298,15 +303,12 @@ session_results = Table(
 # derived feeds it's a single JSONB document (per-lap track status / weather / excitement /
 # overtakes arrays plus every starter's lap times, pit laps and — crucially — the team they
 # drove for in THAT race, so the frontend never joins against the current season's lineup).
-# Keyed (season, round_number) with round_number the official F1 round, matching
-# race_results; circuit_id is a denormalized FK for the per-circuit lookup the panel makes.
+# One per race; season, round and circuit come from the race weekend.
 race_traces = Table(
     "race_traces",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
-    Column("season", Integer, nullable=False),
-    Column("round_number", Integer, nullable=False),
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False, unique=True),
     Column(
         "updated_at",
         DateTime(timezone=True),
@@ -314,7 +316,6 @@ race_traces = Table(
         server_default=func.now(),
     ),
     Column("trace", JSONB, nullable=False),
-    UniqueConstraint("season", "round_number"),
 )
 
 
@@ -328,9 +329,7 @@ race_overtakes = Table(
     "race_overtakes",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
-    Column("season", Integer, nullable=False),
-    Column("round_number", Integer, nullable=False),
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False, unique=True),
     Column(
         "updated_at",
         DateTime(timezone=True),
@@ -338,24 +337,20 @@ race_overtakes = Table(
         server_default=func.now(),
     ),
     Column("overtakes", JSONB, nullable=False),
-    UniqueConstraint("season", "round_number"),
 )
 
 
+# Official finishing order (Jolpica, the Monday after the race). Season, round and circuit
+# come from the race weekend.
 race_results = Table(
     "race_results",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("circuit_id", ForeignKey("circuits.circuit_id"), nullable=False),
-    Column("season", Integer, nullable=False),
-    Column("round_number", Integer, nullable=False),
+    Column("race_weekend_id", ForeignKey("race_weekends.id"), nullable=False),
     Column("position", Integer, nullable=False),
     Column("driver_id", String, nullable=False),
     Column("team", String, nullable=False),
-    # Keyed on (season, round_number) rather than (circuit_id, season): a circuit
-    # can host two rounds in one season (2020 double-headers), which would collide
-    # on circuit_id. circuit_id stays as a denormalized FK for convenient joins.
-    UniqueConstraint("season", "round_number", "position"),
+    UniqueConstraint("race_weekend_id", "position"),
 )
 
 
@@ -378,6 +373,9 @@ standings = Table(
 # row is one DataFrame as Parquet (version-portable, unlike pickle). `kind` = "laps" (cleaned
 # lap frame consumed by the strategy prior + season form) now; "results"/"lap1" reserved for
 # paramset rebuilds. Keyed (kind, year, round_number): one blob per derived file per race.
+# Unlike the race tables above this doesn't reference race_weekends: it's the simulator's
+# cache, addressed in FastF1's (year, round) terms, and it covers races at venues with no
+# `circuits` row that the simulator still learns from.
 derived_artifacts = Table(
     "derived_artifacts",
     metadata,

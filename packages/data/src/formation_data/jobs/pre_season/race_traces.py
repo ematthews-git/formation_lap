@@ -3,8 +3,8 @@
 Cadence: yearly backfill (manual for now), plus one incremental build per completed race
 via the post-race flow (see ``orchestrator.run_post_race_for_last_weekend``, which calls
 :func:`run_single`). For each circuit it builds EVERY race over the trailing
-``HISTORY_SEASONS`` completed seasons and persists one ``race_traces`` blob per race,
-keyed (season, official round) like race_results.
+``HISTORY_SEASONS`` completed seasons and persists one ``race_traces`` blob per race
+weekend, so every season in that window needs its calendar loaded (``weekends refresh``).
 
 Reuses the sim's FastF1 collector for the raw frames (same on-disk cache as
 circuit_race_stats, so a backfill run after that job costs no API budget).
@@ -36,8 +36,15 @@ def run_single(
     Also writes the race's overtake blob: detecting overtakes needs the same
     telemetry-loaded session, which is by far the expensive part, so both feeds are
     produced from one load and are guaranteed to agree.
+
+    Raises RaceWeekendNotFound, before loading anything, if the race isn't in the
+    stored calendar.
     """
     from formation_sim.data import collector
+
+    weekend = repositories.resolve_race_weekend(
+        conn, season=season, circuit_id=circuit_id, round_number=round_number
+    )
 
     # telemetry=True so overtakes come from the classified on-track event detector rather
     # than the coarser lap-line fallback; messages=True brings the authoritative
@@ -60,7 +67,7 @@ def run_single(
     )
     overtakes = None
     if ot_blob is not None:
-        repositories.upsert_race_overtakes(conn, circuit_id, season, round_number, ot_blob)
+        repositories.upsert_race_overtakes(conn, weekend.id, ot_blob)
         overtakes = {i + 1: n for i, n in enumerate(ot_blob["by_lap"]) if n}
     blob = race_trace.build_trace(
         laps,
@@ -74,7 +81,7 @@ def run_single(
     )
     if blob is None:
         return False
-    repositories.upsert_race_trace(conn, circuit_id, season, round_number, blob)
+    repositories.upsert_race_trace(conn, weekend.id, blob)
     return True
 
 

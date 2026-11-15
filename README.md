@@ -176,10 +176,23 @@ formation-data sessions refresh --season 2026
 formation-data run-post-race
 ```
 
-`weekends refresh` renumbers existing weekends *in place* (matched by circuit), so their
-sessions, strategies, weather and sims follow the circuit instead of the round number. A
-round whose circuit isn't seeded is skipped with a warning, and it refuses to run if a
-weekend that would move already has results/standings/traces stored under its old round.
+`weekends refresh` renumbers existing weekends *in place* (matched by circuit), so
+everything attached to them (sessions, strategies, weather, sims, and race results, traces
+and overtakes) follows the circuit instead of the round number. A round whose circuit isn't
+seeded is skipped with a warning, and it refuses to run if a weekend that would move already
+has standings or stored laps under its old round (the two tables still keyed on the round).
+
+**Race history needs its calendar.** `race_results`, `race_traces` and `race_overtakes`
+reference `race_weekends`, which holds every race from 2020 on, not just the current season.
+Before backfilling history for a new season range, load those calendars first:
+
+```bash
+formation-data weekends refresh --season 2019     # past seasons: no sessions needed
+formation-data results backfill --start 2019 --count 1
+```
+
+Past seasons with no Pirelli nomination on file store no tyre allocation (NULL) rather than
+a guess; an allocation already stored is kept.
 Seed new circuits individually rather than re-running the whole `circuits seed`, which
 overwrites any hand-edited values in the table.
 
@@ -308,11 +321,9 @@ Other commands: `db current` (which revision a database is at) and `db downgrade
 Every command targets `DATABASE_URL`. To migrate production, point it at Supabase for that
 one command, e.g. `uv run --env-file .env formation-data db upgrade`.
 
-Databases built before migrations (by `create_all`) have no `alembic_version` table. Their
-first `db upgrade` adopts them: it applies the last of the old fix-ups (missing tables, the
-`strategies` sim columns, and dropping ten `circuit_stats` columns the simulator replaced),
-checks the result matches revision `0001` exactly, and stamps it. If anything else differs,
-it changes nothing and lists the differences.
+Local and Supabase were adopted at revision `0001` when migrations were introduced (commit
+`fe0665e`, which still has the adoption code). `db upgrade` refuses to run against a database
+that has tables but was never adopted.
 
 ## External data sources
 

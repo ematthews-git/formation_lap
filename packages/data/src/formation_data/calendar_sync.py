@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import date
 
 from sqlalchemy import Connection, exists, insert, select, update
 
@@ -41,10 +42,23 @@ class CalendarConflict(RuntimeError):
     """The desired calendar can't be applied safely without a manual decision."""
 
 
-def compounds_for_weekend(season: int, circuit: Circuit) -> tuple[str, str, str]:
+def compounds_for_weekend(
+    season: int, circuit: Circuit, *, today: date | None = None
+) -> tuple[str, str, str] | tuple[None, None, None]:
     """(soft, medium, hard) for a weekend: the Pirelli nomination for the circuit's
-    `fastf1_location`, or `DEFAULT_COMPOUNDS` (with a warning) when none is on file."""
+    `fastf1_location`. With none on file, a past season gets (None, None, None), since
+    a guess would just be wrong data, and the current or a future season gets
+    `DEFAULT_COMPOUNDS` with a warning, so a new venue stays usable until Pirelli
+    publishes."""
     compounds = compounds_for(season, circuit.fastf1_location)
+    if compounds is None and season < (today or date.today()).year:
+        logger.info(
+            "calendar: no Pirelli nomination for %r (%s) in %s; storing no allocation",
+            circuit.fastf1_location,
+            circuit.circuit_id,
+            season,
+        )
+        return (None, None, None)
     if compounds is None:
         logger.warning(
             "calendar: no Pirelli nomination for %r (%s) in %s; using default %s — add "
@@ -128,7 +142,16 @@ def plan_calendar(existing: list[RaceWeekend], desired: list[RaceWeekend]) -> Ca
             plan.inserts.append(want)
             continue
         have = queue.pop(0)
-        change = WeekendChange(old=have, new=want.model_copy(update={"id": have.id}))
+        update = {"id": have.id}
+        if want.soft_compound is None and have.soft_compound is not None:
+            # No nomination on file for a past season: keep what's stored rather than
+            # erase it. A missing entry in the nomination table isn't evidence it's wrong.
+            update.update(
+                soft_compound=have.soft_compound,
+                medium_compound=have.medium_compound,
+                hard_compound=have.hard_compound,
+            )
+        change = WeekendChange(old=have, new=want.model_copy(update=update))
         if change.modified:
             plan.updates.append(change)
         else:
@@ -148,13 +171,12 @@ def plan_calendar(existing: list[RaceWeekend], desired: list[RaceWeekend]) -> Ca
     return plan
 
 
-# Tables keyed on the *official* round number at write time, as (table, season col, round col).
-# If a weekend's round changes while rows already exist under its old round, those rows would
-# silently describe a different race afterwards — so reconcile refuses rather than guess.
+# Tables still keyed on the *official* round number at write time, as (table, season col,
+# round col). If a weekend's round changes while rows already exist under its old round, those
+# rows would silently describe a different race afterwards — so reconcile refuses rather than
+# guess. race_results, race_traces and race_overtakes reference the weekend's id instead, so a
+# renumber carries them along.
 _ROUND_KEYED = (
-    ("race_results", "season", "round_number"),
-    ("race_traces", "season", "round_number"),
-    ("race_overtakes", "season", "round_number"),
     ("standings", "season", "after_round"),
     ("derived_artifacts", "year", "round_number"),
 )

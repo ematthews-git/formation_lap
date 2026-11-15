@@ -36,7 +36,6 @@ from formation_data.jobs.pre_season import (
     sessions,
 )
 from formation_data.jobs.static import circuits as static_circuits
-from formation_data.sources import jolpica_client
 from formation_data.sources.fastf1_client import F1AccessError
 
 logger = logging.getLogger(__name__)
@@ -192,9 +191,9 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
     Two stages, so a FastF1 problem never holds back results:
 
     1. Jolpica: finishing order + driver/constructor standings, one transaction per
-       weekend. The official F1 round is resolved from Jolpica (by circuit) because our
-       seed round can't address the external APIs directly; that lookup also gates on
-       results being published, so an as-yet-unscored weekend is retried next run.
+       weekend. The weekend's race is found among Jolpica's races at its circuit that
+       season (which also tells a double-header's visits apart), and the standings use
+       Jolpica's own round for it. An as-yet-unscored weekend is retried next run.
     2. FastF1: lap record, stored laps frame and race trace (+ overtakes) for every race
        of the latest season that has results but is still missing FastF1 data. Keyed
        on what's missing, not on this run's weekends, so a race FastF1 couldn't serve
@@ -224,36 +223,24 @@ def run_post_race_for_last_weekend(today: date | None = None) -> None:
 
 def _load_results_and_standings(conn, rw) -> None:
     """Stage 1 of the post-race flow for one weekend (see run_post_race_for_last_weekend)."""
-    circuit = repositories.get_circuit(conn, rw.circuit_id)
-    if circuit is None:
-        logger.warning(
-            "run_post_race: weekend %s R%s references unknown circuit %s; skipping",
-            rw.season,
-            rw.round_number,
-            rw.circuit_id,
-        )
-        return
-
     try:
-        race = jolpica_client.get_circuit_race(rw.season, circuit.jolpica_id)
+        official_round = race_results.load_for_weekend(conn, rw)
     except httpx.HTTPError as exc:
         logger.warning(
-            "run_post_race: Jolpica round lookup failed for %s %s (%s); skipping",
-            circuit.circuit_id,
+            "run_post_race: Jolpica results lookup failed for %s %s (%s); skipping",
+            rw.circuit_id,
             rw.season,
             exc,
         )
         return
-    if race is None or not race.get("Results"):
+    if official_round is None:
         logger.info(
-            "run_post_race: no published results yet for %s %s; will retry",
-            circuit.circuit_id,
+            "run_post_race: no published results yet for %s %s R%s; will retry",
+            rw.circuit_id,
             rw.season,
+            rw.round_number,
         )
         return
-
-    official_round = int(race["round"])
-    race_results.run(conn, season=rw.season, round_number=official_round)
     standings.run(conn, season=rw.season, round_number=official_round)
 
 

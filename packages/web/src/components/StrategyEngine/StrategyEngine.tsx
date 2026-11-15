@@ -201,7 +201,7 @@ export function StrategyEngine({
                 return (
                   <div key={c.key} className={styles.compound}>
                     <div className={styles.compoundChip} style={{ borderColor: c.color, color: c.color }}>
-                      {code[c.key]}
+                      {code[c.key] ?? '—'}
                     </div>
                     <div>
                       <div className={styles.compoundName}>{c.name}</div>

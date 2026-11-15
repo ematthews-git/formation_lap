@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel
-from sqlalchemy import Connection, Table, and_, delete, exists, func, select, tuple_
+from sqlalchemy import Connection, Table, and_, delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from formation_data import domain, flexibility, schema
@@ -78,10 +78,20 @@ def upsert(
     hand-authored seed shares a table with columns another job populates (e.g.
     the circuits seed must not clobber `track_outline`). Those columns are still
     set on insert (to the incoming value, typically None), just not on update.
+
+    Model fields that aren't columns of `table` are dropped: some read models carry
+    fields joined in from another table (a RaceResult's season and round come from
+    its race weekend), and those are never written here.
     """
+    columns = set(table.c.keys())
     payload = [
-        item.model_dump(exclude={"id"} | _SERVER_MANAGED_COLS) for item in items
-    ]  # union op
+        {
+            k: v
+            for k, v in item.model_dump(exclude={"id"} | _SERVER_MANAGED_COLS).items()
+            if k in columns
+        }
+        for item in items
+    ]
     if not payload:
         return 0
     stmt = insert(table).values(payload)
@@ -202,47 +212,32 @@ def upsert_circuit_race_stats(
     conn.execute(stmt)
 
 
-def upsert_race_trace(
-    conn: Connection, circuit_id: str, season: int, round_number: int, trace: dict
-) -> None:
-    """Upsert one race's lap-by-lap trace blob (one row per season+round).
+def upsert_race_trace(conn: Connection, race_weekend_id: int, trace: dict) -> None:
+    """Upsert one race's lap-by-lap trace blob (one row per race weekend).
 
     Re-running for the same race replaces the blob — it's recomputed wholesale from the
     FastF1 session, so there's nothing to merge.
     """
-    stmt = insert(schema.race_traces).values(
-        circuit_id=circuit_id, season=season, round_number=round_number, trace=trace
-    )
+    stmt = insert(schema.race_traces).values(race_weekend_id=race_weekend_id, trace=trace)
     stmt = stmt.on_conflict_do_update(
-        index_elements=["season", "round_number"],
-        set_={
-            "circuit_id": stmt.excluded.circuit_id,
-            "trace": stmt.excluded.trace,
-            "updated_at": func.now(),
-        },
+        index_elements=["race_weekend_id"],
+        set_={"trace": stmt.excluded.trace, "updated_at": func.now()},
     )
     conn.execute(stmt)
 
 
-def upsert_race_overtakes(
-    conn: Connection, circuit_id: str, season: int, round_number: int, overtakes: dict
-) -> None:
-    """Upsert one race's classified overtake blob (one row per season+round).
+def upsert_race_overtakes(conn: Connection, race_weekend_id: int, overtakes: dict) -> None:
+    """Upsert one race's classified overtake blob (one row per race weekend).
 
     Re-running replaces the blob wholesale — it is recomputed from the FastF1 session, so
     there is nothing to merge.
     """
     stmt = insert(schema.race_overtakes).values(
-        circuit_id=circuit_id, season=season, round_number=round_number,
-        overtakes=overtakes,
+        race_weekend_id=race_weekend_id, overtakes=overtakes
     )
     stmt = stmt.on_conflict_do_update(
-        index_elements=["season", "round_number"],
-        set_={
-            "circuit_id": stmt.excluded.circuit_id,
-            "overtakes": stmt.excluded.overtakes,
-            "updated_at": func.now(),
-        },
+        index_elements=["race_weekend_id"],
+        set_={"overtakes": stmt.excluded.overtakes, "updated_at": func.now()},
     )
     conn.execute(stmt)
 
@@ -314,6 +309,56 @@ def upsert_session_results(
 
 
 # --- read ---
+
+
+def _with_weekend(table: Table):
+    """SELECT every column of a race-history table plus its weekend's circuit_id, season
+    and round_number, which the read models (RaceResult, RaceTrace, RaceOvertakes) carry."""
+    rw = schema.race_weekends
+    return select(table, rw.c.circuit_id, rw.c.season, rw.c.round_number).join(
+        rw, rw.c.id == table.c.race_weekend_id
+    )
+
+
+class RaceWeekendNotFound(LookupError):
+    """No race weekend matches a race a source described."""
+
+
+def resolve_race_weekend(
+    conn: Connection, *, season: int, circuit_id: str, round_number: int
+) -> domain.RaceWeekend:
+    """The weekend a source's race belongs to, for writing race history against.
+
+    Matched on season and circuit, which identify a race; the round (Jolpica's or
+    FastF1's official one) is only used to pick between a double-header's two visits.
+    Matching on the round alone breaks whenever the stored calendar and the source
+    disagree on numbering, e.g. mid-season while a renumber is pending.
+
+    Raises RaceWeekendNotFound when the season's calendar doesn't have the race (run
+    `weekends refresh` for that season), or when a double-header can't be told apart.
+    """
+    rw = schema.race_weekends
+    rows = conn.execute(
+        select(rw)
+        .where(rw.c.season == season, rw.c.circuit_id == circuit_id)
+        .order_by(rw.c.round_number)
+    ).all()
+    weekends = [domain.RaceWeekend.model_validate(r._mapping) for r in rows]
+    exact = [w for w in weekends if w.round_number == round_number]
+    if exact:
+        return exact[0]
+    if len(weekends) == 1:
+        return weekends[0]
+    if not weekends:
+        raise RaceWeekendNotFound(
+            f"No race weekend for {circuit_id} in {season}. Load that season's calendar "
+            f"with `formation-data weekends refresh --season {season}`."
+        )
+    raise RaceWeekendNotFound(
+        f"{circuit_id} hosts {len(weekends)} races in {season} (rounds "
+        f"{', '.join(str(w.round_number) for w in weekends)}) and none is round "
+        f"{round_number}, so the race can't be placed. Refresh the {season} calendar."
+    )
 
 
 def list_circuits(conn: Connection) -> list[domain.Circuit]:
@@ -441,40 +486,37 @@ def list_circuit_podiums(
     groups consecutive rows sharing (season, round_number) into one race. Returns
     fewer than `limit` races (or `[]`) when the circuit lacks that much history.
     """
-    rr = schema.race_results
-    races = conn.execute(
-        select(rr.c.season, rr.c.round_number)
-        .where(rr.c.circuit_id == circuit_id)
-        .distinct()
-        .order_by(rr.c.season.desc(), rr.c.round_number.desc())
-        .limit(limit)
-    ).all()
-    if not races:
+    rr, rw = schema.race_results, schema.race_weekends
+    weekend_ids = (
+        conn.execute(
+            select(rw.c.id)
+            .where(
+                rw.c.circuit_id == circuit_id,
+                exists().where(rr.c.race_weekend_id == rw.c.id),
+            )
+            .order_by(rw.c.season.desc(), rw.c.round_number.desc())
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    if not weekend_ids:
         return []
-    pairs = [(r.season, r.round_number) for r in races]
     rows = conn.execute(
-        select(rr)
-        .where(
-            rr.c.circuit_id == circuit_id,
-            rr.c.position <= 3,
-            tuple_(rr.c.season, rr.c.round_number).in_(pairs),
-        )
-        .order_by(
-            rr.c.season.desc(), rr.c.round_number.desc(), rr.c.position.asc()
-        )
+        _with_weekend(rr)
+        .where(rr.c.race_weekend_id.in_(weekend_ids), rr.c.position <= 3)
+        .order_by(rw.c.season.desc(), rw.c.round_number.desc(), rr.c.position.asc())
     ).all()
     return [domain.RaceResult.model_validate(row._mapping) for row in rows]
 
 
 def list_race_results(conn: Connection, season: int) -> list[domain.RaceResult]:
     """All race results for a season, ordered by round then finishing position."""
+    rr, rw = schema.race_results, schema.race_weekends
     rows = conn.execute(
-        select(schema.race_results)
-        .where(schema.race_results.c.season == season)
-        .order_by(
-            schema.race_results.c.round_number,
-            schema.race_results.c.position,
-        )
+        _with_weekend(rr)
+        .where(rw.c.season == season)
+        .order_by(rw.c.round_number, rr.c.position)
     ).all()
     return [domain.RaceResult.model_validate(row._mapping) for row in rows]
 
@@ -504,19 +546,10 @@ def race_weekends_missing_results(
     would otherwise leave a permanent hole, so we re-scan every past weekend rather than
     only the most recent. Ordered oldest-first, so cumulative standings load in
     chronological order.
-
-    Matched on (circuit_id, season), not round_number: `race_results` stores the round
-    Jolpica reported when the results were written, which can lag a mid-season renumber of
-    `race_weekends`, so the round isn't a safe join key. Unambiguous for current-season use
-    (one race per circuit); a historical double-header would need the round to disambiguate.
     """
     rw = schema.race_weekends
     rr = schema.race_results
-    has_results = (
-        select(rr.c.id)
-        .where(rr.c.circuit_id == rw.c.circuit_id, rr.c.season == rw.c.season)
-        .exists()
-    )
+    has_results = exists().where(rr.c.race_weekend_id == rw.c.id)
     rows = conn.execute(
         select(rw)
         .where(rw.c.race_date < before, ~has_results)
@@ -532,28 +565,23 @@ def races_missing_fastf1_data(conn: Connection, season: int) -> list[tuple[int, 
     These are the FastF1-derived pieces of the post-race flow. Results come from Jolpica
     and can land while FastF1 is still unpublished, rate-limited or signed out, so
     the flow keys its FastF1 catch-up on what's missing rather than on which weekends
-    got results this run. The round is the official one stored with the results.
+    got results this run. The round is the weekend's, which calendar_sync keeps equal
+    to FastF1's; the laps check goes through it because derived_artifacts is keyed the
+    way FastF1 keys races.
     """
-    rr, rt, da = schema.race_results, schema.race_traces, schema.derived_artifacts
-    has_trace = (
-        select(rt.c.id)
-        .where(rt.c.season == rr.c.season, rt.c.round_number == rr.c.round_number)
-        .exists()
-    )
-    has_laps = (
-        select(da.c.id)
-        .where(
-            da.c.kind == "laps",
-            da.c.year == rr.c.season,
-            da.c.round_number == rr.c.round_number,
-        )
-        .exists()
+    rw, rr = schema.race_weekends, schema.race_results
+    rt, da = schema.race_traces, schema.derived_artifacts
+    has_results = exists().where(rr.c.race_weekend_id == rw.c.id)
+    has_trace = exists().where(rt.c.race_weekend_id == rw.c.id)
+    has_laps = exists().where(
+        da.c.kind == "laps",
+        da.c.year == rw.c.season,
+        da.c.round_number == rw.c.round_number,
     )
     rows = conn.execute(
-        select(rr.c.season, rr.c.round_number, rr.c.circuit_id)
-        .where(rr.c.season == season, ~(has_trace & has_laps))
-        .distinct()
-        .order_by(rr.c.round_number)
+        select(rw.c.season, rw.c.round_number, rw.c.circuit_id)
+        .where(rw.c.season == season, has_results, ~(has_trace & has_laps))
+        .order_by(rw.c.round_number)
     ).all()
     return [(int(s), int(r), str(c)) for s, r, c in rows]
 
@@ -838,13 +866,11 @@ def list_race_traces_for_circuit(
     conn: Connection, circuit_id: str, limit: int = 5
 ) -> list[domain.RaceTrace]:
     """The most recent race traces for a circuit, newest first."""
+    rw = schema.race_weekends
     rows = conn.execute(
-        select(schema.race_traces)
-        .where(schema.race_traces.c.circuit_id == circuit_id)
-        .order_by(
-            schema.race_traces.c.season.desc(),
-            schema.race_traces.c.round_number.desc(),
-        )
+        _with_weekend(schema.race_traces)
+        .where(rw.c.circuit_id == circuit_id)
+        .order_by(rw.c.season.desc(), rw.c.round_number.desc())
         .limit(limit)
     ).all()
     return [domain.RaceTrace.model_validate(row._mapping) for row in rows]
@@ -854,10 +880,10 @@ def get_race_overtakes(
     conn: Connection, season: int, round_number: int
 ) -> domain.RaceOvertakes | None:
     """One race's classified overtake blob, or None."""
+    rw = schema.race_weekends
     row = conn.execute(
-        select(schema.race_overtakes).where(
-            schema.race_overtakes.c.season == season,
-            schema.race_overtakes.c.round_number == round_number,
+        _with_weekend(schema.race_overtakes).where(
+            rw.c.season == season, rw.c.round_number == round_number
         )
     ).first()
     return domain.RaceOvertakes.model_validate(row._mapping) if row else None
@@ -867,13 +893,11 @@ def list_race_overtakes_for_circuit(
     conn: Connection, circuit_id: str, limit: int = 5
 ) -> list[domain.RaceOvertakes]:
     """The most recent overtake blobs for a circuit, newest first."""
+    rw = schema.race_weekends
     rows = conn.execute(
-        select(schema.race_overtakes)
-        .where(schema.race_overtakes.c.circuit_id == circuit_id)
-        .order_by(
-            schema.race_overtakes.c.season.desc(),
-            schema.race_overtakes.c.round_number.desc(),
-        )
+        _with_weekend(schema.race_overtakes)
+        .where(rw.c.circuit_id == circuit_id)
+        .order_by(rw.c.season.desc(), rw.c.round_number.desc())
         .limit(limit)
     ).all()
     return [domain.RaceOvertakes.model_validate(row._mapping) for row in rows]

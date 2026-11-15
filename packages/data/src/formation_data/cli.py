@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from datetime import date
 
 import httpx
 import typer
@@ -145,7 +146,9 @@ def _echo_plan(plan: calendar_sync.CalendarPlan | None, *, dry_run: bool) -> Non
         typer.echo(line)
     if dry_run:
         typer.echo("(dry run — nothing written)")
-    elif plan.inserts:
+    elif plan.inserts and plan.season >= date.today().year:
+        # Past seasons are loaded for their history (results, traces); they don't need
+        # session timetables.
         typer.echo(
             f"New weekend(s) need their timetable: formation-data sessions refresh "
             f"--season {plan.season}"
@@ -308,7 +311,9 @@ def results_backfill(
     count: int = typer.Option(6, help="Number of seasons back from --start."),
     circuit: str | None = typer.Option(None, "--circuit", help="Single circuit_id; default all."),
 ) -> None:
-    """Backfill past race results (for the past-results archive)."""
+    """Load results for every stored weekend in those seasons (for the past-results archive).
+
+    Walks the stored calendar, so run `weekends refresh --season N` for each season first."""
     seasons = list(range(start, start - count, -1))
     circuit_ids = [circuit] if circuit else None
     with connection_scope() as conn:
@@ -600,6 +605,8 @@ def _explain(exc: BaseException) -> tuple[str, str] | None:
 
     if isinstance(exc, MigrationError):
         return "Database migration stopped", str(exc)
+    if isinstance(exc, repositories.RaceWeekendNotFound):
+        return "That race isn't in the stored calendar", str(exc)
     if isinstance(exc, fastf1_client.SessionDataUnavailable):
         return "No FastF1 data for this session", str(exc)
     if isinstance(exc, RateLimitExceededError):

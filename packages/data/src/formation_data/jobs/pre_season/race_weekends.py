@@ -63,6 +63,16 @@ def run(
         jolpica_circuit = race["Circuit"]["circuitId"]
         circuit = circuits_by_jolpica_id.get(jolpica_circuit)
         if circuit is None:
+            if season < date.today().year:
+                # Backfilling history: venues off today's calendar are deliberately unseeded.
+                logger.info(
+                    "pre_season.race_weekends.run: skipping %s R%s %r — circuit %r is not seeded",
+                    season,
+                    round_number,
+                    race["raceName"],
+                    jolpica_circuit,
+                )
+                continue
             logger.warning(
                 "pre_season.race_weekends.run: skipping R%s %r — circuit %r is not seeded; "
                 "add it to jobs/static/circuits.py, run `circuits seed`, then refresh again",

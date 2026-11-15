@@ -9,9 +9,8 @@ alembic.ini to keep in sync and no config path to remember:
     formation-data db current             the revision DATABASE_URL is at
     formation-data db check               fail if schema.py has changes with no revision
 
-Databases built before Alembic (by `metadata.create_all` plus a hand-written patch to
-`strategies`) have tables but no `alembic_version` row. `upgrade` adopts such a
-database once, inside the same transaction as the upgrade; see `_adopt_legacy`.
+Every database this project runs against was adopted at the baseline (0001) when
+migrations were introduced; see `_refuse_unversioned` for one that wasn't.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Connection, Text, inspect
+from sqlalchemy import Connection, inspect
 
 from formation_data import schema
 from formation_data.db import get_engine
@@ -82,14 +81,13 @@ def schema_diffs(conn: Connection) -> list:
 
 
 def upgrade(target: str = "head") -> tuple[str | None, str | None]:
-    """Bring DATABASE_URL to `target`, adopting a pre-Alembic database first if needed.
+    """Bring DATABASE_URL to `target`.
 
-    Runs in one transaction (Postgres DDL is transactional), so a failed revision
-    leaves the database as it was. Returns (revision before, revision after).
+    Runs in one transaction (Postgres DDL is transactional), so if any revision fails,
+    none of them are applied. Returns (revision before, revision after).
     """
     with get_engine().begin() as conn:
-        if _adopt_legacy(conn):
-            logger.info("db.upgrade: adopted existing database at baseline %s", BASELINE_REVISION)
+        _refuse_unversioned(conn)
         before = current_revision(conn)
         command.upgrade(config(conn), target)
         after = current_revision(conn)
@@ -142,122 +140,19 @@ def check() -> list:
         return schema_diffs(conn)
 
 
-# --- adopting databases built before Alembic -----------------------------------------
-#
-# Remove this section, and the legacy SQL, once every database has an alembic_version
-# row (local and Supabase).
+def _refuse_unversioned(conn: Connection) -> None:
+    """Stop before running 0001 against a database built before migrations.
 
-# What the old `db upgrade` ran after create_all: add the sim columns to `strategies` and
-# swap its unique key from (race_weekend_id, label) to (race_weekend_id, source, label).
-# Idempotent; a no-op on a database that already has the new shape.
-_LEGACY_STRATEGIES_SQL = """
-ALTER TABLE strategies ADD COLUMN IF NOT EXISTS source varchar NOT NULL DEFAULT 'historical';
-ALTER TABLE strategies ADD COLUMN IF NOT EXISTS phase varchar;
-ALTER TABLE strategies ADD COLUMN IF NOT EXISTS plausibility double precision;
-ALTER TABLE strategies ADD COLUMN IF NOT EXISTS tier varchar;
-DO $$
-DECLARE old_con text;
-BEGIN
-  SELECT con.conname INTO old_con
-  FROM pg_constraint con
-  WHERE con.conrelid = 'strategies'::regclass AND con.contype = 'u'
-    AND (SELECT array_agg(att.attname::text ORDER BY att.attname::text)
-         FROM unnest(con.conkey) AS k
-         JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k)
-        = ARRAY['label', 'race_weekend_id'];
-  IF old_con IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE strategies DROP CONSTRAINT ' || quote_ident(old_con);
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'uq_strategies_weekend_source_label'
-      AND conrelid = 'strategies'::regclass
-  ) THEN
-    ALTER TABLE strategies
-      ADD CONSTRAINT uq_strategies_weekend_source_label
-      UNIQUE (race_weekend_id, source, label);
-  END IF;
-END $$;
-"""
-
-# Columns schema.py stopped declaring when the simulator took over pit loss, undercut and
-# degradation. create_all never drops columns, so they stayed behind on older databases,
-# NOT NULL with no default, which makes every write to circuit_stats fail.
-_LEGACY_CIRCUIT_STATS_COLUMNS = (
-    "pit_loss_normal",
-    "pit_loss_sc",
-    "pit_loss_vsc",
-    "tyre_deg_rate",
-    "warmup_penalty",
-    "overtaking_difficulty",
-    "undercut_laptime_swing",
-    "undercut_sample_size",
-    "undercut_strength",
-    "overcut_strength",
-)
-
-
-def _apply_legacy_fixups(conn: Connection) -> None:
-    """Bring a pre-Alembic database to the baseline's shape: what the old `db upgrade`
-    did, plus the leftovers it never cleaned up. Each step is a no-op when not needed."""
-    schema.metadata.create_all(conn)  # tables added to schema.py since the last upgrade
-    conn.exec_driver_sql(_LEGACY_STRATEGIES_SQL)
-
-    insp = inspect(conn)
-    present = {c["name"] for c in insp.get_columns("circuit_stats")}
-    stale = [c for c in _LEGACY_CIRCUIT_STATS_COLUMNS if c in present]
-    if stale:
-        logger.warning(
-            "db.upgrade: dropping %d circuit_stats columns schema.py no longer declares: %s",
-            len(stale),
-            ", ".join(stale),
-        )
-        drops = ", ".join(f"DROP COLUMN {c}" for c in stale)
-        conn.exec_driver_sql(f"ALTER TABLE circuit_stats {drops}")
-
-    # track_outline was added to existing databases by hand, as text; schema.py had it as
-    # String (varchar) until migrations. Text is the declared type now.
-    outline = {c["name"]: c for c in insp.get_columns("circuits")}.get("track_outline")
-    if outline is not None and not isinstance(outline["type"], Text):
-        conn.exec_driver_sql("ALTER TABLE circuits ALTER COLUMN track_outline TYPE text")
-
-
-def _adopt_legacy(conn: Connection) -> bool:
-    """Stamp a pre-Alembic database at the baseline. Returns True if it adopted one.
-
-    A database with an `alembic_version` table is already managed, and an empty one is
-    built from scratch by the baseline revision, so both are left alone. Otherwise the
-    database gets `_apply_legacy_fixups`, must then match the baseline exactly, and is
-    stamped. Any remaining difference stops the upgrade, rolls everything back and lists
-    itself, since stamping a database whose shape differs from the baseline would make
-    later revisions fail or corrupt it.
+    Such a database has tables but no `alembic_version` row; 0001 would fail on the first
+    table that already exists. Local and Supabase were adopted (stamped at 0001) by the
+    commit that introduced migrations, fe0665e, which still has the adoption code.
     """
     insp = inspect(conn)
     if insp.has_table("alembic_version"):
-        return False
-    if not set(insp.get_table_names()) & set(schema.metadata.tables):
-        return False
-
-    if head_revision() != BASELINE_REVISION:
-        # The legacy steps build tables from today's schema.py, which is only the
-        # baseline's shape while no later revision exists.
+        return
+    if set(insp.get_table_names()) & set(schema.metadata.tables):
         raise MigrationError(
-            "This database was built before migrations, and adopting one only works "
-            f"while {BASELINE_REVISION} is the newest revision. Run `formation-data db "
-            "upgrade` against it from the commit that added migrations, then upgrade "
-            "again from here."
+            "This database was built before migrations and was never adopted. Check out "
+            "commit fe0665e (where 0001 was the newest revision), run `formation-data db "
+            "upgrade` there to adopt it, then upgrade again from here."
         )
-
-    logger.info("db.upgrade: no alembic_version table; adopting existing database")
-    _apply_legacy_fixups(conn)
-
-    diffs = schema_diffs(conn)
-    if diffs:
-        listed = "\n".join(f"  {d}" for d in diffs)
-        raise MigrationError(
-            "This database was built before migrations and doesn't match the baseline "
-            "schema, so it wasn't adopted. Every change logged above was rolled back, so "
-            f"the database is exactly as it was. Differences:\n{listed}"
-        )
-    command.stamp(config(conn), BASELINE_REVISION)
-    return True

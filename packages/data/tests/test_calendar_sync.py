@@ -132,3 +132,22 @@ def test_describe_plan_summarises_the_change():
     assert any(line.startswith("+ R16") and "sepang" in line for line in lines)
     assert any("singapore" in line and "round 16 -> 17" in line for line in lines)
     assert lines[-1] == "1 to insert, 7 to update (7 renumbered), 1 unchanged"
+
+
+def test_missing_nomination_keeps_the_stored_allocation():
+    """A past season with no nomination on file comes in with no compounds. That must not
+    erase an allocation already stored for the weekend."""
+    stored = _wk(13, "spa", id=90, season=2025)
+    desired = stored.model_copy(
+        update={"id": None, "soft_compound": None, "medium_compound": None, "hard_compound": None}
+    )
+    plan = plan_calendar([stored], [desired])
+    assert plan.updates == [] and plan.unchanged == 1
+
+
+def test_missing_nomination_on_a_new_weekend_stores_none():
+    desired = _wk(2, "red_bull_ring", season=2020).model_copy(
+        update={"soft_compound": None, "medium_compound": None, "hard_compound": None}
+    )
+    plan = plan_calendar([], [desired])
+    assert plan.inserts[0].soft_compound is None
