@@ -78,7 +78,7 @@ formation_lap/
 │   │   ├── schema.py           # table definitions (source of truth for the schema)
 │   │   ├── migrations/         # Alembic revisions
 │   │   ├── domain.py           # Pydantic models
-│   │   └── repositories.py     # reads and the shared upsert
+│   │   └── repositories/       # reads and writes, one module per topic
 │   ├── sim/src/formation_sim/  # params, generation, sim, evaluation, selection, validation
 │   ├── api/src/formation_api/  # FastAPI app and routers
 │   └── web/                    # front end
