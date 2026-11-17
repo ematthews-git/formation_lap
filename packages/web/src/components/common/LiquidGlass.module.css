@@ -1,0 +1,63 @@
+/*
+ * Layers, bottom to top: the refracted scene (.lens), a light legibility tint,
+ * a hairline rim for engines that skip the filter's specular edge, then content.
+ * Children set their type in var(--ink).
+ */
+.glass {
+  position: relative;
+  height: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  isolation: isolate;
+  --ink: #ffffff;
+
+  color: var(--ink);
+  /* Shadow and hover lift come from Lift.module.css. */
+}
+
+.lens {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* No photo to look through: a bold racing-red field, which the glass still bends. */
+.field {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 85% 10%, #ff6a3d 0%, transparent 55%),
+    radial-gradient(90% 80% at 10% 100%, #8f0a14 0%, transparent 60%),
+    #d3121c;
+}
+
+.tint {
+  position: absolute;
+  inset: 0;
+  /* Same as the photo outside the card at the top, slightly darker below. */
+  background: linear-gradient(180deg, rgba(8, 8, 10, 0.06) 0%, rgba(8, 8, 10, 0.18) 100%);
+  pointer-events: none;
+}
+
+.rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
+.defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.content {
+  position: relative;
+  height: 100%;
+}

@@ -144,6 +144,7 @@ export default function App() {
         <section className={`${styles.splitWide} ${styles.profileRow}`}>
           <SectionBoundary label="TRK_PROFILE">
             <CircuitProfile
+              circuitId={featured.circuit_id}
               circuit={circuit.data}
               circuitLoading={circuit.isLoading}
               circuitError={circuit.isError}

@@ -1,114 +1,236 @@
-/* Flex column so the body fills the panel down to its bottom edge. */
-.panel {
+/*
+ * Same type system as the weather card — heavy uppercase title, ink chip,
+ * display numbers in size tiers — set on clear liquid glass instead of
+ * a sky. All type uses var(--ink), which LiquidGlass flips to suit the photo.
+ */
+.card {
+  min-height: 300px;
+}
+
+.content {
+  height: 100%;
   display: flex;
   flex-direction: column;
+  padding: 18px 20px 18px;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Same face, weight and spacing as the race-name header. */
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 46px;
+  line-height: 0.84;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+}
+
+.chip {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
 }
 
 .body {
   flex: 1;
   display: grid;
-  /* Track map shrunk so the stats block gets room for a third metric column. */
-  grid-template-columns: 1fr 1.55fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr);
+  gap: 24px;
+  margin-top: 14px;
 }
 
-.diagram {
-  padding: 18px 20px;
-  border-right: 1px solid var(--border-soft);
+.map {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .track {
-  max-width: 240px;
+  width: 100%;
+  max-width: 260px;
   overflow: visible;
 }
 
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  /* Two metric rows sit at their natural height; the lap-record row absorbs the
-     rest so it fills to the panel bottom and its hover reaches the edge. */
-  grid-template-rows: auto auto 1fr;
-}
-
-.cellBorder {
-  border-bottom: 1px solid var(--border-soft);
-  transition: background-color 0.12s ease;
-}
-
-.cellBorder:hover {
-  background: var(--glass-bg-raised);
-}
-
-.cellLeft {
-  border-left: 1px solid var(--border-soft);
-}
-
-.span2 {
-  grid-column: 1 / -1;
-}
-
-.lapRecord {
-  grid-column: 1 / -1;
-  padding: 15px 18px;
-  transition: background-color 0.12s ease;
-}
-
-.lapRecord:hover {
-  background: var(--glass-bg-raised);
-}
-
-.lapRecordLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--text-fainter);
-  margin-bottom: 6px;
-}
-
-.lapRecordValue {
+.data {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
-.lapTime {
+.label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Lap record: the card's hero number, like the weather card's temperature ---- */
+.record {
+  padding-bottom: 12px;
+}
+
+.recordValue {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/* Fastest-lap purple, as on the timing screens — lifted so it holds on the
+   dark glass. */
+.recordTime {
+  margin-top: 6px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 30px;
-  line-height: 0.9;
-  color: var(--text-num);
+  font-size: 72px;
+  line-height: 0.76;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+  color: #b56cff;
 }
 
-.lapDriver {
+.recordDriver {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-faint);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---- Second and third tier: rows of stats, separated by space alone ---- */
+.tier {
+  display: grid;
+  column-gap: 16px;
+}
+
+.tier + .tier {
+  margin-top: 6px;
+}
+
+.tier2 {
+  /* Sized to content so straight mode zones sits right beside laps. */
+  grid-template-columns: repeat(2, max-content);
+  column-gap: 32px;
+}
+
+.tier3 {
+  /* Content-width stats with the spare room shared out evenly between them
+     (same as the weather card's stat row). */
+  display: flex;
+  justify-content: space-between;
+}
+
+.stat {
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.statValue {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tier2 .statValue {
+  font-size: 44px;
+  line-height: 0.85;
+}
+
+.tier3 .statValue {
+  font-size: 22px;
+}
+
+.statUnit {
+  font-size: 0.55em;
+  margin-left: -4px;
+  align-self: flex-end;
+}
+
+/* Calendar ranking: a solid ink pill, so it reads as a badge on the number
+   rather than another figure. */
+.rank {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #0b0b0c;
+}
+
+.message {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 750px) {
-  /* Driver sits under the time rather than squeezed to its right. */
-  .lapRecordValue {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+  .card {
+    min-height: 0;
   }
 
-  /* Track map stacks above the stats (source order already puts .diagram
-     first) instead of squeezing beside them, and gets to run larger with
-     the full panel width to itself. */
+  .content {
+    padding: 16px 16px 14px;
+  }
+
+  .title {
+    font-size: 38px;
+  }
+
+  /* Map stacks above the data with the full card width to itself. */
   .body {
     grid-template-columns: 1fr;
-  }
-
-  .diagram {
-    border-right: none;
-    border-bottom: 1px solid var(--border-soft);
+    gap: 18px;
+    margin-top: 18px;
   }
 
   .track {
-    max-width: 300px;
+    max-width: 280px;
+  }
+
+  .recordTime {
+    font-size: 60px;
+  }
+
+  .recordValue {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* Third tier goes 2 × 2. */
+  .tier3 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .message {
+    margin-top: 28px;
   }
 }

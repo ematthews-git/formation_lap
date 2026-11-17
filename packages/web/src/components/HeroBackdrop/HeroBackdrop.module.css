@@ -19,6 +19,16 @@
   mask-composite: intersect;
 }
 
+/* The liquid-glass copy: placed by inline style, so it ignores the page layout.
+   When its card lifts on hover (--lift, from Lift.module.css) the copy moves
+   back by the same amount, on the same curve, so the photo seen through the
+   glass stays lined up with the one on the page. */
+.lens {
+  z-index: auto;
+  transform: translateY(calc(-1 * var(--lift, 0px)));
+  transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 .photo {
   position: absolute;
   inset: 0;

@@ -1,0 +1,42 @@
+/*
+ * Hover lift for a card: it rises a few pixels on a deeper shadow, and (via
+ * useLift) tilts a few degrees towards the pointer while the pointer is over
+ * it. Only for devices that can hover with a fine pointer; reduced-motion
+ * users get the shadow change alone.
+ *
+ * --lift is read by children too: the liquid-glass photo copy moves back by
+ * the same amount so it stays lined up with the page photo while the card rises.
+ */
+.lift {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --lift: 0px;
+
+  transform: perspective(1100px) translateY(var(--lift)) rotateX(var(--tilt-x))
+    rotateY(var(--tilt-y));
+  /* The long ease also smooths the tilt, so the card trails the pointer a little
+     rather than snapping to it. */
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    0 18px 40px -18px rgba(0, 0, 0, 0.6);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    --lift: -1px;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.24),
+      0 24px 48px -20px rgba(0, 0, 0, 0.66);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lift,
+  .lift:hover {
+    --lift: 0px;
+    transform: none;
+  }
+}

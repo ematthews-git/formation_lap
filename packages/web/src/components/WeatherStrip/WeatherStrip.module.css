@@ -1,116 +1,236 @@
-/* Flex column so the forecast (or empty state) fills the panel down to its
-   bottom edge — keeps the frosted hover reaching every tile's edge. */
-.panel {
+/*
+ * The forecast card: a full-bleed weather backdrop (Sky) with everything set in
+ * heavy near-black ink on top. Bold colour comes from the sky, not from the
+ * type — the type stays one colour so it reads on every backdrop.
+ */
+.card {
+  --ink: #0b0b0c;
+
+  position: relative;
+  height: 100%;
+  min-height: 300px;
+  border-radius: 18px;
+  overflow: hidden;
+  color: var(--ink);
   display: flex;
   flex-direction: column;
 }
 
-.fill {
-  display: flex;
+.content {
+  position: relative;
   flex: 1;
-  align-items: center;
-  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 16px;
 }
 
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.cell {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border-soft);
-  transition: background-color 0.12s ease;
-}
-
-.cell:hover {
-  background: var(--glass-bg-raised);
-}
-
-.cellLeft {
-  border-left: 1px solid var(--border-soft);
-}
-
-.cellLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  color: var(--text-fainter);
-  margin-bottom: 6px;
-}
-
-.cellValue {
+/* Same face, weight and spacing as the race-name header. */
+.title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 30px;
-  line-height: 0.9;
-  color: var(--text-num);
+  font-size: 46px;
+  line-height: 0.84;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+}
+
+.chip {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+
+/* ---- Race-day temperature ---- */
+.hero {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
 }
 
-.cellUnit {
+.temp {
+  font-weight: 700;
+  font-size: 108px;
+  line-height: 0.74;
+  letter-spacing: -0.03em;
+}
+
+.low {
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 0.8;
+}
+
+.heroLabel {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: right;
+}
+
+/* ---- Stat row ---- */
+.stats {
+  /* Each stat takes its own width and the leftover space is shared out evenly
+     between them, first flush left and last flush right. */
+  display: flex;
+  justify-content: space-between;
+  column-gap: 16px;
+  margin-top: 16px;
+}
+
+/* Just the two climate stats: kept together on the left rather than pushed
+   to opposite edges. */
+.statsHalf {
+  justify-content: flex-start;
+  column-gap: 32px;
+}
+
+.stat {
+  min-width: 0;
+  padding-top: 8px;
+}
+
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statValue {
+  margin-top: 3px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.statUnit {
   font-size: 15px;
-  color: var(--text-faint);
+  font-weight: 700;
   margin-left: 2px;
 }
 
-.chart {
-  /* Grows to fill the panel's remaining height so its hover reaches the bottom. */
-  flex: 1;
-  padding: 15px 18px 18px;
-  transition: background-color 0.12s ease;
-}
-
-.chart:hover {
-  background: var(--glass-bg-raised);
-}
-
-.chartLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  color: var(--text-fainter);
-  margin-bottom: 11px;
-}
-
-.bars {
+/* ---- Rain by session ---- */
+.sessions {
   display: flex;
-  align-items: flex-end;
-  gap: 7px;
-  height: 70px;
+  gap: 6px;
+  margin-top: 14px;
 }
 
-.barCol {
+.session {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  height: 100%;
-  justify-content: flex-end;
+  gap: 3px;
 }
 
-.barPct {
+.sessionPct,
+.sessionName {
   font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Fixed 0–100% scale so a 20% session never looks like a washout. */
+.track {
+  position: relative;
+  width: 100%;
+  height: 30px;
+  border-bottom: 2px solid var(--ink);
 }
 
 .bar {
-  width: 100%;
-  background: var(--rain);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--ink);
+  border-radius: 3px 3px 0 0;
 }
 
-.barName {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-ghost);
+/* ---- No forecast yet / loading / error ---- */
+.pending {
+  margin-top: auto;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 0.86;
+  text-transform: uppercase;
 }
 
-.chartPending {
+.message {
+  margin-top: auto;
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--text-ghost);
-  padding: 18px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 750px) {
+  .card {
+    min-height: 0;
+  }
+
+  .content {
+    padding: 16px 16px 14px;
+  }
+
+  .title {
+    font-size: 38px;
+  }
+
+  .hero {
+    margin-top: 28px;
+  }
+
+  .temp {
+    font-size: 88px;
+  }
+
+  .pending {
+    margin-top: 28px;
+    font-size: 36px;
+  }
+
+  .message {
+    margin-top: 28px;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 2×2 on phones. */
+  .stats > .stat:nth-child(n + 3) {
+    margin-top: 8px;
+  }
 }

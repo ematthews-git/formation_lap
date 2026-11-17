@@ -1,9 +1,6 @@
+import type { ReactNode } from 'react'
 import type { Circuit, CircuitRaceStats, LapRecord } from '../../api/types'
-import { Panel } from '../common/Panel'
-import { PanelHeader } from '../common/PanelHeader'
-import { StatCell } from '../common/StatCell'
-import { EmptyState, ErrorState, LoadingState } from '../common/Status'
-import { prettifyCircuit } from '../../lib/format'
+import { LiquidGlass } from '../common/LiquidGlass'
 import { pathStartPoint } from '../../lib/trackPath'
 import styles from './CircuitProfile.module.css'
 
@@ -13,7 +10,23 @@ function formatLapTime(seconds: number): string {
   return `${m}:${s}`
 }
 
+function ordinal(n: number): string {
+  const v = n % 100
+  const suffix = v >= 11 && v <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')
+  return `${n}${suffix}`
+}
+
+/**
+ * PLACEHOLDER — no endpoint ranks circuits by overtakes yet, so this is a fixed
+ * made-up value to preview the pill. The real figure needs a calendar-wide
+ * ranking of `avg_overtakes_per_race` (like /circuits/calendar-grid-averages).
+ */
+const PLACEHOLDER_OVERTAKE_RANK = { rank: 4, of: 24 }
+
 interface Props {
+  /** The featured weekend's circuit — known before the circuit query lands, so
+      the glass can line up with the hero photo straight away. */
+  circuitId: string
   circuit: Circuit | undefined
   circuitLoading: boolean
   /** Query failure (network/5xx) — distinct from "no circuit data yet". */
@@ -24,6 +37,7 @@ interface Props {
 }
 
 export function CircuitProfile({
+  circuitId,
   circuit,
   circuitLoading,
   circuitError,
@@ -31,9 +45,52 @@ export function CircuitProfile({
   lapRecordLoading,
   raceStats,
 }: Props) {
-  const distance =
-    circuit ? Math.round(circuit.num_laps * circuit.track_length_km) : null
-  const trackPath = circuit?.track_outline
+  let body
+  if (circuit) {
+    body = (
+      <Profile
+        circuit={circuit}
+        lapRecord={lapRecord}
+        lapRecordLoading={lapRecordLoading}
+        raceStats={raceStats}
+      />
+    )
+  } else if (circuitLoading) {
+    body = <p className={styles.message}>Loading circuit…</p>
+  } else if (circuitError) {
+    body = <p className={styles.message}>Couldn't load the circuit profile</p>
+  } else {
+    body = <p className={styles.message}>No circuit data yet</p>
+  }
+
+  return (
+    <LiquidGlass circuitId={circuitId} label="Track profile" className={styles.card}>
+      <div className={styles.content}>
+        <header className={styles.top}>
+          <h2 className={styles.title}>Track profile</h2>
+          {circuit && (
+            <span className={styles.chip}>{circuit.track_length_km.toFixed(3)} km</span>
+          )}
+        </header>
+        {body}
+      </div>
+    </LiquidGlass>
+  )
+}
+
+function Profile({
+  circuit,
+  lapRecord,
+  lapRecordLoading,
+  raceStats,
+}: {
+  circuit: Circuit
+  lapRecord: LapRecord | null | undefined
+  lapRecordLoading: boolean
+  raceStats: CircuitRaceStats | null | undefined
+}) {
+  const distance = Math.round(circuit.num_laps * circuit.track_length_km)
+  const trackPath = circuit.track_outline
   const [startX, startY] = trackPath ? pathStartPoint(trackPath) : [0, 0]
 
   // Empirical overtaking figures (null until the pre-season job has run).
@@ -46,106 +103,96 @@ export function CircuitProfile({
     lap1 != null && afterLap1 != null && lap1 + afterLap1 > 0
       ? Math.round((lap1 / (lap1 + afterLap1)) * 100)
       : null
+  const overtakeRank = PLACEHOLDER_OVERTAKE_RANK
 
   return (
-    <Panel frosted className={styles.panel}>
-      <PanelHeader
-        label="TRK_PROFILE"
-        sub={circuit ? prettifyCircuit(circuit.circuit_id).toUpperCase() : undefined}
-        meta={
-          circuit ? `${circuit.track_length_km.toFixed(3)} KM` : undefined
-        }
-      />
-      <div className={styles.body}>
-        <div className={styles.diagram}>
-          {trackPath ? (
-            <svg viewBox="0 0 400 248" width="100%" className={styles.track}>
-              <path
-                d={trackPath}
-                fill="none"
-                stroke="#4A4744"
-                strokeWidth="9"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-              <path
-                d={trackPath}
-                fill="none"
-                stroke="var(--text)"
-                strokeWidth="2.4"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-              <circle cx={startX} cy={startY} r="4" fill="var(--accent)" />
-            </svg>
+    <div className={styles.body}>
+      <div className={styles.map}>
+        {trackPath ? (
+          <svg viewBox="0 0 400 248" className={styles.track} role="img" aria-label="Track map">
+            <path
+              d={trackPath}
+              fill="none"
+              stroke="var(--ink)"
+              strokeWidth="6"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            {/* Start/finish: a ring around a dot, so it reads in one colour. */}
+            <circle cx={startX} cy={startY} r="11" fill="none" stroke="var(--ink)" strokeWidth="3" />
+            <circle cx={startX} cy={startY} r="4.5" fill="var(--ink)" />
+          </svg>
+        ) : (
+          <p className={styles.message}>No track outline yet</p>
+        )}
+      </div>
+
+      <div className={styles.data}>
+        <div className={styles.record}>
+          <div className={styles.label}>Lap record</div>
+          {lapRecord ? (
+            <div className={styles.recordValue}>
+              <span className={styles.recordTime}>{formatLapTime(lapRecord.lap_time_seconds)}</span>
+              <span className={styles.recordDriver}>
+                {lapRecord.family_name} ’{String(lapRecord.year).slice(-2)}
+              </span>
+            </div>
           ) : (
-            circuit && <EmptyState label="NEW CIRCUIT" hint="No track outline yet" />
+            <div className={styles.recordTime}>{lapRecordLoading ? '…' : '—'}</div>
           )}
         </div>
 
-        <div className={styles.stats}>
-          {circuitLoading && !circuit ? (
-            <div className={styles.span2}>
-              <LoadingState label="LOADING CIRCUIT" />
-            </div>
-          ) : circuit ? (
-            <>
-              <div className={styles.cellBorder}>
-                <StatCell label="LAPS" value={circuit.num_laps} size="md" />
-              </div>
-              <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
-                <StatCell label="DISTANCE" value={distance} unit="km" size="md" />
-              </div>
-              <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
-                <StatCell
-                  label="OVERTAKES/RACE"
-                  value={avgOvertakes != null ? avgOvertakes.toFixed(1) : '—'}
-                  size="md"
-                />
-              </div>
-              <div className={styles.cellBorder}>
-                <StatCell label="STRAIGHT MODE ZONES" value={circuit.sm_zones} size="md" />
-              </div>
-              <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
-                <StatCell label="CORNERS" value={circuit.num_corners} size="md" />
-              </div>
-              <div className={`${styles.cellBorder} ${styles.cellLeft}`}>
-                <StatCell
-                  label="OVERTAKES IN L1"
-                  value={lap1Share != null ? lap1Share : '—'}
-                  unit={lap1Share != null ? '%' : undefined}
-                  size="md"
-                />
-              </div>
-              <div className={styles.lapRecord}>
-                <div className={styles.lapRecordLabel}>LAP RECORD</div>
-                {lapRecordLoading ? (
-                  <LoadingState />
-                ) : lapRecord ? (
-                  <div className={styles.lapRecordValue}>
-                    <span className={styles.lapTime}>
-                      {formatLapTime(lapRecord.lap_time_seconds)}
-                    </span>
-                    <span className={styles.lapDriver}>
-                      {lapRecord.family_name} ’{String(lapRecord.year).slice(-2)}
-                    </span>
-                  </div>
-                ) : (
-                  <EmptyState hint="Lap-record not found" />
-                )}
-              </div>
-            </>
-          ) : circuitError ? (
-            <div className={styles.span2}>
-              <ErrorState message="couldn't load the circuit profile" />
-            </div>
-          ) : (
-            <div className={styles.span2}>
-              <EmptyState label="NO CIRCUIT DATA" />
-            </div>
-          )}
+        <div className={`${styles.tier} ${styles.tier2}`}>
+          <Stat label="Laps" value={circuit.num_laps} />
+          <Stat label="Straight mode zones" value={circuit.sm_zones} />
+        </div>
+
+        <div className={`${styles.tier} ${styles.tier3}`}>
+          <Stat label="Distance" value={distance} unit="km" />
+          <Stat label="Corners" value={circuit.num_corners} />
+          <Stat
+            label="Overtakes / race"
+            value={avgOvertakes != null ? avgOvertakes.toFixed(1) : '—'}
+            badge={
+              <span
+                className={styles.rank}
+                title={`${ordinal(overtakeRank.rank)} most overtakes of ${overtakeRank.of} circuits on the calendar`}
+              >
+                {ordinal(overtakeRank.rank)}/{overtakeRank.of}
+              </span>
+            }
+          />
+          <Stat
+            label="Overtakes on L1"
+            value={lap1Share ?? '—'}
+            unit={lap1Share != null ? '%' : undefined}
+          />
         </div>
       </div>
-    </Panel>
+    </div>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  unit,
+  badge,
+}: {
+  label: string
+  value: string | number | null
+  unit?: string
+  /** Small pill after the value (e.g. the calendar ranking). */
+  badge?: ReactNode
+}) {
+  return (
+    <div className={styles.stat}>
+      <div className={styles.label}>{label}</div>
+      <div className={styles.statValue}>
+        <span>{value ?? '—'}</span>
+        {unit && value != null && <span className={styles.statUnit}>{unit}</span>}
+        {badge}
+      </div>
+    </div>
   )
 }
